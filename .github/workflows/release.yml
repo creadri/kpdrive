@@ -1,0 +1,94 @@
+name: Release
+
+# Pushing a version tag is what publishes a release:
+#   git tag -a v0.2.0 -m "..." && git push origin v0.2.0
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build, for example v0.1.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  rpm:
+    name: Build RPMs and publish
+    runs-on: ubuntu-latest
+    container: fedora:latest
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf -y install --setopt=install_weak_deps=False \
+            git rust cargo gcc-c++ cmake extra-cmake-modules lld perl-interpreter \
+            qt6-qtbase-devel qt6-qtdeclarative-devel \
+            kf6-kcoreaddons-devel kf6-kio-devel kf6-kirigami-devel \
+            rpm-build tar gzip gh
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Take the version from the tag
+        id: version
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # A tag that disagrees with the crates would ship an RPM whose
+          # version does not match what the binary reports about itself.
+          for manifest in Cargo.toml ui/Cargo.toml; do
+            declared=$(grep -m1 '^version = ' "$manifest" | cut -d'"' -f2)
+            if [ "$declared" != "$version" ]; then
+              echo "::error::$manifest says $declared but the tag says $version. Bump the crate versions to match."
+              exit 1
+            fi
+          done
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-release-
+
+      - name: Build the RPMs
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p ~/rpmbuild/SOURCES
+          git config --global --add safe.directory "$PWD"
+          git archive --format=tar.gz --prefix="kpdrive-$VERSION/" \
+            -o ~/rpmbuild/SOURCES/"kpdrive-$VERSION.tar.gz" HEAD
+          rpmbuild -ba --define "kpdrive_version $VERSION" packaging/kpdrive.spec
+          mkdir -p dist
+          find ~/rpmbuild/RPMS ~/rpmbuild/SRPMS -name '*.rpm' -exec cp {} dist/ \;
+          ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpms
+          path: dist/*.rpm
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          # A tag like v0.2.0-rc1 is a pre-release; a plain v0.2.0 is not.
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.rpm --clobber
+          else
+            gh release create "$TAG" dist/*.rpm \
+              --title "kpdrive ${TAG#v}" --generate-notes $prerelease
+          fi

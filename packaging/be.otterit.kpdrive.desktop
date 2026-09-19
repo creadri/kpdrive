@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Proton Drive
+GenericName=Cloud storage
+Comment=Account, storage and activity log for Proton Drive
+Exec=kpdrive-ui
+Icon=folder-cloud
+Terminal=false
+Categories=Utility;FileTools;
+StartupNotify=true

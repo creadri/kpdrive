@@ -120,6 +120,38 @@ cargo build                 # CLI and daemon
 cargo build -p kpdrive-ui   # the window; needs qt6-qtdeclarative-devel and kf6-kirigami
 ```
 
+## Releases
+
+Pushing a version tag builds the RPMs and publishes them as a GitHub release.
+The tag is the single source of truth for the version, and the workflow refuses
+to build if the crates disagree with it:
+
+```
+# bump both crates first, then
+git commit -am "Release 0.2.0"
+git tag -a v0.2.0 -m "kpdrive 0.2.0"
+git push origin dev v0.2.0
+```
+
+A tag containing a hyphen (`v0.2.0-rc1`) is published as a pre-release.
+`.github/workflows/release.yml` can also be run by hand against an existing tag.
+Every push and pull request runs the build and the tests through
+`.github/workflows/ci.yml`. Both use a Fedora container, because the window
+needs Qt 6 and KDE Frameworks 6.
+
+Three packages come out: `kpdrive` (the CLI and daemon), `kpdrive-ui` (the
+window), and `kpdrive-dolphin` (overlay icons and the context-menu entry).
+Installing them does *not* start syncing on its own; `kpdrive setup` is still
+how you choose a folder and opt into autostart.
+
+To build one locally:
+
+```
+rpmbuild -ba --define "kpdrive_version 0.1.0" packaging/kpdrive.spec
+```
+
+after putting a matching source tarball in `~/rpmbuild/SOURCES`.
+
 ## Licence
 
 GNU GPL v3 **or later** (`GPL-3.0-or-later`); see [LICENSE](LICENSE).

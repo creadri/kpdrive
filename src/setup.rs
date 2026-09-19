@@ -84,8 +84,18 @@ pub fn ignore_template(root: &Path) -> Result<bool> {
     Ok(true)
 }
 
+/// True when the package already installed this file system-wide, in which case
+/// writing a copy under the user's home would only shadow it with a stale path.
+fn packaged(rel: &str) -> Option<PathBuf> {
+    let system = Path::new("/usr/share").join(rel);
+    system.is_file().then_some(system)
+}
+
 /// Puts the account window in the application launcher.
 pub fn launcher() -> Result<PathBuf> {
+    if let Some(system) = packaged("applications/be.otterit.kpdrive.desktop") {
+        return Ok(system);
+    }
     let dir = xdg("XDG_DATA_HOME", ".local/share")?.join("applications");
     std::fs::create_dir_all(&dir)?;
     let exe = ui_binary()?;
@@ -111,6 +121,9 @@ pub fn ui_binary() -> Result<PathBuf> {
 /// to limit a service menu to one directory, so the entry appears everywhere and
 /// the command declines politely outside the sync folder.
 pub fn servicemenu() -> Result<PathBuf> {
+    if let Some(system) = packaged("kio/servicemenus/kpdrive-share.desktop") {
+        return Ok(system);
+    }
     let dir = xdg("XDG_DATA_HOME", ".local/share")?.join("kio/servicemenus");
     std::fs::create_dir_all(&dir)?;
     let exe = std::env::current_exe()?;

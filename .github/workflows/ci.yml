@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    # Fedora rather than Ubuntu: the window needs Qt 6 and KDE Frameworks 6,
+    # and this is the distribution the RPMs target.
+    container: fedora:latest
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf -y install --setopt=install_weak_deps=False \
+            git rust cargo gcc-c++ cmake extra-cmake-modules lld perl-interpreter \
+            rpm-build \
+            qt6-qtbase-devel qt6-qtdeclarative-devel \
+            kf6-kcoreaddons-devel kf6-kio-devel kf6-kirigami-devel
+
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Build
+        run: cargo build --workspace
+
+      # Catches a broken spec here rather than at release time.
+      - name: Check the RPM spec parses
+        run: rpmspec -P --define "kpdrive_version 0.0.0" packaging/kpdrive.spec > /dev/null
+
+      - name: Build the Dolphin plugin
+        run: |
+          cmake -S dolphin-overlay -B dolphin-overlay/build \
+                -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+          cmake --build dolphin-overlay/build --parallel

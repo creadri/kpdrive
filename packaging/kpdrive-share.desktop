@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Service
+# all files inherit from application/octet-stream
+MimeType=application/octet-stream;inode/directory;
+Actions=kpdriveShare;
+X-KDE-MaxNumberOfUrls=1
+
+[Desktop Action kpdriveShare]
+Name=Copy Proton Drive link
+Icon=emblem-shared
+Exec=kpdrive share --copy %f
