@@ -1,6 +1,8 @@
 mod api;
 mod drive;
 mod sync;
+mod daemon;
+mod setup;
 
 use anyhow::{Context, Result};
 use api::{Api, Session};
@@ -30,7 +32,13 @@ enum Cmd {
         #[arg(default_value = "/")]
         path: String,
     },
-    /// Sync Drive into the local folder (one-way, remote → local).
+    /// Create the local folder, add a Dolphin Places entry, and autostart the daemon.
+    Setup {
+        /// Local folder. Default: ~/ProtonDrive
+        #[arg(long)]
+        root: Option<std::path::PathBuf>,
+    },
+    /// Sync Drive with the local folder (two-way). --watch keeps running with a tray icon.
     Sync {
         /// Local folder; remembered after the first run. Default: ~/ProtonDrive
         #[arg(long)]
@@ -70,6 +78,7 @@ async fn main() -> Result<()> {
         Cmd::Get { remote, local } => get(&remote, local).await,
         Cmd::Sync { root, watch, force } => sync(root, watch, force).await,
         Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
+        Cmd::Setup { root } => setup(root).await,
         Cmd::Mkdir { remote } => mkdir(&remote).await,
     }
 }
@@ -150,32 +159,58 @@ async fn mkdir(remote: &str) -> Result<()> {
     persist(drive.api, before).await
 }
 
-async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Result<()> {
-    let mut state = sync::load_state()?.unwrap_or_default();
+fn resolve_root(state: &mut sync::State, root: Option<std::path::PathBuf>) -> Result<()> {
     if let Some(root) = root {
         state.root = root;
     }
     if state.root.as_os_str().is_empty() {
         state.root = std::path::PathBuf::from(std::env::var_os("HOME").context("HOME not set")?).join("ProtonDrive");
     }
-    let (mut drive, mut before) = open_drive().await?;
-    loop {
-        match sync::run(&mut drive, &mut state, force).await {
-            Ok(true) => println!("synced to {}", state.root.display()),
-            Ok(false) => {}
-            Err(e) if watch => eprintln!("sync error: {e:#}"),
-            Err(e) => return Err(e),
-        }
-        if let Some(s) = drive.api.session.clone().filter(|s| *s != before) {
-            save_session(&s).await?;
-            before = s;
-        }
-        if !watch {
-            return Ok(());
-        }
-        // ponytail: fixed 30s poll of the latest event id; long-poll/push if Proton ever offers it.
-        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+    Ok(())
+}
+
+async fn setup(root: Option<std::path::PathBuf>) -> Result<()> {
+    let mut state = sync::load_state()?.unwrap_or_default();
+    resolve_root(&mut state, root)?;
+    std::fs::create_dir_all(&state.root)?;
+    sync::save_state(&state)?;
+    println!("folder: {}", state.root.display());
+    if setup::places_entry(&state.root)? {
+        println!("added Proton Drive to Dolphin's Places");
     }
+    println!("autostart: {}", setup::autostart()?.display());
+    if load_session().await?.is_none() {
+        println!("not logged in yet: run `kpdrive login`");
+    }
+    println!("start now with: kpdrive sync --watch   (Dolphin overlay icons: see dolphin-overlay/README.md)");
+    Ok(())
+}
+
+async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Result<()> {
+    let mut state = sync::load_state()?.unwrap_or_default();
+    resolve_root(&mut state, root)?;
+    let (mut drive, before) = open_drive().await?;
+    if watch {
+        let mut last = before;
+        return daemon::run(drive, state, move |d| {
+            if let Some(s) = d.api.session.clone().filter(|s| *s != last) {
+                // Wallet writes are async; block briefly on a small runtime-free path.
+                let s2 = s.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = save_session(&s2).await {
+                        eprintln!("could not store refreshed session: {e:#}");
+                    }
+                });
+                last = s;
+            }
+        })
+        .await;
+    }
+    match sync::run(&mut drive, &mut state, force).await? {
+        Some(_) => println!("synced to {}", state.root.display()),
+        None => {}
+    }
+    persist(drive.api, before).await
 }
 
 async fn open_drive() -> Result<(Drive<impl PGPProviderSync>, Session)> {

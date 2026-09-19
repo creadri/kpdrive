@@ -67,14 +67,19 @@ pub fn save_state(state: &State) -> Result<()> {
     Ok(())
 }
 
-/// One sync pass. Returns whether a full pass ran.
-pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, force: bool) -> Result<bool> {
+/// One sync pass. `None` when nothing needed doing; otherwise the notable
+/// lines (conflicts, errors) of the pass that ran.
+pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, force: bool) -> Result<Option<Vec<String>>> {
+    let mut notes: Vec<String> = Vec::new();
+    macro_rules! note {
+        ($($arg:tt)*) => {{ let s = format!($($arg)*); eprintln!("{s}"); notes.push(s); }};
+    }
     fs::create_dir_all(&state.root).with_context(|| format!("create {}", state.root.display()))?;
     let (cursor, remote_changed) = drive.events_since(state.event_id.as_deref()).await?;
     if !force && !remote_changed && !local_changed(state) {
         state.event_id = Some(cursor);
         save_state(state)?;
-        return Ok(false);
+        return Ok(None);
     }
 
     let mut seen: BTreeMap<String, Entry> = BTreeMap::new();
@@ -120,14 +125,14 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
                 stack.push((node.id.clone(), node_rel.clone()));
                 Entry { path: node_rel, is_folder: true, revision: None, mtime: 0, size: 0 }
             } else {
-                match sync_file(drive, &node, &local, old).await {
+                match sync_file(drive, &node, &local, old, &mut notes).await {
                     Ok(Some((mtime, size))) => Entry { path: node_rel, is_folder: false, revision: node.revision.clone(), mtime, size },
                     Ok(None) => {
                         nodes.insert(node.id.clone(), node);
                         continue; // conflict: kept local, not tracked this round
                     }
                     Err(e) => {
-                        eprintln!("error: {}: {e:#}", node_rel.display());
+                        note!("error: {}: {e:#}", node_rel.display());
                         continue;
                     }
                 }
@@ -165,7 +170,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
                             nodes.insert(node.id.clone(), node);
                         }
                         Err(e) => {
-                            eprintln!("error: push {}/: {e:#}", item_rel.display());
+                            note!("error: push {}/: {e:#}", item_rel.display());
                             continue;
                         }
                     }
@@ -189,7 +194,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
             let mut file = match fs::File::open(item.path()) {
                 Ok(f) => f,
                 Err(e) => {
-                    eprintln!("error: open {}: {e}", item_rel.display());
+                    note!("error: open {}: {e}", item_rel.display());
                     continue;
                 }
             };
@@ -200,13 +205,13 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
                     seen.insert(id.clone(), Entry { path: item_rel.clone(), is_folder: false, revision: Some(revision), mtime, size: meta.len() });
                     by_path.insert(item_rel, id);
                 }
-                Err(e) => eprintln!("error: push {}: {e:#}", item_rel.display()),
+                Err(e) => note!("error: push {}: {e:#}", item_rel.display()),
             }
         }
     }
 
     if let Err(e) = drive.trash(&to_trash).await {
-        eprintln!("error: trash: {e:#}");
+        note!("error: trash: {e:#}");
     }
 
     // ---- gone remotely: remove locally, but only what we wrote and the user hasn't touched.
@@ -221,20 +226,20 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
                 fs::remove_dir(&local)?;
                 println!("removed {}/", old.path.display());
             } else {
-                eprintln!("keep: {} removed remotely but not empty locally", old.path.display());
+                note!("keep: {} removed remotely but not empty locally", old.path.display());
             }
         } else if local_matches(&meta, old) {
             fs::remove_file(&local)?;
             println!("removed {}", old.path.display());
         } else {
-            eprintln!("keep: {} removed remotely but edited locally", old.path.display());
+            note!("keep: {} removed remotely but edited locally", old.path.display());
         }
     }
 
     state.nodes = seen;
     state.event_id = Some(cursor);
     save_state(state)?;
-    Ok(true)
+    Ok(Some(notes))
 }
 
 /// Cheap local scan: anything new, edited or deleted since the last pass?
@@ -276,6 +281,7 @@ async fn sync_file<P: PGPProviderSync>(
     node: &Node<P::PrivateKey>,
     local: &Path,
     old: Option<&Entry>,
+    notes: &mut Vec<String>,
 ) -> Result<Option<(i64, u64)>> {
     if let Ok(meta) = fs::metadata(local) {
         match old {
@@ -287,11 +293,15 @@ async fn sync_file<P: PGPProviderSync>(
                 return Ok(Some((old.mtime, old.size)));
             }
             Some(old) if !local_matches(&meta, old) => {
-                eprintln!("conflict: {} edited locally and remotely; keeping local, not pushing", local.display());
+                let s = format!("conflict: {} edited locally and remotely; keeping local, not pushing", local.display());
+                eprintln!("{s}");
+                notes.push(s);
                 return Ok(None);
             }
             None => {
-                eprintln!("conflict: {} exists locally and remotely; keeping local, not pushing", local.display());
+                let s = format!("conflict: {} exists locally and remotely; keeping local, not pushing", local.display());
+                eprintln!("{s}");
+                notes.push(s);
                 return Ok(None);
             }
             _ => {} // known file, unchanged locally, new revision remotely: refresh it
@@ -315,7 +325,7 @@ fn mtime_of(meta: &fs::Metadata) -> i64 {
 }
 
 /// A local file is "ours and untouched" when size and mtime still match what we recorded.
-fn local_matches(meta: &fs::Metadata, entry: &Entry) -> bool {
+pub fn local_matches(meta: &fs::Metadata, entry: &Entry) -> bool {
     meta.len() == entry.size && mtime_of(meta) == entry.mtime
 }
 

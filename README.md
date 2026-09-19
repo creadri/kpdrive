@@ -23,7 +23,7 @@ Proton Drive sync client for KDE Plasma, written in Rust.
 2. List root, download one file.
 3. Remote → local one-way sync driven by the event stream.
 4. Local → remote uploads (`put`, `mkdir`); `sync` pushes new/edited local files and trashes locally deleted ones.
-5. Tray, Places entry, notifications, servicemenus, Dolphin overlay plugin.
+5. Tray, Places entry, notifications, autostart, Dolphin overlay plugin (servicemenus skipped: no action needs one yet).
 
 Conflicts, trash, sharing and photos wait until two-way sync is stable.
 
@@ -36,7 +36,8 @@ kpdrive ls [path]
 kpdrive get <remote> [local]
 kpdrive put <local> [remote-folder]   # new file, or new revision if the name exists
 kpdrive mkdir <remote>
-kpdrive sync [--root DIR] [--watch] [--force]   # two-way Drive <-> local
+kpdrive setup [--root DIR]    # local folder, Dolphin Places entry, autostart
+kpdrive sync [--root DIR] [--watch] [--force]   # two-way Drive <-> local; --watch = daemon with tray
 kpdrive logout
 ```
 
@@ -45,6 +46,11 @@ locally is never overwritten (if the remote changed too, it is reported and
 neither side is pushed); a file deleted locally and unchanged remotely is
 trashed remotely; a file removed remotely is deleted locally only if untouched.
 Set `KPDRIVE_DEBUG=1` for event-page diagnostics.
+
+The daemon (`sync --watch`) shows a Plasma tray icon, sends desktop
+notifications for conflicts and errors, and serves `$XDG_RUNTIME_DIR/kpdrive.sock`
+(line protocol: `STATUS <path>` → `OK|SYNC|NONE`, `ROOT`, `SYNC`, `QUIT`).
+The Dolphin overlay plugin in `dolphin-overlay/` uses that socket; see its README.
 
 ## Build
 

@@ -12,6 +12,7 @@ base64 = "0.23.1"
 clap = { version = "4.6.7", features = ["derive"] }
 hex = "0.4"
 hmac = "0.12"
+ksni = "0.3"
 oo7 = "0.6.0"
 # Proton's own crypto: SRP login, user/address keys. Pinned commit, pure-Rust backend.
 proton-crypto = { git = "https://github.com/ProtonMail/proton-crypto-rs", rev = "7797aacf5ae39b0982e594eb12b26489c2e77b48", default-features = false, features = ["rustpgp"] }
@@ -21,5 +22,5 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha1 = "0.10"
 sha2 = "0.10"
-tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "process"] }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "process", "net", "sync", "time", "io-util"] }
 zeroize = "1.9.0"

@@ -1,0 +1,7 @@
+{
+    "KPlugin": {
+        "Id": "kpdriveoverlay",
+        "Name": "Proton Drive sync status",
+        "Description": "Overlay icons for files in the kpdrive sync folder"
+    }
+}
