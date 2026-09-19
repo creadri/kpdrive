@@ -7,9 +7,12 @@
 //! affected nodes when the tree gets big enough for the walk to hurt.
 //!
 //! Rules, in order of who wins:
-//! - A file edited locally is never overwritten; if the remote also changed it
-//!   is reported and left alone (neither side is pushed).
+//! - A file edited on one side only is copied to the other side.
+//! - A file edited on both sides keeps *both*: the remote version takes the
+//!   name and the local version is moved aside as a "conflict copy", which the
+//!   push step then uploads. Nothing is ever silently overwritten or dropped.
 //! - A file deleted locally that is unchanged remotely is trashed remotely.
+//!   If it changed remotely, the remote version is restored instead.
 //! - A file removed remotely is deleted locally only if untouched since we wrote it.
 
 use anyhow::{Context, Result};
@@ -111,16 +114,25 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
                 }
             }
 
-            // We wrote it before, it is gone locally, and the remote is unchanged: the user deleted it.
+            // Gone locally: the user deleted it. Trash it remotely, unless the
+            // remote also changed — then the remote version comes back instead,
+            // because a delete must not discard someone else's edit.
             if let Some(old) = old {
-                if !local.exists() && old.revision == node.revision {
-                    println!("trash {} (deleted locally)", node_rel.display());
-                    to_trash.push(node.id.clone());
-                    continue;
+                if !local.exists() {
+                    if old.revision == node.revision {
+                        println!("trash {} (deleted locally)", node_rel.display());
+                        to_trash.push(node.id.clone());
+                        continue;
+                    }
+                    note!("{} was deleted locally but changed remotely; restoring the remote version", node_rel.display());
                 }
             }
 
             let entry = if node.is_folder {
+                if local.is_file() {
+                    let copy = keep_local_copy(&local, "is a folder remotely", &mut notes)?;
+                    note!("conflict: {} kept as {}", node_rel.display(), copy);
+                }
                 fs::create_dir_all(&local)?;
                 stack.push((node.id.clone(), node_rel.clone()));
                 Entry { path: node_rel, is_folder: true, revision: None, mtime: 0, size: 0 }
@@ -184,7 +196,9 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
             let mtime = mtime_of(&meta);
             let (existing, changed) = match by_path.get(&item_rel) {
                 Some(id) => (Some(id.clone()), !local_matches(&meta, &seen[id])),
-                None if old_paths.contains_key(&item_rel) => continue, // conflict reported above
+                // Tracked before but missing from this pass: its download failed
+                // above. Pushing now would send a half-known file, so leave it.
+                None if old_paths.contains_key(&item_rel) => continue,
                 None => (None, true),
             };
             if !changed {
@@ -274,8 +288,12 @@ fn local_changed(state: &State) -> bool {
     false
 }
 
-/// Downloads `node` to `local` when needed. Returns the (mtime, size) recorded,
-/// or `None` when a locally edited file was left alone.
+/// Brings `local` up to date with `node`. Returns the (mtime, size) recorded.
+///
+/// When the local file also changed, or we have no record of it at all, the
+/// remote bytes are fetched first and compared: identical contents are a
+/// bookkeeping gap, not a conflict, and must not spawn a copy. Only a real
+/// content difference moves the local version aside.
 async fn sync_file<P: PGPProviderSync>(
     drive: &mut Drive<P>,
     node: &Node<P::PrivateKey>,
@@ -283,30 +301,16 @@ async fn sync_file<P: PGPProviderSync>(
     old: Option<&Entry>,
     notes: &mut Vec<String>,
 ) -> Result<Option<(i64, u64)>> {
-    if let Ok(meta) = fs::metadata(local) {
-        match old {
-            Some(old) if old.revision == node.revision && local_matches(&meta, old) => {
-                return Ok(Some((old.mtime, old.size)));
-            }
-            Some(old) if old.revision == node.revision => {
-                // Edited locally, unchanged remotely: keep tracking; the push step uploads it.
-                return Ok(Some((old.mtime, old.size)));
-            }
-            Some(old) if !local_matches(&meta, old) => {
-                let s = format!("conflict: {} edited locally and remotely; keeping local, not pushing", local.display());
-                eprintln!("{s}");
-                notes.push(s);
-                return Ok(None);
-            }
-            None => {
-                let s = format!("conflict: {} exists locally and remotely; keeping local, not pushing", local.display());
-                eprintln!("{s}");
-                notes.push(s);
-                return Ok(None);
-            }
-            _ => {} // known file, unchanged locally, new revision remotely: refresh it
+    let local_meta = fs::metadata(local).ok();
+    if let (Some(_), Some(old)) = (&local_meta, old) {
+        if old.revision == node.revision {
+            // Remote unchanged. Either nothing happened, or the user edited it;
+            // returning the *recorded* mtime/size either way is what lets the
+            // push step notice the edit and send it.
+            return Ok(Some((old.mtime, old.size)));
         }
     }
+
     let tmp = local.with_file_name(format!(".{}{PART_SUFFIX}", local.file_name().and_then(|n| n.to_str()).unwrap_or("file")));
     let mut out = std::io::BufWriter::new(fs::File::create(&tmp)?);
     let size = drive.download(node, &mut out).await?;
@@ -315,9 +319,87 @@ async fn sync_file<P: PGPProviderSync>(
     let mtime = node.modify_time;
     file.set_modified(UNIX_EPOCH + Duration::from_secs(mtime.max(0) as u64))?;
     drop(file);
+
+    let mut quiet = false;
+    if let Some(meta) = &local_meta {
+        // Reasons the local copy might be worth keeping: it was edited while the
+        // remote changed too, or we have no record of it and cannot assume.
+        let why = match old {
+            Some(old) if !local_matches(meta, old) => Some("edited locally and remotely"),
+            None => Some("exists locally and remotely"),
+            Some(_) => None, // ours, untouched: the remote update just lands
+        };
+        if let Some(why) = why {
+            if same_contents(local, &tmp).unwrap_or(false) {
+                // The bytes already agree; nothing to keep, nothing to report.
+                quiet = true;
+            } else {
+                keep_local_copy(local, why, notes)?;
+            }
+        }
+    }
+
     fs::rename(&tmp, local)?;
-    println!("fetched {} ({size} bytes)", local.display());
+    if !quiet {
+        println!("fetched {} ({size} bytes)", local.display());
+    }
     Ok(Some((mtime, size)))
+}
+
+/// Byte-for-byte comparison, cheapest checks first.
+fn same_contents(a: &Path, b: &Path) -> Result<bool> {
+    let (mut a, mut b) = (fs::File::open(a)?, fs::File::open(b)?);
+    if a.metadata()?.len() != b.metadata()?.len() {
+        return Ok(false);
+    }
+    let (mut buf_a, mut buf_b) = (vec![0u8; 64 * 1024], vec![0u8; 64 * 1024]);
+    loop {
+        let n = std::io::Read::read(&mut a, &mut buf_a)?;
+        if n == 0 {
+            return Ok(true);
+        }
+        std::io::Read::read_exact(&mut b, &mut buf_b[..n])?;
+        if buf_a[..n] != buf_b[..n] {
+            return Ok(false);
+        }
+    }
+}
+
+/// Moves `local` aside so the remote version can take its name, and reports it.
+/// Returns the copy's file name. The copy is untracked, so the push step in the
+/// same pass uploads it as a new file.
+fn keep_local_copy(local: &Path, why: &str, notes: &mut Vec<String>) -> Result<String> {
+    let when = fs::metadata(local).map(|m| mtime_of(&m)).unwrap_or(0);
+    let copy = conflict_copy(local, when);
+    fs::rename(local, &copy).with_context(|| format!("rename {} aside", local.display()))?;
+    let name = copy.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let s = format!("conflict: {} {why}; local version kept as {name}", local.display());
+    eprintln!("{s}");
+    notes.push(s);
+    Ok(name)
+}
+
+/// `report.txt` → `report (conflict copy 2026-09-19 20-15-03).txt`, stamped with
+/// the local version's mtime. Counts up rather than ever landing on a name that
+/// already exists.
+fn conflict_copy(local: &Path, when: i64) -> PathBuf {
+    let stem = local.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+    let ext = local.extension().and_then(|e| e.to_str());
+    let (y, m, d, hh, mi, ss) = crate::drive::civil_utc(when);
+    let stamp = format!("{y:04}-{m:02}-{d:02} {hh:02}-{mi:02}-{ss:02}");
+    let mut n = 1;
+    loop {
+        let count = if n == 1 { String::new() } else { format!(" {n}") };
+        let name = match ext {
+            Some(ext) => format!("{stem} (conflict copy {stamp}{count}).{ext}"),
+            None => format!("{stem} (conflict copy {stamp}{count})"),
+        };
+        let path = local.with_file_name(name);
+        if !path.exists() {
+            return path;
+        }
+        n += 1;
+    }
 }
 
 fn mtime_of(meta: &fs::Metadata) -> i64 {
@@ -348,6 +430,44 @@ mod tests {
         for bad in ["", ".", "..", "a/b", "x\0"] {
             assert!(safe_name(bad).is_none(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn contents_comparison() {
+        let dir = std::env::temp_dir().join(format!("kpdrive-eq-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let (a, b, c, d) = (dir.join("a"), dir.join("b"), dir.join("c"), dir.join("d"));
+        let big = vec![7u8; 200 * 1024];
+        fs::write(&a, &big).unwrap();
+        fs::write(&b, &big).unwrap();
+        let mut differs = big.clone();
+        differs[150 * 1024] = 8;
+        fs::write(&c, &differs).unwrap();
+        fs::write(&d, b"short").unwrap();
+        assert!(same_contents(&a, &b).unwrap());
+        assert!(!same_contents(&a, &c).unwrap(), "differs past the first chunk");
+        assert!(!same_contents(&a, &d).unwrap(), "different lengths");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn conflict_copy_names() {
+        let dir = std::env::temp_dir().join(format!("kpdrive-conflict-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("report.txt");
+        let first = conflict_copy(&f, 1_700_000_000);
+        assert_eq!(first.file_name().unwrap(), "report (conflict copy 2023-11-14 22-13-20).txt");
+        assert_eq!(
+            conflict_copy(&dir.join("notes"), 0).file_name().unwrap(),
+            "notes (conflict copy 1970-01-01 00-00-00)"
+        );
+        // An existing copy is never overwritten.
+        fs::write(&first, b"earlier").unwrap();
+        assert_eq!(
+            conflict_copy(&f, 1_700_000_000).file_name().unwrap(),
+            "report (conflict copy 2023-11-14 22-13-20 2).txt"
+        );
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

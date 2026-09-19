@@ -41,10 +41,18 @@ kpdrive sync [--root DIR] [--watch] [--force]   # two-way Drive <-> local; --wat
 kpdrive logout
 ```
 
-Sync state lives in `~/.local/share/kpdrive/state.json`. Rules: a file edited
-locally is never overwritten (if the remote changed too, it is reported and
-neither side is pushed); a file deleted locally and unchanged remotely is
-trashed remotely; a file removed remotely is deleted locally only if untouched.
+Sync state lives in `~/.local/share/kpdrive/state.json`. Rules:
+
+- Edited on one side only: copied to the other side.
+- Edited on **both** sides: both versions are kept. The remote version takes the
+  name; the local one becomes `name (conflict copy 2026-09-19 18-30-26).ext` and
+  is uploaded as a new file in the same pass. Contents are compared first, so
+  two identical files are never split into a copy. Timestamps in those names
+  are UTC.
+- Deleted locally, unchanged remotely: trashed remotely (restorable in the web app).
+- Deleted locally but changed remotely: the remote version is restored, because
+  a deletion must not discard someone else's edit.
+- Removed remotely: deleted locally only if untouched since we wrote it.
 Set `KPDRIVE_DEBUG=1` for event-page diagnostics.
 
 The daemon (`sync --watch`) shows a Plasma tray icon, sends desktop

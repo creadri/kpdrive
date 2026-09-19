@@ -716,8 +716,9 @@ fn now() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
 }
 
-/// Unix seconds → "YYYY-MM-DDTHH:MM:SSZ" (Howard Hinnant's civil-from-days).
-fn iso8601(secs: i64) -> String {
+/// Unix seconds → (year, month, day, hour, minute, second) UTC
+/// (Howard Hinnant's civil-from-days).
+pub fn civil_utc(secs: i64) -> (i64, i64, i64, i64, i64, i64) {
     let days = secs.div_euclid(86_400);
     let tod = secs.rem_euclid(86_400);
     let z = days + 719_468;
@@ -729,7 +730,13 @@ fn iso8601(secs: i64) -> String {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = yoe + era * 400 + if m <= 2 { 1 } else { 0 };
-    format!("{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z", tod / 3600, (tod % 3600) / 60, tod % 60)
+    (y, m, d, tod / 3600, (tod % 3600) / 60, tod % 60)
+}
+
+/// Unix seconds → "YYYY-MM-DDTHH:MM:SSZ", the form Drive's extended attributes use.
+fn iso8601(secs: i64) -> String {
+    let (y, m, d, hh, mm, ss) = civil_utc(secs);
+    format!("{y:04}-{m:02}-{d:02}T{hh:02}:{mm:02}:{ss:02}Z")
 }
 
 #[cfg(test)]
