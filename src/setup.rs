@@ -61,6 +61,29 @@ pub fn autostart() -> Result<PathBuf> {
     Ok(file)
 }
 
+/// Drops a commented `.protonignore` into the sync folder when there is none,
+/// so the feature is discoverable. Returns whether one was written.
+pub fn ignore_template(root: &Path) -> Result<bool> {
+    let file = root.join(crate::sync::IGNORE_FILE);
+    if file.exists() {
+        return Ok(false);
+    }
+    std::fs::create_dir_all(root)?;
+    std::fs::write(
+        &file,
+        "# Paths kpdrive leaves alone, one pattern per line.\n\
+         # Same syntax as .gitignore:\n\
+         #   *.tmp           any file with that extension, at any depth\n\
+         #   build/          a folder and everything in it\n\
+         #   /Scratch/       only at the top of this folder\n\
+         #   !keep.tmp       an exception to an earlier pattern\n\
+         #\n\
+         # Ignored paths are neither uploaded nor downloaded, and are never\n\
+         # deleted by sync. This file itself does sync, like .gitignore does.\n",
+    )?;
+    Ok(true)
+}
+
 /// Puts the account window in the application launcher.
 pub fn launcher() -> Result<PathBuf> {
     let dir = xdg("XDG_DATA_HOME", ".local/share")?.join("applications");

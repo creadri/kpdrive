@@ -28,6 +28,7 @@ pub mod qobject {
         #[qproperty(QStringList, log_lines, cxx_name = "logLines")]
         #[qproperty(i32, retention_days, cxx_name = "retentionDays")]
         #[qproperty(QString, sync_folder, cxx_name = "syncFolder")]
+        #[qproperty(QString, ignore_file, cxx_name = "ignoreFile")]
         #[qproperty(QString, version)]
         #[qproperty(QString, license)]
         type Backend = super::BackendRust;
@@ -37,6 +38,17 @@ pub mod qobject {
         #[qsignal]
         #[cxx_name = "openUrlRequested"]
         fn open_url_requested(self: Pin<&mut Self>, url: QString);
+
+        /// Sync somewhere else. Moves what is already synced when it can.
+        #[qinvokable]
+        #[cxx_name = "changeSyncFolder"]
+        fn change_sync_folder(self: Pin<&mut Self>, folder: &QString);
+
+        /// Open the ignore file for editing, writing a commented starter first
+        /// if there is none.
+        #[qinvokable]
+        #[cxx_name = "openIgnoreFile"]
+        fn open_ignore_file(self: Pin<&mut Self>);
 
         /// Reload the account details from Proton.
         #[qinvokable]
@@ -84,6 +96,7 @@ pub struct BackendRust {
     log_lines: QStringList,
     retention_days: i32,
     sync_folder: QString,
+    ignore_file: QString,
     version: QString,
     license: QString,
     tasks: Option<Sender<Task>>,
@@ -101,6 +114,7 @@ impl Default for BackendRust {
             log_lines: QStringList::default(),
             retention_days: 30,
             sync_folder: QString::default(),
+            ignore_file: QString::default(),
             version: QString::from(env!("CARGO_PKG_VERSION")),
             license: QString::from("GNU GPL v3 or later"),
             tasks: None,
@@ -160,18 +174,53 @@ impl cxx_qt::Initialize for qobject::Backend {
         });
 
         self.as_mut().set_retention_days(kpdrive::config::load().log_retention_days as i32);
-        let folder = kpdrive::sync::load_state()
-            .ok()
-            .flatten()
-            .map(|s| s.root.display().to_string())
-            .unwrap_or_default();
-        self.as_mut().set_sync_folder(QString::from(&folder));
+        self.as_mut().show_folder();
         self.as_mut().reload_logs("");
         self.refresh();
     }
 }
 
 impl qobject::Backend {
+    /// Reads the configured folder into the two path properties.
+    fn show_folder(mut self: Pin<&mut Self>) {
+        let root = current_root();
+        let folder = root.as_ref().map(|r| r.display().to_string()).unwrap_or_default();
+        let ignore = root.map(|r| r.join(kpdrive::sync::IGNORE_FILE).display().to_string()).unwrap_or_default();
+        self.as_mut().set_sync_folder(QString::from(&folder));
+        self.as_mut().set_ignore_file(QString::from(&ignore));
+    }
+
+    pub fn change_sync_folder(mut self: Pin<&mut Self>, folder: &QString) {
+        let folder = std::path::PathBuf::from(folder.to_string());
+        if folder.as_os_str().is_empty() {
+            return;
+        }
+        let mut state = kpdrive::sync::load_state().ok().flatten().unwrap_or_default();
+        match kpdrive::sync::set_folder(&mut state, folder) {
+            Ok(note) => {
+                // A running daemon holds the old path in memory.
+                let running = kpdrive::daemon::socket_path().exists();
+                let note = if running { format!("{note}. Restart the sync daemon to use it.") } else { note };
+                self.as_mut().set_status(QString::from(&note));
+            }
+            Err(e) => self.as_mut().set_status(QString::from(&format!("cannot change the folder: {e:#}"))),
+        }
+        self.show_folder();
+    }
+
+    pub fn open_ignore_file(mut self: Pin<&mut Self>) {
+        let Some(root) = current_root() else {
+            self.as_mut().set_status(QString::from("No sync folder yet. Run: kpdrive setup"));
+            return;
+        };
+        if let Err(e) = kpdrive::setup::ignore_template(&root) {
+            self.as_mut().set_status(QString::from(&format!("cannot create the ignore file: {e:#}")));
+            return;
+        }
+        let url = format!("file://{}", root.join(kpdrive::sync::IGNORE_FILE).display());
+        self.as_mut().open_url_requested(QString::from(&url));
+    }
+
     pub fn refresh(mut self: Pin<&mut Self>) {
         self.as_mut().set_busy(true);
         self.as_mut().set_status(QString::from("Checking the account…"));
@@ -218,7 +267,9 @@ impl qobject::Backend {
 
     pub fn set_retention(mut self: Pin<&mut Self>, days: i32) {
         let days = days.clamp(1, 3650) as u64;
-        let config = kpdrive::config::Config { log_retention_days: days };
+        // Load and amend: building a fresh Config would drop the sync folder.
+        let mut config = kpdrive::config::load();
+        config.log_retention_days = days;
         if let Err(e) = kpdrive::config::save(&config) {
             self.as_mut().set_status(QString::from(&format!("cannot save the setting: {e:#}")));
             return;
@@ -231,6 +282,14 @@ impl qobject::Backend {
         self.as_mut().set_retention_days(days as i32);
         self.reload_logs("");
     }
+}
+
+/// The configured sync folder, falling back to what the sync state recorded.
+fn current_root() -> Option<std::path::PathBuf> {
+    kpdrive::config::load()
+        .sync_folder
+        .or_else(|| kpdrive::sync::load_state().ok().flatten().map(|s| s.root))
+        .filter(|p| !p.as_os_str().is_empty())
 }
 
 /// Loads the account details and pushes them into the window.

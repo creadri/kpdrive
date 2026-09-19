@@ -50,7 +50,7 @@ kpdrive mkdir <remote>
 kpdrive photos [--dest DIR]   # download the Photos timeline
 kpdrive share <path> [--copy] [--password P] [--expires-days N]
 kpdrive unshare <path>
-kpdrive setup [--root DIR]    # local folder, Dolphin Places entry, autostart
+kpdrive setup [--root DIR]    # local folder, ignore file, Places entry, autostart, launcher
 kpdrive sync [--root DIR] [--watch] [--force]   # two-way Drive <-> local; --watch = daemon with tray
 kpdrive logs [--search TERM] [--lines N] [--retention DAYS]
 kpdrive logout
@@ -64,6 +64,21 @@ It is also in the application launcher and in the tray menu after `kpdrive setup
 Activity goes to `~/.local/share/kpdrive/logs/YYYY-MM-DD.log` as plain text,
 one file per day, pruned to `log_retention_days` from
 `~/.config/kpdrive/config.json` (30 by default).
+
+The sync folder is `~/ProtonDrive` until you change it, with `--root` on
+`setup` or `sync`, or the **Change…** button in the window. Changing it moves
+what is already synced when the two paths are on one filesystem, which keeps
+every recorded path valid; across filesystems the old folder is left alone and
+the files are fetched again into the new one. The choice lives in
+`~/.config/kpdrive/config.json`. A running daemon keeps the old path until it
+restarts.
+
+`.protonignore` in the root of the sync folder lists paths to leave alone, with
+the same syntax as `.gitignore` (`*`, `**`, a trailing slash for folders only, a
+leading slash to anchor, `!` to make an exception); it is matched by the same
+library ripgrep uses. Ignored paths are neither uploaded nor downloaded nor
+deleted, and they do not wake the daemon. The file itself syncs, as `.gitignore`
+does, and `setup` writes a commented starter.
 
 Sync state lives in `~/.local/share/kpdrive/state.json`. Rules:
 

@@ -271,12 +271,26 @@ async fn mkdir(remote: &str) -> Result<()> {
     account::persist(drive.api, before).await
 }
 
+/// Where to sync: an explicit `--root` wins, then the configured folder, then
+/// `~/ProtonDrive`. A folder set by an older version lives in the sync state
+/// instead, so it is adopted into the config on first sight.
 fn resolve_root(state: &mut sync::State, root: Option<std::path::PathBuf>) -> Result<()> {
     if let Some(root) = root {
-        state.root = root;
+        println!("{}", sync::set_folder(state, root)?);
+        return Ok(());
     }
-    if state.root.as_os_str().is_empty() {
-        state.root = std::path::PathBuf::from(std::env::var_os("HOME").context("HOME not set")?).join("ProtonDrive");
+    let mut config = config::load();
+    match config.sync_folder.clone() {
+        Some(folder) => state.root = folder,
+        None if state.root.as_os_str().is_empty() => {
+            state.root = config::default_sync_folder()?;
+            config.sync_folder = Some(state.root.clone());
+            config::save(&config)?;
+        }
+        None => {
+            config.sync_folder = Some(state.root.clone());
+            config::save(&config)?;
+        }
     }
     Ok(())
 }
@@ -287,6 +301,10 @@ async fn setup(root: Option<std::path::PathBuf>) -> Result<()> {
     std::fs::create_dir_all(&state.root)?;
     sync::save_state(&state)?;
     println!("folder: {}", state.root.display());
+    match setup::ignore_template(&state.root)? {
+        true => println!("ignore file: {}", state.root.join(sync::IGNORE_FILE).display()),
+        false => println!("ignore file: {} (kept)", state.root.join(sync::IGNORE_FILE).display()),
+    }
     if setup::places_entry(&state.root)? {
         println!("added Proton Drive to Dolphin's Places");
     }

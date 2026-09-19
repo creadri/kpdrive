@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Controls as Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import org.kde.kirigami as Kirigami
 import be.otterit.kpdrive
 
@@ -18,6 +19,14 @@ Kirigami.ApplicationWindow {
     // The tab bar is this window's header; Kirigami's own page header would
     // only add an empty band above it.
     pageStack.globalToolBar.style: Kirigami.ApplicationHeaderStyle.None
+
+    FolderDialog {
+        id: folderDialog
+        title: "Choose the Proton Drive folder"
+        currentFolder: backend.syncFolder.length > 0 ? "file://" + encodeURI(backend.syncFolder) : ""
+        // The dialog hands back a URL; sync wants a plain path.
+        onAccepted: backend.changeSyncFolder(decodeURIComponent(selectedFolder.toString().replace(/^file:\/\//, "")))
+    }
 
     Backend {
         id: backend
@@ -152,15 +161,27 @@ Kirigami.ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.topMargin: Kirigami.Units.largeSpacing
-                            visible: backend.syncFolder.length > 0
                             spacing: Kirigami.Units.smallSpacing
 
                             Controls.Label { text: "Syncing to"; opacity: 0.7 }
+
                             Controls.Label {
                                 Layout.fillWidth: true
-                                text: backend.syncFolder
+                                text: backend.syncFolder.length > 0 ? backend.syncFolder : "nowhere yet"
                                 elide: Text.ElideMiddle
                                 font.family: "monospace"
+                            }
+
+                            Controls.Button {
+                                text: "Change…"
+                                icon.name: "folder-sync"
+                                onClicked: folderDialog.open()
+                            }
+
+                            Controls.Button {
+                                text: "Ignore file…"
+                                icon.name: "document-edit"
+                                onClicked: backend.openIgnoreFile()
                             }
                         }
                     }

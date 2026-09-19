@@ -16,6 +16,7 @@
 //! - A file removed remotely is deleted locally only if untouched since we wrote it.
 
 use anyhow::{Context, Result};
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use proton_crypto::crypto::PGPProviderSync;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -45,6 +46,87 @@ pub struct Entry {
 }
 
 const PART_SUFFIX: &str = ".kpdrive-part";
+
+/// Patterns for paths sync should leave alone, in the root of the sync folder.
+/// Same syntax as `.gitignore`, matched by the same library, so anchoring,
+/// `**`, trailing-slash directory rules and `!` negation all behave as expected.
+pub const IGNORE_FILE: &str = ".protonignore";
+
+/// What the ignore file says. Absent or unreadable means nothing is ignored.
+pub struct Ignores {
+    matcher: Gitignore,
+    root: PathBuf,
+}
+
+impl Ignores {
+    pub fn load(root: &Path) -> Self {
+        let mut builder = GitignoreBuilder::new(root);
+        // A parse error names the offending line; the rest of the file still applies.
+        if let Some(e) = builder.add(root.join(IGNORE_FILE)) {
+            if !matches!(e, ignore::Error::Io(ref io) if io.kind() == std::io::ErrorKind::NotFound) {
+                crate::log::warn(&format!("{IGNORE_FILE}: {e}"));
+            }
+        }
+        let matcher = builder.build().unwrap_or_else(|e| {
+            crate::log::warn(&format!("{IGNORE_FILE} could not be read ({e}); ignoring nothing"));
+            Gitignore::empty()
+        });
+        Self { matcher, root: root.to_owned() }
+    }
+
+    /// Whether `rel` (relative to the sync folder) is excluded, either directly
+    /// or because one of its parent folders is.
+    pub fn is_ignored(&self, rel: &Path, is_dir: bool) -> bool {
+        if rel.as_os_str().is_empty() {
+            return false;
+        }
+        self.matcher.matched_path_or_any_parents(self.root.join(rel), is_dir).is_ignore()
+    }
+}
+
+/// Points sync at `new_root`, moving what is already synced when it can.
+///
+/// Recorded paths are relative to the root, so a plain rename keeps every entry
+/// valid. Across filesystems a rename fails, and rather than copying gigabytes
+/// this forgets what it knew and lets the next pass fetch into the new place,
+/// leaving the old folder untouched for the user to delete.
+pub fn set_folder(state: &mut State, new_root: PathBuf) -> Result<String> {
+    let old = std::mem::replace(&mut state.root, new_root.clone());
+    let mut config = crate::config::load();
+    config.sync_folder = Some(new_root.clone());
+    crate::config::save(&config)?;
+
+    if old == new_root || old.as_os_str().is_empty() {
+        fs::create_dir_all(&new_root)?;
+        save_state(state)?;
+        return Ok(format!("syncing to {}", new_root.display()));
+    }
+
+    let had_content = fs::read_dir(&old).map(|mut d| d.next().is_some()).unwrap_or(false);
+    let note = if had_content && !new_root.exists() {
+        match fs::rename(&old, &new_root) {
+            Ok(()) => format!("moved {} to {}", old.display(), new_root.display()),
+            Err(_) => {
+                state.nodes.clear();
+                format!(
+                    "syncing to {} (could not move across filesystems, so it will be fetched again; {} was left alone)",
+                    new_root.display(),
+                    old.display()
+                )
+            }
+        }
+    } else {
+        // Somewhere that already exists: the next pass compares contents and
+        // adopts anything identical rather than duplicating it.
+        state.nodes.clear();
+        format!("syncing to {}", new_root.display())
+    };
+
+    fs::create_dir_all(&new_root)?;
+    save_state(state)?;
+    crate::log::write("INFO", &note);
+    Ok(note)
+}
 
 pub fn state_path() -> PathBuf {
     let base = std::env::var_os("XDG_DATA_HOME")
@@ -78,8 +160,9 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
         ($($arg:tt)*) => {{ let s = format!($($arg)*); crate::log::warn(&s); notes.push(s); }};
     }
     fs::create_dir_all(&state.root).with_context(|| format!("create {}", state.root.display()))?;
+    let ignores = Ignores::load(&state.root);
     let (cursor, remote_changed) = drive.events_since(state.event_id.as_deref()).await?;
-    if !force && !remote_changed && !local_changed(state) {
+    if !force && !remote_changed && !local_changed(state, &ignores) {
         state.event_id = Some(cursor);
         save_state(state)?;
         return Ok(None);
@@ -102,6 +185,9 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
                 continue;
             };
             let node_rel = rel.join(name);
+            if ignores.is_ignored(&node_rel, node.is_folder) {
+                continue;
+            }
             let local = state.root.join(&node_rel);
             let old = state.nodes.get(&node.id);
 
@@ -171,6 +257,9 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
             }
             let item_rel = rel.join(name);
             let meta = item.metadata()?;
+            if ignores.is_ignored(&item_rel, meta.is_dir()) {
+                continue;
+            }
             if meta.is_dir() {
                 if !by_path.contains_key(&item_rel) {
                     let parent_id = by_path[&rel].clone();
@@ -230,7 +319,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
 
     // ---- gone remotely: remove locally, but only what we wrote and the user hasn't touched.
     for (id, old) in &state.nodes {
-        if seen.contains_key(id) || to_trash.contains(id) {
+        if seen.contains_key(id) || to_trash.contains(id) || ignores.is_ignored(&old.path, old.is_folder) {
             continue;
         }
         let local = state.root.join(&old.path);
@@ -257,10 +346,10 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
 }
 
 /// Cheap local scan: anything new, edited or deleted since the last pass?
-fn local_changed(state: &State) -> bool {
+fn local_changed(state: &State, ignores: &Ignores) -> bool {
     let by_path: HashMap<&PathBuf, &Entry> = state.nodes.values().map(|e| (&e.path, e)).collect();
     for entry in state.nodes.values() {
-        if !state.root.join(&entry.path).exists() {
+        if !ignores.is_ignored(&entry.path, entry.is_folder) && !state.root.join(&entry.path).exists() {
             return true;
         }
     }
@@ -275,6 +364,10 @@ fn local_changed(state: &State) -> bool {
             }
             let item_rel = rel.join(name);
             let Ok(meta) = item.metadata() else { continue };
+            // An ignored file must not keep waking the daemon.
+            if ignores.is_ignored(&item_rel, meta.is_dir()) {
+                continue;
+            }
             match by_path.get(&item_rel) {
                 None => return true,
                 Some(e) if meta.is_file() && !local_matches(&meta, e) => return true,
@@ -425,6 +518,38 @@ mod tests {
     use super::*;
 
     #[test]
+    fn ignore_rules() {
+        let dir = std::env::temp_dir().join(format!("kpdrive-ignore-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join(IGNORE_FILE),
+            "*.tmp\nbuild/\n!keep.tmp\n**/node_modules/\n/only-at-root.txt\n",
+        )
+        .unwrap();
+        let ig = Ignores::load(&dir);
+        assert!(ig.is_ignored(Path::new("a.tmp"), false));
+        assert!(ig.is_ignored(Path::new("deep/inside/a.tmp"), false), "patterns are not anchored");
+        assert!(!ig.is_ignored(Path::new("keep.tmp"), false), "negation wins by being last");
+        assert!(ig.is_ignored(Path::new("build"), true), "trailing slash means the folder");
+        assert!(ig.is_ignored(Path::new("build/out.o"), false), "and everything under it");
+        assert!(ig.is_ignored(Path::new("web/node_modules"), true));
+        assert!(ig.is_ignored(Path::new("only-at-root.txt"), false));
+        assert!(!ig.is_ignored(Path::new("sub/only-at-root.txt"), false), "leading slash anchors");
+        assert!(!ig.is_ignored(Path::new("notes.txt"), false));
+        assert!(!ig.is_ignored(Path::new(""), true), "the root is never ignored");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn nothing_is_ignored_without_the_file() {
+        let dir = std::env::temp_dir().join(format!("kpdrive-noignore-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let ig = Ignores::load(&dir);
+        assert!(!ig.is_ignored(Path::new("a.tmp"), false));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn names() {
         assert_eq!(safe_name("a.txt"), Some("a.txt"));
         for bad in ["", ".", "..", "a/b", "x\0"] {
@@ -482,10 +607,11 @@ mod tests {
         let entry = Entry { path: "f".into(), is_folder: false, revision: None, mtime: 1_700_000_000, size: 3 };
         assert!(local_matches(&fs::metadata(&f).unwrap(), &entry));
         let state = State { root: dir.clone(), event_id: None, nodes: BTreeMap::from([("id".to_string(), entry.clone())]) };
-        assert!(!local_changed(&state));
+        let ignores = Ignores::load(&dir);
+        assert!(!local_changed(&state, &ignores));
         fs::write(&f, b"abcd").unwrap();
         assert!(!local_matches(&fs::metadata(&f).unwrap(), &entry));
-        assert!(local_changed(&state));
+        assert!(local_changed(&state, &ignores));
         fs::remove_dir_all(&dir).unwrap();
     }
 }

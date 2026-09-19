@@ -7,13 +7,26 @@ use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
     /// Days of activity log to keep. Older day-files are deleted.
+    #[serde(default = "default_retention")]
     pub log_retention_days: u64,
+    /// Where Drive is mirrored. Unset until the first `setup` or `--root`.
+    #[serde(default)]
+    pub sync_folder: Option<PathBuf>,
+}
+
+fn default_retention() -> u64 {
+    30
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { log_retention_days: 30 }
+        Self { log_retention_days: default_retention(), sync_folder: None }
     }
+}
+
+/// `~/ProtonDrive`, used until the user picks somewhere else.
+pub fn default_sync_folder() -> Result<PathBuf> {
+    Ok(PathBuf::from(std::env::var_os("HOME").context("HOME not set")?).join("ProtonDrive"))
 }
 
 pub fn path() -> PathBuf {
