@@ -1,0 +1,4 @@
+# proton-crypto-rs references a private registry in its workspace manifests.
+# Cargo needs the name to resolve; nothing is ever fetched from it.
+[registries.proton]
+index = "sparse+https://index.crates.io/"

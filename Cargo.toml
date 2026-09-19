@@ -1,0 +1,21 @@
+[package]
+name = "kpdrive"
+version = "0.1.0"
+edition = "2024"
+description = "Proton Drive sync client for KDE Plasma"
+license = "MIT"
+
+[dependencies]
+aes-gcm = "0.11"
+anyhow = "1.0.104"
+base64 = "0.23.1"
+clap = { version = "4.6.7", features = ["derive"] }
+oo7 = "0.6.0"
+# Proton's own crypto: SRP login, user/address keys. Pinned commit, pure-Rust backend.
+proton-crypto = { git = "https://github.com/ProtonMail/proton-crypto-rs", rev = "7797aacf5ae39b0982e594eb12b26489c2e77b48", default-features = false, features = ["rustpgp"] }
+proton-crypto-account = { git = "https://github.com/ProtonMail/proton-crypto-rs", rev = "7797aacf5ae39b0982e594eb12b26489c2e77b48", default-features = false, features = ["rustpgp"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "gzip"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "process"] }
+zeroize = "1.9.0"
