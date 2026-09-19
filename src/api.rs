@@ -264,12 +264,43 @@ fn decrypt_fork_key_password(key: &[u8; 32], payload: &str) -> Result<Zeroizing<
         .ok_or_else(|| anyhow!("fork payload has no keyPassword"))
 }
 
+/// A failed Proton API call. Carries the code so callers can tell apart the ones
+/// that are ordinary answers, such as 2501 for "no such thing".
+#[derive(Debug)]
+pub struct ApiError {
+    pub code: i64,
+    pub status: u16,
+    pub message: String,
+    pub path: String,
+}
+
+/// "does not exist" — an answer, not always a failure.
+pub const DOES_NOT_EXIST: i64 = 2501;
+
+impl std::fmt::Display for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: Proton API error {} (HTTP {}): {}", self.path, self.code, self.status, self.message)
+    }
+}
+
+impl std::error::Error for ApiError {}
+
+/// The code of a failed call, when the failure came from the API at all.
+pub fn api_code(error: &anyhow::Error) -> Option<i64> {
+    error.downcast_ref::<ApiError>().map(|e| e.code)
+}
+
 /// Every Proton response is `{Code, Error?, ...}`; 1000/1001 mean success.
 fn parse_envelope<T: DeserializeOwned>(path: &str, status: StatusCode, value: Value) -> Result<T> {
     let code = value.get("Code").and_then(Value::as_i64).unwrap_or(0);
     if !(status.is_success() && (code == 1000 || code == 1001)) {
-        let msg = value.get("Error").and_then(Value::as_str).unwrap_or("no error message");
-        bail!("{path}: Proton API error {code} (HTTP {}): {msg}", status.as_u16());
+        return Err(ApiError {
+            code,
+            status: status.as_u16(),
+            message: value.get("Error").and_then(Value::as_str).unwrap_or("no error message").to_owned(),
+            path: path.to_owned(),
+        }
+        .into());
     }
     serde_json::from_value(value).context("unexpected response shape")
 }

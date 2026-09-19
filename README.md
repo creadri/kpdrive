@@ -30,6 +30,7 @@ Proton Drive sync client for KDE Plasma, written in Rust.
 5. Tray, Places entry, notifications, autostart, Dolphin overlay plugin.
 6. Conflicts: both versions kept.
 7. Public links (`share`/`unshare`) and a "Copy Proton Drive link" Dolphin menu entry.
+8. Photos: timeline download.
 
 Conflicts, trash, sharing and photos wait until two-way sync is stable.
 
@@ -42,6 +43,7 @@ kpdrive ls [path]
 kpdrive get <remote> [local]
 kpdrive put <local> [remote-folder]   # new file, or new revision if the name exists
 kpdrive mkdir <remote>
+kpdrive photos [--dest DIR]   # download the Photos timeline
 kpdrive share <path> [--copy] [--password P] [--expires-days N]
 kpdrive unshare <path>
 kpdrive setup [--root DIR]    # local folder, Dolphin Places entry, autostart
@@ -62,6 +64,12 @@ Sync state lives in `~/.local/share/kpdrive/state.json`. Rules:
   a deletion must not discard someone else's edit.
 - Removed remotely: deleted locally only if untouched since we wrote it.
 Set `KPDRIVE_DEBUG=1` for event-page diagnostics.
+
+Photos are a separate volume with a flat, capture-time-ordered timeline, so
+`photos` is its own command and writes to `~/Pictures/Proton Drive/YYYY/MM/`
+(state in `photos.json`). It only downloads. The destination must be outside the
+file sync folder, or the file sync would upload the whole library back into
+Drive; kpdrive refuses that rather than letting it happen.
 
 `share` returns a public read-only link. The URL ends in `#<password>`: that
 fragment never leaves the browser, so the link itself is the credential. Keep

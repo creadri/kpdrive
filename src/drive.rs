@@ -40,6 +40,33 @@ struct LinkDetails {
     sharing: Option<Sharing>,
 }
 
+/// `v2/shares/my-files` and `v2/shares/photos` answer with the same shape.
+#[derive(Deserialize)]
+struct ShareBootstrap {
+    #[serde(rename = "Volume")]
+    volume: BootstrapVolume,
+    #[serde(rename = "Share")]
+    share: BootstrapShare,
+    #[serde(rename = "Link")]
+    link: LinkDetails,
+}
+
+#[derive(Deserialize)]
+struct BootstrapVolume {
+    #[serde(rename = "VolumeID")]
+    id: String,
+}
+
+#[derive(Deserialize)]
+struct BootstrapShare {
+    #[serde(rename = "Key")]
+    key: String,
+    #[serde(rename = "Passphrase")]
+    passphrase: String,
+    #[serde(rename = "AddressID")]
+    address_id: String,
+}
+
 #[derive(Deserialize)]
 struct Sharing {
     #[serde(rename = "ShareID")]
@@ -92,6 +119,8 @@ struct ActiveRevision {
 /// A decrypted node with its unlocked key.
 pub struct Node<K> {
     pub id: String,
+    /// Photos live in their own volume, so a node cannot assume the files one.
+    pub volume_id: String,
     pub name: String,
     pub is_folder: bool,
     /// Server-side last modification, unix seconds.
@@ -163,57 +192,31 @@ impl<P: PGPProviderSync> Drive<P> {
             address_keys.insert(a.id, (a.email, primary, keys));
         }
 
-        #[derive(Deserialize)]
-        struct MyFiles {
-            #[serde(rename = "Volume")]
-            volume: Volume,
-            #[serde(rename = "Share")]
-            share: Share,
-            #[serde(rename = "Link")]
-            link: LinkDetails,
-        }
-        #[derive(Deserialize)]
-        struct Volume {
-            #[serde(rename = "VolumeID")]
-            id: String,
-        }
-        #[derive(Deserialize)]
-        struct Share {
-            #[serde(rename = "Key")]
-            key: String,
-            #[serde(rename = "Passphrase")]
-            passphrase: String,
-            #[serde(rename = "AddressID")]
-            address_id: String,
-        }
-        let my_files: MyFiles = api.get("drive/v2/shares/my-files").await?;
-        let (email, primary, address_keys) = address_keys
-            .remove(&my_files.share.address_id)
-            .filter(|(_, _, k)| !k.is_empty())
-            .ok_or_else(|| anyhow!("no unlocked keys for the share's address"))?;
-        let signing_key = primary.ok_or_else(|| anyhow!("share address has no primary key"))?;
-        let passphrase = pgp
-            .new_decryptor()
-            .with_decryption_keys(address_keys.iter())
-            .decrypt(&my_files.share.passphrase, DataEncoding::Armor)
-            .map_err(|e| anyhow!("decrypt share passphrase: {e}"))?;
-        let share_key = pgp
-            .private_key_import(&my_files.share.key, passphrase.as_bytes(), DataEncoding::Armor)
-            .map_err(|e| anyhow!("unlock share key: {e}"))?;
-        let root = Self::decrypt_link(&pgp, &share_key, my_files.link)?;
+        let my_files: ShareBootstrap = api.get("drive/v2/shares/my-files").await?;
+        let ShareBootstrap { volume, share, link } = my_files;
+        let (email, signing_key) = address_keys
+            .get(&share.address_id)
+            .and_then(|(email, primary, _)| primary.as_ref().map(|k| (email.clone(), k)))
+            .map(|(email, key)| Ok::<_, anyhow::Error>((email, Self::reimport_key(&pgp, key)?)))
+            .transpose()?
+            .ok_or_else(|| anyhow!("no primary key for the Drive share's address"))?;
+        // Every address's keys, because the photos share may sit on another one.
+        let address_keys: Vec<P::PrivateKey> =
+            address_keys.into_values().flat_map(|(_, _, keys)| keys).collect();
+        let root = decrypt_share_root(&pgp, &address_keys, &share, &volume.id, link)?;
         Ok(Self {
             api,
             pgp,
-            volume_id: my_files.volume.id,
+            volume_id: volume.id,
             root,
-            address_id: my_files.share.address_id,
+            address_id: share.address_id,
             email,
             signing_key,
             address_keys,
         })
     }
 
-    fn decrypt_link(pgp: &P, parent: &P::PrivateKey, d: LinkDetails) -> Result<Node<P::PrivateKey>> {
+    fn decrypt_link(pgp: &P, volume_id: &str, parent: &P::PrivateKey, d: LinkDetails) -> Result<Node<P::PrivateKey>> {
         let (armored_passphrase, name_armored) = (d.link.node_passphrase.clone(), d.link.name.clone());
         let passphrase = pgp
             .new_decryptor()
@@ -230,6 +233,7 @@ impl<P: PGPProviderSync> Drive<P> {
             .map_err(|e| anyhow!("decrypt node name: {e}"))?;
         Ok(Node {
             id: d.link.id,
+            volume_id: volume_id.to_owned(),
             name: String::from_utf8(name.to_vec()).context("node name is not UTF-8")?,
             is_folder: d.link.kind == 1,
             modify_time: d.link.modify_time,
@@ -256,7 +260,7 @@ impl<P: PGPProviderSync> Drive<P> {
         let mut ids = Vec::new();
         let mut anchor: Option<String> = None;
         loop {
-            let mut path = format!("drive/v2/volumes/{}/folders/{}/children", self.volume_id, folder.id);
+            let mut path = format!("drive/v2/volumes/{}/folders/{}/children", folder.volume_id, folder.id);
             if let Some(a) = &anchor {
                 path.push_str(&format!("?AnchorID={a}"));
             }
@@ -275,13 +279,13 @@ impl<P: PGPProviderSync> Drive<P> {
         }
         let mut nodes = Vec::with_capacity(ids.len());
         for chunk in ids.chunks(150) {
-            let path = format!("drive/v2/volumes/{}/links", self.volume_id);
+            let path = format!("drive/v2/volumes/{}/links", folder.volume_id);
             let links: Links = self.api.post(&path, &json!({ "LinkIDs": chunk })).await?;
             for d in links.links {
                 if d.link.state != 1 || d.link.trash_time.is_some() {
                     continue; // trashed, draft or deleted
                 }
-                nodes.push(Self::decrypt_link(&self.pgp, &folder.key, d)?);
+                nodes.push(Self::decrypt_link(&self.pgp, &folder.volume_id, &folder.key, d)?);
             }
         }
         nodes.sort_by(|a, b| a.name.cmp(&b.name));
@@ -367,6 +371,7 @@ impl<P: PGPProviderSync> Drive<P> {
     pub fn root(&self) -> Result<Node<P::PrivateKey>> {
         Ok(Node {
             id: self.root.id.clone(),
+            volume_id: self.root.volume_id.clone(),
             name: self.root.name.clone(),
             is_folder: true,
             modify_time: self.root.modify_time,
@@ -479,10 +484,11 @@ impl<P: PGPProviderSync> Drive<P> {
             #[serde(rename = "ID")]
             id: String,
         }
-        let path = format!("drive/v2/volumes/{}/folders", self.volume_id);
+        let path = format!("drive/v2/volumes/{}/folders", parent.volume_id);
         let r: R = self.api.post(&path, &serde_json::Value::Object(body)).await?;
         Ok(Node {
             id: r.folder.id,
+            volume_id: parent.volume_id.clone(),
             name: name.to_owned(),
             is_folder: true,
             modify_time: now(),
@@ -538,7 +544,7 @@ impl<P: PGPProviderSync> Drive<P> {
                     #[serde(rename = "ID")]
                     id: String,
                 }
-                let path = format!("drive/v2/volumes/{}/files/{}/revisions", self.volume_id, node.id);
+                let path = format!("drive/v2/volumes/{}/files/{}/revisions", node.volume_id, node.id);
                 let uid = self.api.session.as_ref().map(|s| s.uid.clone()).unwrap_or_default();
                 let r: R = self.api.post(&path, &json!({ "CurrentRevisionID": current, "ClientUID": uid })).await?;
                 (node.id.clone(), r.revision.id, self.reimport(&node.key)?, session_key)
@@ -573,7 +579,7 @@ impl<P: PGPProviderSync> Drive<P> {
                     #[serde(rename = "RevisionID")]
                     revision_id: String,
                 }
-                let path = format!("drive/v2/volumes/{}/files", self.volume_id);
+                let path = format!("drive/v2/volumes/{}/files", parent.volume_id);
                 let r: R = self.api.post(&path, &serde_json::Value::Object(body)).await?;
                 (r.file.id, r.file.revision_id, key, session_key)
             }
@@ -586,7 +592,7 @@ impl<P: PGPProviderSync> Drive<P> {
             #[serde(rename = "VerificationCode")]
             code: String,
         }
-        let path = format!("drive/v2/volumes/{}/links/{link_id}/revisions/{revision_id}/verification", self.volume_id);
+        let path = format!("drive/v2/volumes/{}/links/{link_id}/revisions/{revision_id}/verification", parent.volume_id);
         let code = B64.decode(self.api.get::<Verification>(&path).await?.code).context("verification code base64")?;
 
         // 3. Blocks. ponytail: one prepare request and one upload per block, sequential.
@@ -636,7 +642,7 @@ impl<P: PGPProviderSync> Drive<P> {
                     "drive/blocks",
                     &json!({
                         "AddressID": self.address_id,
-                        "VolumeID": self.volume_id,
+                        "VolumeID": parent.volume_id,
                         "LinkID": link_id,
                         "RevisionID": revision_id,
                         "BlockList": [{
@@ -715,7 +721,7 @@ impl<P: PGPProviderSync> Drive<P> {
         loop {
             let path = format!(
                 "drive/v2/volumes/{}/files/{}/revisions/{}?FromBlockIndex={next_index}&PageSize={PAGE}&NoBlockUrls=0",
-                self.volume_id, file.id, revision.id
+                file.volume_id, file.id, revision.id
             );
             let mut blocks = self.api.get::<R>(&path).await?.revision.blocks;
             blocks.sort_by_key(|b| b.index);
@@ -741,6 +747,70 @@ impl<P: PGPProviderSync> Drive<P> {
         }
         Ok(written)
     }
+    // ---- photos -----------------------------------------------------------
+
+    /// The photos timeline root, or `None` when the account has no photos
+    /// volume. Photos live in their own volume with their own share.
+    pub async fn photos_root(&mut self) -> Result<Option<Node<P::PrivateKey>>> {
+        let bootstrap: ShareBootstrap = match self.api.get("drive/v2/shares/photos").await {
+            Ok(b) => b,
+            Err(e) if crate::api::api_code(&e) == Some(crate::api::DOES_NOT_EXIST) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+        let ShareBootstrap { volume, share, link } = bootstrap;
+        Ok(Some(decrypt_share_root(&self.pgp, &self.address_keys, &share, &volume.id, link)?))
+    }
+
+    /// Every photo on the timeline, newest first, with its capture time. The
+    /// timeline is flat: it is not the folder tree.
+    pub async fn timeline(&mut self, root: &Node<P::PrivateKey>) -> Result<Vec<TimelinePhoto>> {
+        #[derive(Deserialize)]
+        struct Page {
+            #[serde(rename = "Photos", default)]
+            photos: Vec<TimelinePhoto>,
+        }
+        const PAGE: usize = 500;
+        let mut all: Vec<TimelinePhoto> = Vec::new();
+        let mut anchor: Option<String> = None;
+        loop {
+            let mut path = format!("drive/volumes/{}/photos", root.volume_id);
+            if let Some(a) = &anchor {
+                path.push_str(&format!("?PreviousPageLastLinkID={a}"));
+            }
+            let page: Page = self.api.get(&path).await?;
+            let count = page.photos.len();
+            let last = page.photos.last().map(|p| p.id.clone());
+            all.extend(page.photos);
+            // Stop on a short page, and also if the cursor fails to advance —
+            // a repeated page would otherwise loop forever.
+            if count < PAGE || last.is_none() || last == anchor {
+                return Ok(all);
+            }
+            anchor = last;
+        }
+    }
+
+    /// Decrypts photo nodes by id. Photos have their own link-details route.
+    pub async fn photo_nodes(&mut self, root: &Node<P::PrivateKey>, ids: &[String]) -> Result<Vec<Node<P::PrivateKey>>> {
+        #[derive(Deserialize)]
+        struct Links {
+            #[serde(rename = "Links")]
+            links: Vec<LinkDetails>,
+        }
+        let mut nodes = Vec::with_capacity(ids.len());
+        for chunk in ids.chunks(150) {
+            let path = format!("drive/photos/volumes/{}/links", root.volume_id);
+            let links: Links = self.api.post(&path, &json!({ "LinkIDs": chunk })).await?;
+            for d in links.links {
+                if d.link.state != 1 || d.link.trash_time.is_some() {
+                    continue;
+                }
+                nodes.push(Self::decrypt_link(&self.pgp, &root.volume_id, &root.key, d)?);
+            }
+        }
+        Ok(nodes)
+    }
+
     // ---- public links -----------------------------------------------------
 
     /// Recovers the session key a PGP message was encrypted with.
@@ -826,7 +896,7 @@ impl<P: PGPProviderSync> Drive<P> {
             #[serde(rename = "ID")]
             id: String,
         }
-        let path = format!("drive/volumes/{}/shares", self.volume_id);
+        let path = format!("drive/volumes/{}/shares", node.volume_id);
         let created: R = self
             .api
             .post(
@@ -993,6 +1063,36 @@ struct ShareUrl {
 /// Proton's alphabet and length for the generated half of a link password.
 const LINK_PASSWORD_LEN: usize = 12;
 const LINK_PASSWORD_CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+/// One timeline entry. The capture time is what orders the timeline, and it is
+/// what a photo is filed under locally.
+#[derive(Deserialize)]
+pub struct TimelinePhoto {
+    #[serde(rename = "LinkID")]
+    pub id: String,
+    #[serde(rename = "CaptureTime", default)]
+    pub capture_time: i64,
+}
+
+/// Unlocks a share key with the account's address keys, then decrypts the
+/// share's root node with it.
+fn decrypt_share_root<P: PGPProviderSync>(
+    pgp: &P,
+    address_keys: &[P::PrivateKey],
+    share: &BootstrapShare,
+    volume_id: &str,
+    link: LinkDetails,
+) -> Result<Node<P::PrivateKey>> {
+    let passphrase = pgp
+        .new_decryptor()
+        .with_decryption_keys(address_keys.iter())
+        .decrypt(&share.passphrase, DataEncoding::Armor)
+        .map_err(|e| anyhow!("decrypt share passphrase: {e}"))?;
+    let share_key = pgp
+        .private_key_import(&share.key, passphrase.as_bytes(), DataEncoding::Armor)
+        .map_err(|e| anyhow!("unlock share key: {e}"))?;
+    Drive::<P>::decrypt_link(pgp, volume_id, &share_key, link)
+}
 
 /// The key a visitor derives from the link password to unwrap the share's
 /// session key: bcrypt over the password and salt, keeping only the hash half.

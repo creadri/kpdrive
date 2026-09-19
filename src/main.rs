@@ -1,5 +1,6 @@
 mod api;
 mod drive;
+mod photos;
 mod sync;
 mod daemon;
 mod setup;
@@ -37,6 +38,12 @@ enum Cmd {
         /// Local folder. Default: ~/ProtonDrive
         #[arg(long)]
         root: Option<std::path::PathBuf>,
+    },
+    /// Download the Proton Photos timeline (one-way, remote → local).
+    Photos {
+        /// Where to put them. Default: ~/Pictures/Proton Drive
+        #[arg(long)]
+        dest: Option<std::path::PathBuf>,
     },
     /// Sync Drive with the local folder (two-way). --watch keeps running with a tray icon.
     Sync {
@@ -96,6 +103,7 @@ async fn main() -> Result<()> {
         Cmd::Ls { path } => ls(&path).await,
         Cmd::Get { remote, local } => get(&remote, local).await,
         Cmd::Sync { root, watch, force } => sync(root, watch, force).await,
+        Cmd::Photos { dest } => photos(dest).await,
         Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
         Cmd::Setup { root } => setup(root).await,
         Cmd::Mkdir { remote } => mkdir(&remote).await,
@@ -270,6 +278,26 @@ async fn setup(root: Option<std::path::PathBuf>) -> Result<()> {
     }
     println!("start now with: kpdrive sync --watch   (Dolphin overlay icons: see dolphin-overlay/README.md)");
     Ok(())
+}
+
+async fn photos(dest: Option<std::path::PathBuf>) -> Result<()> {
+    let mut state = photos::load_state()?.unwrap_or_default();
+    if let Some(dest) = dest {
+        state.dest = dest;
+    }
+    if state.dest.as_os_str().is_empty() {
+        state.dest = photos::default_dest()?;
+    }
+    photos::check_dest(&state.dest, sync::load_state()?.map(|s| s.root).as_deref())?;
+
+    let (mut drive, before) = open_drive().await?;
+    match photos::run(&mut drive, &mut state).await? {
+        None => println!("this account has no Proton Photos library"),
+        Some(0) => println!("photos up to date in {}", state.dest.display()),
+        Some(n) => println!("{n} photo(s) into {}", state.dest.display()),
+    }
+    photos::save_state(&state)?;
+    persist(drive.api, before).await
 }
 
 async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Result<()> {
