@@ -10,9 +10,10 @@ use base64::Engine as _;
 use base64::prelude::BASE64_STANDARD as B64;
 use hmac::{Hmac, Mac};
 use proton_crypto::crypto::{
-    DataEncoding, Decryptor, DecryptorSync, Encryptor, EncryptorSync, KeyGenerator, KeyGeneratorSync, PGPProviderSync,
-    SessionKey, SessionKeyAlgorithm, Signer, SignerSync, VerifiedData,
+    DataEncoding, Decryptor, DecryptorSync, Encryptor, EncryptorSync, KeyGenerator, KeyGeneratorSync, PGPMessage,
+    PGPProviderSync, SessionKey, SessionKeyAlgorithm, Signer, SignerSync, VerifiedData,
 };
+use proton_crypto::srp::{HashedPassword, SRPProvider};
 use proton_crypto_account::keys::AddressKeys;
 use serde::Deserialize;
 use serde_json::json;
@@ -34,6 +35,15 @@ struct LinkDetails {
     file: Option<File>,
     #[serde(rename = "Folder")]
     folder: Option<Folder>,
+    /// Present once the node has a share of its own (what a public link hangs off).
+    #[serde(rename = "Sharing", default)]
+    sharing: Option<Sharing>,
+}
+
+#[derive(Deserialize)]
+struct Sharing {
+    #[serde(rename = "ShareID")]
+    share_id: String,
 }
 
 #[derive(Deserialize)]
@@ -91,6 +101,12 @@ pub struct Node<K> {
     key: K,
     file: Option<File>,
     hash_key: Option<String>,
+    /// Armored, encrypted to the *parent* key. Creating a share re-wraps their
+    /// session keys so the share can read this node's name and passphrase.
+    passphrase: String,
+    name_armored: String,
+    /// Set once the node has its own share.
+    share_id: Option<String>,
 }
 
 pub struct Drive<P: PGPProviderSync> {
@@ -101,7 +117,10 @@ pub struct Drive<P: PGPProviderSync> {
     /// The share's address: id, email, and its primary key, which signs what we write.
     address_id: String,
     email: String,
+    /// Primary address key: signs everything we write.
     signing_key: P::PrivateKey,
+    /// Every unlocked key of that address, for reading what other clients wrote.
+    address_keys: Vec<P::PrivateKey>,
 }
 
 impl<P: PGPProviderSync> Drive<P> {
@@ -168,14 +187,14 @@ impl<P: PGPProviderSync> Drive<P> {
             address_id: String,
         }
         let my_files: MyFiles = api.get("drive/v2/shares/my-files").await?;
-        let (email, primary, keys) = address_keys
+        let (email, primary, address_keys) = address_keys
             .remove(&my_files.share.address_id)
             .filter(|(_, _, k)| !k.is_empty())
             .ok_or_else(|| anyhow!("no unlocked keys for the share's address"))?;
         let signing_key = primary.ok_or_else(|| anyhow!("share address has no primary key"))?;
         let passphrase = pgp
             .new_decryptor()
-            .with_decryption_keys(keys.iter())
+            .with_decryption_keys(address_keys.iter())
             .decrypt(&my_files.share.passphrase, DataEncoding::Armor)
             .map_err(|e| anyhow!("decrypt share passphrase: {e}"))?;
         let share_key = pgp
@@ -190,10 +209,12 @@ impl<P: PGPProviderSync> Drive<P> {
             address_id: my_files.share.address_id,
             email,
             signing_key,
+            address_keys,
         })
     }
 
     fn decrypt_link(pgp: &P, parent: &P::PrivateKey, d: LinkDetails) -> Result<Node<P::PrivateKey>> {
+        let (armored_passphrase, name_armored) = (d.link.node_passphrase.clone(), d.link.name.clone());
         let passphrase = pgp
             .new_decryptor()
             .with_decryption_key(parent)
@@ -216,6 +237,9 @@ impl<P: PGPProviderSync> Drive<P> {
             key,
             file: d.file,
             hash_key: d.folder.map(|f| f.hash_key),
+            passphrase: armored_passphrase,
+            name_armored,
+            share_id: d.sharing.map(|s| s.share_id),
         })
     }
 
@@ -303,6 +327,24 @@ impl<P: PGPProviderSync> Drive<P> {
         }
     }
 
+    /// Resolves `path` to its parent folder and the node itself. The root has
+    /// no parent, so it is rejected.
+    pub async fn resolve_with_parent(&mut self, path: &str) -> Result<(Node<P::PrivateKey>, Node<P::PrivateKey>)> {
+        let trimmed = path.trim_matches('/');
+        let (parent_path, name) = trimmed.rsplit_once('/').unwrap_or(("", trimmed));
+        if name.is_empty() {
+            bail!("the Drive root itself cannot be shared; name a file or folder inside it");
+        }
+        let parent = self.resolve(parent_path).await?;
+        let node = self
+            .list(&parent)
+            .await?
+            .into_iter()
+            .find(|n| n.name == name)
+            .ok_or_else(|| anyhow!("no such file or folder: {name}"))?;
+        Ok((parent, node))
+    }
+
     /// Walks `path` ("a/b/c", leading slash optional) from the root.
     pub async fn resolve(&mut self, path: &str) -> Result<Node<P::PrivateKey>> {
         let mut node = self.root()?;
@@ -332,6 +374,9 @@ impl<P: PGPProviderSync> Drive<P> {
             key: self.reimport(&self.root.key)?,
             file: None,
             hash_key: self.root.hash_key.clone(),
+            passphrase: self.root.passphrase.clone(),
+            name_armored: self.root.name_armored.clone(),
+            share_id: self.root.share_id.clone(),
         })
     }
 
@@ -445,6 +490,9 @@ impl<P: PGPProviderSync> Drive<P> {
             key,
             file: None,
             hash_key: Some(hash_key_armored),
+            passphrase: String::new(),
+            name_armored: String::new(),
+            share_id: None,
         })
     }
 
@@ -693,6 +741,284 @@ impl<P: PGPProviderSync> Drive<P> {
         }
         Ok(written)
     }
+    // ---- public links -----------------------------------------------------
+
+    /// Recovers the session key a PGP message was encrypted with.
+    fn message_session_key(&self, key: &P::PrivateKey, armored: &str) -> Result<P::SessionKey> {
+        let message = self
+            .pgp
+            .pgp_message_import(armored, DataEncoding::Armor)
+            .map_err(|e| anyhow!("parse message: {e}"))?;
+        self.pgp
+            .new_decryptor()
+            .with_decryption_key(key)
+            .decrypt_session_key(message.as_key_packets())
+            .map_err(|e| anyhow!("recover session key: {e}"))
+    }
+
+    /// Re-wraps a session key for `key`, base64 as the API wants it.
+    fn wrap_session_key(&self, key: &P::PrivateKey, session_key: &P::SessionKey) -> Result<String> {
+        let public = self.pgp.private_key_to_public_key(key).map_err(|e| anyhow!("public key: {e}"))?;
+        let packet = self
+            .pgp
+            .new_encryptor()
+            .with_encryption_key(&public)
+            .encrypt_session_key(session_key)
+            .map_err(|e| anyhow!("wrap session key: {e}"))?;
+        Ok(B64.encode(packet))
+    }
+
+    /// The share hanging off `node`, created if it has none. A public link is
+    /// always attached to such a share, never to the node directly.
+    async fn ensure_share(
+        &mut self,
+        parent: &Node<P::PrivateKey>,
+        node: &Node<P::PrivateKey>,
+    ) -> Result<(String, P::SessionKey)> {
+        if let Some(share_id) = &node.share_id {
+            // Unlike the my-files lookup, this route puts the share's own fields
+            // at the top level of the envelope.
+            #[derive(Deserialize)]
+            struct Share {
+                #[serde(rename = "Passphrase")]
+                passphrase: String,
+            }
+            let path = format!("drive/shares/{share_id}");
+            let share: Share = self.api.get(&path).await?;
+            let session_key = self.message_session_key(&node.key, &share.passphrase)?;
+            return Ok((share_id.clone(), session_key));
+        }
+
+        // A new share gets its own key. Its passphrase is encrypted to both the
+        // node key and our address key, under a session key we keep: the public
+        // link is exactly that session key re-wrapped under the link password.
+        let (share_key, share_key_armored, share_passphrase) = self.new_node_key()?;
+        let session_key = self
+            .pgp
+            .session_key_generate(SessionKeyAlgorithm::Aes256)
+            .map_err(|e| anyhow!("generate share session key: {e}"))?;
+        let node_public = self.pgp.private_key_to_public_key(&node.key).map_err(|e| anyhow!("public key: {e}"))?;
+        let address_public = self
+            .pgp
+            .private_key_to_public_key(&self.signing_key)
+            .map_err(|e| anyhow!("public key: {e}"))?;
+        let armored_passphrase = String::from_utf8(
+            self.pgp
+                .new_encryptor()
+                .with_encryption_keys([&node_public, &address_public])
+                .with_session_key(session_key.clone())
+                .encrypt_raw(&share_passphrase, DataEncoding::Armor)
+                .map_err(|e| anyhow!("encrypt share passphrase: {e}"))?,
+        )?;
+
+        // The share must be able to read the node's name and passphrase, so
+        // their session keys are re-wrapped for the share key.
+        let node_passphrase_sk = self.message_session_key(&parent.key, &node.passphrase)?;
+        let node_name_sk = self.message_session_key(&parent.key, &node.name_armored)?;
+
+        #[derive(Deserialize)]
+        struct R {
+            #[serde(rename = "Share")]
+            share: Id,
+        }
+        #[derive(Deserialize)]
+        struct Id {
+            #[serde(rename = "ID")]
+            id: String,
+        }
+        let path = format!("drive/volumes/{}/shares", self.volume_id);
+        let created: R = self
+            .api
+            .post(
+                &path,
+                &json!({
+                    "RootLinkID": node.id,
+                    "AddressID": self.address_id,
+                    "Name": "New Share",
+                    "ShareKey": share_key_armored,
+                    "SharePassphrase": armored_passphrase,
+                    "SharePassphraseSignature": self.sign_detached(&self.signing_key, &share_passphrase)?,
+                    "PassphraseKeyPacket": self.wrap_session_key(&share_key, &node_passphrase_sk)?,
+                    "NameKeyPacket": self.wrap_session_key(&share_key, &node_name_sk)?,
+                }),
+            )
+            .await?;
+        Ok((created.share.id, session_key))
+    }
+
+    /// The public link already on `node`, if any, password fragment included.
+    pub async fn public_link(&mut self, node: &Node<P::PrivateKey>) -> Result<Option<String>> {
+        let Some(share_id) = &node.share_id else { return Ok(None) };
+        let path = format!("drive/shares/{share_id}/urls");
+        let Some(url) = self.api.get::<ShareUrls>(&path).await?.urls.into_iter().next() else {
+            return Ok(None);
+        };
+        Ok(Some(self.link_url(&url)))
+    }
+
+    /// Rebuilds the shareable URL. The generated password is stored encrypted to
+    /// our address key precisely so any of our clients can show the link again.
+    fn link_url(&self, url: &ShareUrl) -> String {
+        let generated = url.password.as_deref().and_then(|armored| {
+            let plain = self
+                .pgp
+                .new_decryptor()
+                .with_decryption_keys(self.address_keys.iter())
+                .decrypt(armored, DataEncoding::Armor)
+                .ok()?;
+            let text = String::from_utf8(plain.as_bytes().to_vec()).ok()?;
+            Some(text.chars().take(LINK_PASSWORD_LEN).collect::<String>())
+        });
+        match generated {
+            Some(p) => format!("{}#{p}", url.public_url),
+            None => url.public_url.clone(),
+        }
+    }
+
+    /// Creates a read-only public link for `node`, or returns the existing one.
+    /// `custom_password` is appended to the generated half and is *not* part of
+    /// the URL, so it has to be sent to the recipient separately.
+    pub async fn share(
+        &mut self,
+        parent: &Node<P::PrivateKey>,
+        node: &Node<P::PrivateKey>,
+        custom_password: Option<&str>,
+        expires_days: Option<i64>,
+    ) -> Result<String> {
+        if let Some(existing) = self.public_link(node).await? {
+            return Ok(existing);
+        }
+        let (share_id, session_key) = self.ensure_share(parent, node).await?;
+
+        let generated = generated_password();
+        let full = match custom_password {
+            Some(custom) if !custom.is_empty() => format!("{generated}{custom}"),
+            _ => generated.clone(),
+        };
+
+        // Visitors prove they know the password by SRP, against a verifier built
+        // on a modulus the server signs.
+        #[derive(Deserialize)]
+        struct Modulus {
+            #[serde(rename = "Modulus")]
+            modulus: String,
+            #[serde(rename = "ModulusID")]
+            modulus_id: String,
+        }
+        let modulus: Modulus = self.api.get("auth/v4/modulus").await?;
+        let srp = proton_crypto::new_srp_provider();
+        let verifier = srp
+            .generate_client_verifier(&full, &modulus.modulus)
+            .map_err(|e| anyhow!("srp verifier: {e}"))?;
+
+        // The share's session key, re-wrapped under a key derived from the
+        // password: that is what lets a visitor decrypt the share at all.
+        let salt: [u8; 16] = proton_crypto::generate_secure_random_bytes();
+        let derived = link_password_key(&full, &salt)?;
+        let key_packet = self
+            .pgp
+            .new_encryptor()
+            .with_passphrase(&derived)
+            .encrypt_session_key(&session_key)
+            .map_err(|e| anyhow!("wrap share key under the link password: {e}"))?;
+
+        let address_public = self
+            .pgp
+            .private_key_to_public_key(&self.signing_key)
+            .map_err(|e| anyhow!("public key: {e}"))?;
+        let stored_password = String::from_utf8(
+            self.pgp
+                .new_encryptor()
+                .with_encryption_key(&address_public)
+                .encrypt_raw(full.as_bytes(), DataEncoding::Armor)
+                .map_err(|e| anyhow!("store link password: {e}"))?,
+        )?;
+
+        let mut body = json!({
+            "CreatorEmail": self.email,
+            "Permissions": 4, // viewer
+            "Flags": if custom_password.map(|p| !p.is_empty()).unwrap_or(false) { 3 } else { 2 },
+            "SharePasswordSalt": B64.encode(salt),
+            "SharePassphraseKeyPacket": B64.encode(key_packet),
+            "Password": stored_password,
+            "UrlPasswordSalt": verifier.salt,
+            "SRPVerifier": verifier.verifier,
+            "SRPModulusID": modulus.modulus_id,
+            "MaxAccesses": 0,
+        });
+        if let Some(days) = expires_days {
+            body["ExpirationTime"] = json!(now() + days * 86_400);
+        }
+
+        #[derive(Deserialize)]
+        struct R {
+            #[serde(rename = "ShareURL")]
+            url: ShareUrl,
+        }
+        let path = format!("drive/shares/{share_id}/urls");
+        let created: R = self.api.post(&path, &body).await?;
+        Ok(format!("{}#{generated}", created.url.public_url))
+    }
+
+    /// Removes every public link on `node`. Returns how many were removed.
+    pub async fn unshare(&mut self, node: &Node<P::PrivateKey>) -> Result<usize> {
+        let Some(share_id) = node.share_id.clone() else { return Ok(0) };
+        let path = format!("drive/shares/{share_id}/urls");
+        let urls = self.api.get::<ShareUrls>(&path).await?.urls;
+        for url in &urls {
+            let path = format!("drive/shares/{share_id}/urls/{}", url.id);
+            let _: serde_json::Value = self.api.delete(&path).await?;
+        }
+        Ok(urls.len())
+    }
+}
+
+#[derive(Deserialize)]
+struct ShareUrls {
+    #[serde(rename = "ShareURLs", default)]
+    urls: Vec<ShareUrl>,
+}
+
+#[derive(Deserialize)]
+struct ShareUrl {
+    #[serde(rename = "ShareURLID")]
+    id: String,
+    #[serde(rename = "PublicUrl", default)]
+    public_url: String,
+    /// The full link password, encrypted to the creator's address key.
+    #[serde(rename = "Password", default)]
+    password: Option<String>,
+}
+
+/// Proton's alphabet and length for the generated half of a link password.
+const LINK_PASSWORD_LEN: usize = 12;
+const LINK_PASSWORD_CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+/// The key a visitor derives from the link password to unwrap the share's
+/// session key: bcrypt over the password and salt, keeping only the hash half.
+fn link_password_key(password: &str, salt: &[u8; 16]) -> Result<String> {
+    let hashed = proton_crypto::new_srp_provider()
+        .mailbox_password(password.as_bytes(), salt)
+        .map_err(|e| anyhow!("derive link key: {e}"))?;
+    Ok(std::str::from_utf8(hashed.password_hash()).context("derived key is not ascii")?.to_owned())
+}
+
+/// Rejection sampling, so every character is equally likely: taking bytes mod 62
+/// would quietly favour the first few letters.
+fn generated_password() -> String {
+    let limit = 256 - 256 % LINK_PASSWORD_CHARSET.len();
+    let mut out = String::with_capacity(LINK_PASSWORD_LEN);
+    while out.len() < LINK_PASSWORD_LEN {
+        for b in proton_crypto::generate_secure_random_bytes::<32>() {
+            if (b as usize) < limit {
+                out.push(LINK_PASSWORD_CHARSET[b as usize % LINK_PASSWORD_CHARSET.len()] as char);
+                if out.len() == LINK_PASSWORD_LEN {
+                    break;
+                }
+            }
+        }
+    }
+    out
 }
 
 fn name_hash(hash_key: &[u8], name: &str) -> String {
@@ -748,6 +1074,35 @@ mod tests {
         assert_eq!(iso8601(0), "1970-01-01T00:00:00Z");
         assert_eq!(iso8601(1_700_000_000), "2023-11-14T22:13:20Z");
         assert_eq!(iso8601(951_782_400), "2000-02-29T00:00:00Z");
+    }
+
+    /// The step a visitor depends on: the share's session key must come back out
+    /// of the packet using nothing but the link password and the stored salt.
+    #[test]
+    fn link_password_unwraps_the_share_key() {
+        let pgp = proton_crypto::new_pgp_provider();
+        let session_key = pgp.session_key_generate(SessionKeyAlgorithm::Aes256).unwrap();
+        let salt: [u8; 16] = proton_crypto::generate_secure_random_bytes();
+        let derived = link_password_key("oHVAuzd2NcS2", &salt).unwrap();
+        let packet = pgp.new_encryptor().with_passphrase(&derived).encrypt_session_key(&session_key).unwrap();
+
+        let recovered = pgp
+            .new_decryptor()
+            .with_passphrase(&derived)
+            .decrypt_session_key(&packet)
+            .expect("the derived key must open the packet");
+        assert_eq!(recovered.export().as_ref(), session_key.export().as_ref());
+
+        let wrong = link_password_key("oHVAuzd2NcS3", &salt).unwrap();
+        assert!(pgp.new_decryptor().with_passphrase(&wrong).decrypt_session_key(&packet).is_err());
+    }
+
+    #[test]
+    fn link_passwords() {
+        let a = generated_password();
+        assert_eq!(a.chars().count(), LINK_PASSWORD_LEN);
+        assert!(a.bytes().all(|b| LINK_PASSWORD_CHARSET.contains(&b)), "{a}");
+        assert_ne!(a, generated_password(), "two draws must not match");
     }
 
     #[test]

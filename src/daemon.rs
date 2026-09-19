@@ -149,7 +149,7 @@ async fn serve_socket(snap: Shared, cmds: mpsc::UnboundedSender<Cmd>) -> Result<
     }
 }
 
-fn notify(body: &str) {
+pub fn notify(body: &str) {
     let _ = std::process::Command::new("notify-send")
         .args(["-a", "kpdrive", "-i", "folder-cloud", "Proton Drive", body])
         .spawn();

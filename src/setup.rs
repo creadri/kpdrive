@@ -61,6 +61,26 @@ pub fn autostart() -> Result<PathBuf> {
     Ok(file)
 }
 
+/// Adds "Copy Proton Drive link" to Dolphin's right-click menu. KDE has no way
+/// to limit a service menu to one directory, so the entry appears everywhere and
+/// the command declines politely outside the sync folder.
+pub fn servicemenu() -> Result<PathBuf> {
+    let dir = xdg("XDG_DATA_HOME", ".local/share")?.join("kio/servicemenus");
+    std::fs::create_dir_all(&dir)?;
+    let exe = std::env::current_exe()?;
+    let file = dir.join("kpdrive-share.desktop");
+    std::fs::write(
+        &file,
+        format!(
+            "[Desktop Entry]\nType=Service\n# all files inherit from application/octet-stream\nMimeType=application/octet-stream;inode/directory;\nActions=kpdriveShare;\nX-KDE-MaxNumberOfUrls=1\n\n[Desktop Action kpdriveShare]\nName=Copy Proton Drive link\nIcon=emblem-shared\nExec={} share --copy %f\n",
+            exe.display()
+        ),
+    )?;
+    // Service menus are only picked up once the desktop cache is rebuilt.
+    let _ = std::process::Command::new("kbuildsycoca6").arg("--noincremental").output();
+    Ok(file)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

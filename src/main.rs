@@ -4,7 +4,7 @@ mod sync;
 mod daemon;
 mod setup;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use api::{Api, Session};
 use drive::Drive;
 use proton_crypto::crypto::PGPProviderSync;
@@ -56,6 +56,25 @@ enum Cmd {
         #[arg(default_value = "/")]
         remote_folder: String,
     },
+    /// Create (or show) a public link for a file or folder. Accepts a remote
+    /// path or a local one inside the sync folder.
+    Share {
+        remote: String,
+        /// Put the link on the clipboard and show a notification.
+        #[arg(long)]
+        copy: bool,
+        /// Extra password a recipient must type. It is NOT part of the link, so
+        /// send it separately.
+        #[arg(long)]
+        password: Option<String>,
+        /// Expire the link after this many days.
+        #[arg(long)]
+        expires_days: Option<i64>,
+    },
+    /// Remove the public link(s) from a remote file or folder.
+    Unshare {
+        remote: String,
+    },
     /// Create a remote folder.
     Mkdir {
         remote: String,
@@ -80,6 +99,8 @@ async fn main() -> Result<()> {
         Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
         Cmd::Setup { root } => setup(root).await,
         Cmd::Mkdir { remote } => mkdir(&remote).await,
+        Cmd::Share { remote, copy, password, expires_days } => share(&remote, copy, password.as_deref(), expires_days).await,
+        Cmd::Unshare { remote } => unshare(&remote).await,
     }
 }
 
@@ -150,6 +171,70 @@ async fn put(local: &std::path::Path, remote_folder: &str) -> Result<()> {
     persist(drive.api, before).await
 }
 
+async fn share(remote: &str, copy: bool, password: Option<&str>, expires_days: Option<i64>) -> Result<()> {
+    let remote = remote_path(remote)?;
+    let (mut drive, before) = open_drive().await?;
+    let (parent, node) = drive.resolve_with_parent(&remote).await?;
+    let existing = drive.public_link(&node).await?.is_some();
+    let url = drive.share(&parent, &node, password, expires_days).await?;
+    println!("{url}");
+    if copy {
+        let copied = copy_to_clipboard(&url);
+        daemon::notify(&if copied { format!("Link copied to the clipboard\n{url}") } else { format!("Link for {remote}\n{url}") });
+    }
+    if existing {
+        println!("(this link already existed; its settings were left alone)");
+    } else if let Some(p) = password.filter(|p| !p.is_empty()) {
+        println!("password to send separately: {p}");
+    }
+    persist(drive.api, before).await
+}
+
+async fn unshare(remote: &str) -> Result<()> {
+    let remote = remote_path(remote)?;
+    let (mut drive, before) = open_drive().await?;
+    let (_, node) = drive.resolve_with_parent(&remote).await?;
+    match drive.unshare(&node).await? {
+        0 => println!("{remote} has no public link"),
+        n => println!("removed {n} public link(s) from {remote}"),
+    }
+    persist(drive.api, before).await
+}
+
+/// Accepts either a remote path ("a/b.txt") or an absolute local path inside the
+/// sync folder, so Dolphin can pass %f straight through.
+fn remote_path(arg: &str) -> Result<String> {
+    let path = std::path::Path::new(arg);
+    if !path.is_absolute() {
+        return Ok(arg.trim_start_matches('/').to_owned());
+    }
+    let root = sync::load_state()?.map(|s| s.root).context("no sync folder yet; run `kpdrive setup`")?;
+    let rel = path
+        .strip_prefix(&root)
+        .map_err(|_| anyhow!("{} is not inside the sync folder ({})", path.display(), root.display()))?;
+    Ok(rel.to_string_lossy().into_owned())
+}
+
+/// Plasma keeps the clipboard alive through klipper once something owns it.
+fn copy_to_clipboard(text: &str) -> bool {
+    use std::io::Write;
+    for (cmd, args) in [("wl-copy", &[][..]), ("xclip", &["-selection", "clipboard"])] {
+        let Ok(mut child) = std::process::Command::new(cmd)
+            .args(args)
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+        else {
+            continue;
+        };
+        let wrote = child.stdin.take().map(|mut i| i.write_all(text.as_bytes()).is_ok()).unwrap_or(false);
+        let _ = child.wait();
+        if wrote {
+            return true;
+        }
+    }
+    false
+}
+
 async fn mkdir(remote: &str) -> Result<()> {
     let (mut drive, before) = open_drive().await?;
     let (parent, name) = remote.trim_end_matches('/').rsplit_once('/').unwrap_or(("", remote));
@@ -179,6 +264,7 @@ async fn setup(root: Option<std::path::PathBuf>) -> Result<()> {
         println!("added Proton Drive to Dolphin's Places");
     }
     println!("autostart: {}", setup::autostart()?.display());
+    println!("Dolphin menu: {}", setup::servicemenu()?.display());
     if load_session().await?.is_none() {
         println!("not logged in yet: run `kpdrive login`");
     }

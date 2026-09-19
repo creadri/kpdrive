@@ -12,6 +12,10 @@ Proton Drive sync client for KDE Plasma, written in Rust.
 - **KDE integration without C++:** tray via StatusNotifierItem, notifications and
   KWallet via D-Bus, prompts via `kdialog`, browser via `xdg-open`, Places entry via `user-places.xbel`,
   context menu via `kio/servicemenus`.
+- **Sharing:** a public link hangs off a share on the node. The share's session
+  key is re-wrapped under a bcrypt-derived key from the link password, and the
+  visitor proves the password by SRP. The generated password is also stored
+  encrypted to our own address key, which is how the link can be shown again.
 - **The one C++ piece:** Dolphin overlay icons (`KOverlayIconPlugin`). Lives in its own
   directory, talks to the daemon socket, optional package.
 - **Packaging:** `cargo install` now; RPM, deb, AUR later.
@@ -23,7 +27,9 @@ Proton Drive sync client for KDE Plasma, written in Rust.
 2. List root, download one file.
 3. Remote → local one-way sync driven by the event stream.
 4. Local → remote uploads (`put`, `mkdir`); `sync` pushes new/edited local files and trashes locally deleted ones.
-5. Tray, Places entry, notifications, autostart, Dolphin overlay plugin (servicemenus skipped: no action needs one yet).
+5. Tray, Places entry, notifications, autostart, Dolphin overlay plugin.
+6. Conflicts: both versions kept.
+7. Public links (`share`/`unshare`) and a "Copy Proton Drive link" Dolphin menu entry.
 
 Conflicts, trash, sharing and photos wait until two-way sync is stable.
 
@@ -36,6 +42,8 @@ kpdrive ls [path]
 kpdrive get <remote> [local]
 kpdrive put <local> [remote-folder]   # new file, or new revision if the name exists
 kpdrive mkdir <remote>
+kpdrive share <path> [--copy] [--password P] [--expires-days N]
+kpdrive unshare <path>
 kpdrive setup [--root DIR]    # local folder, Dolphin Places entry, autostart
 kpdrive sync [--root DIR] [--watch] [--force]   # two-way Drive <-> local; --watch = daemon with tray
 kpdrive logout
@@ -54,6 +62,14 @@ Sync state lives in `~/.local/share/kpdrive/state.json`. Rules:
   a deletion must not discard someone else's edit.
 - Removed remotely: deleted locally only if untouched since we wrote it.
 Set `KPDRIVE_DEBUG=1` for event-page diagnostics.
+
+`share` returns a public read-only link. The URL ends in `#<password>`: that
+fragment never leaves the browser, so the link itself is the credential. Keep
+it secret, or add `--password` for a second one the recipient must type, which
+is deliberately *not* in the URL and has to be sent separately. Passing `share`
+a path that already has a link returns that link unchanged. `--copy` puts it on
+the clipboard and is what the Dolphin right-click entry uses; `share` accepts a
+local path inside the sync folder as well as a remote one.
 
 The daemon (`sync --watch`) shows a Plasma tray icon, sends desktop
 notifications for conflicts and errors, and serves `$XDG_RUNTIME_DIR/kpdrive.sock`
