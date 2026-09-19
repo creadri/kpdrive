@@ -61,6 +61,29 @@ pub fn autostart() -> Result<PathBuf> {
     Ok(file)
 }
 
+/// Puts the account window in the application launcher.
+pub fn launcher() -> Result<PathBuf> {
+    let dir = xdg("XDG_DATA_HOME", ".local/share")?.join("applications");
+    std::fs::create_dir_all(&dir)?;
+    let exe = ui_binary()?;
+    let file = dir.join("be.otterit.kpdrive.desktop");
+    std::fs::write(
+        &file,
+        format!(
+            "[Desktop Entry]\nType=Application\nName=Proton Drive\nGenericName=Cloud storage\nComment=Account, storage and activity log for Proton Drive\nExec={} %u\nIcon=folder-cloud\nTerminal=false\nCategories=Utility;Network;FileTools;\nStartupNotify=true\n",
+            exe.display()
+        ),
+    )?;
+    Ok(file)
+}
+
+/// Where the window binary is: next to this one when run from a build tree,
+/// otherwise whatever is on PATH.
+pub fn ui_binary() -> Result<PathBuf> {
+    let sibling = std::env::current_exe()?.with_file_name("kpdrive-ui");
+    Ok(if sibling.is_file() { sibling } else { PathBuf::from("kpdrive-ui") })
+}
+
 /// Adds "Copy Proton Drive link" to Dolphin's right-click menu. KDE has no way
 /// to limit a service menu to one directory, so the entry appears everywhere and
 /// the command declines politely outside the sync folder.

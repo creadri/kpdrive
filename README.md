@@ -16,6 +16,9 @@ Proton Drive sync client for KDE Plasma, written in Rust.
   key is re-wrapped under a bcrypt-derived key from the link password, and the
   visitor proves the password by SRP. The generated password is also stored
   encrypted to our own address key, which is how the link can be shown again.
+- **Window:** `ui/` is a separate crate so the CLI and daemon never need Qt.
+  It is Rust plus QML (Kirigami) through cxx-qt; network work runs on a worker
+  thread and results are posted back to the Qt thread.
 - **The one C++ piece:** Dolphin overlay icons (`KOverlayIconPlugin`). Lives in its own
   directory, talks to the daemon socket, optional package.
 - **Packaging:** `cargo install` now; RPM, deb, AUR later.
@@ -31,6 +34,7 @@ Proton Drive sync client for KDE Plasma, written in Rust.
 6. Conflicts: both versions kept.
 7. Public links (`share`/`unshare`) and a "Copy Proton Drive link" Dolphin menu entry.
 8. Photos: timeline download.
+9. Account window and activity log with search and retention (`kpdrive-ui`).
 
 Conflicts, trash, sharing and photos wait until two-way sync is stable.
 
@@ -48,8 +52,18 @@ kpdrive share <path> [--copy] [--password P] [--expires-days N]
 kpdrive unshare <path>
 kpdrive setup [--root DIR]    # local folder, Dolphin Places entry, autostart
 kpdrive sync [--root DIR] [--watch] [--force]   # two-way Drive <-> local; --watch = daemon with tray
+kpdrive logs [--search TERM] [--lines N] [--retention DAYS]
 kpdrive logout
 ```
+
+`kpdrive-ui` opens the account window: who is signed in, storage used, links to
+Proton Drive and the account page on the web, sign in / sign out, and a second
+tab holding the activity log with a live search box and the retention setting.
+It is also in the application launcher and in the tray menu after `kpdrive setup`.
+
+Activity goes to `~/.local/share/kpdrive/logs/YYYY-MM-DD.log` as plain text,
+one file per day, pruned to `log_retention_days` from
+`~/.config/kpdrive/config.json` (30 by default).
 
 Sync state lives in `~/.local/share/kpdrive/state.json`. Rules:
 
@@ -87,5 +101,19 @@ The Dolphin overlay plugin in `dolphin-overlay/` uses that socket; see its READM
 ## Build
 
 ```
-cargo build
+cargo build                 # CLI and daemon
+cargo build -p kpdrive-ui   # the window; needs qt6-qtdeclarative-devel and kf6-kirigami
 ```
+
+## Licence
+
+GNU GPL v3 **or later** (`GPL-3.0-or-later`); see [LICENSE](LICENSE).
+
+Every library kpdrive links permits this. Qt 6 here is `LGPL-3.0-only`, which
+explicitly allows conveying the result under GPL v3. The KDE Frameworks behind
+the Dolphin plugin are `LGPL-2.0-or-later`, and `KOverlayIconPlugin` itself is
+`LGPL-2.0-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL`, so the v3
+option applies. Three Rust dependencies are Apache-2.0 with no alternative
+(`sync_wrapper` at run time, `clang-sys` and `codespan-reporting` at build
+time); Apache-2.0 is compatible with GPL v3 and *not* with GPL v2, which is what
+ruled v2 out. Everything else is MIT, BSD, Unicode or dual MIT/Apache.

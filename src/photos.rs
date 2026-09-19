@@ -96,7 +96,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State) ->
     if missing.is_empty() {
         return Ok(Some(0));
     }
-    println!("{} photo(s) to fetch", missing.len());
+    crate::log::info(&format!("{} photo(s) to fetch", missing.len()));
 
     let mut fetched = 0;
     for chunk in missing.chunks(150) {
@@ -111,7 +111,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State) ->
                 _ => match dated_path(&state.dest, taken, &node.name) {
                     Some(rel) => rel,
                     None => {
-                        eprintln!("skip: unusable photo name {:?}", node.name);
+                        crate::log::warn(&format!("skip: unusable photo name {:?}", node.name));
                         continue;
                     }
                 },
@@ -122,7 +122,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State) ->
             }
             match fetch(drive, &node, &local, taken).await {
                 Ok(size) => {
-                    println!("fetched {} ({size} bytes)", rel.display());
+                    crate::log::info(&format!("fetched photo {} ({size} bytes)", rel.display()));
                     state.photos.insert(node.id.clone(), Entry { path: rel, revision: node.revision.clone() });
                     fetched += 1;
                 }

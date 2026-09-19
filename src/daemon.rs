@@ -73,6 +73,22 @@ impl ksni::Tray for Tray {
             }
             .into(),
             StandardItem {
+                label: "Account and logs…".into(),
+                icon_name: "user-identity".into(),
+                activate: Box::new(|_: &mut Self| {
+                    match crate::setup::ui_binary() {
+                        Ok(exe) => {
+                            if let Err(e) = std::process::Command::new(&exe).spawn() {
+                                crate::log::error(&format!("cannot start {}: {e}", exe.display()));
+                            }
+                        }
+                        Err(e) => crate::log::error(&format!("cannot locate the window: {e:#}")),
+                    }
+                }),
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
                 label: "Sync now".into(),
                 icon_name: "view-refresh".into(),
                 activate: Box::new(|t: &mut Self| {
@@ -183,14 +199,20 @@ pub async fn run<P: PGPProviderSync>(
         }
     };
 
+    crate::log::write("INFO", "daemon started");
     let mut force = false;
     loop {
+        // Cheap: a directory listing, once per pass.
+        if let Err(e) = crate::log::prune(crate::config::load().log_retention_days) {
+            crate::log::error(&format!("log retention: {e:#}"));
+        }
         refresh(&snap, &state, true, None);
         if let Some(t) = &tray {
             t.update(|_| {}).await;
         }
         let error = match sync::run(&mut drive, &mut state, force).await {
             Ok(Some(notes)) => {
+                crate::log::write("INFO", &format!("synced to {}", state.root.display()));
                 println!("synced to {}", state.root.display());
                 if !notes.is_empty() {
                     notify(&notes.join("\n"));
@@ -200,7 +222,7 @@ pub async fn run<P: PGPProviderSync>(
             Ok(None) => None,
             Err(e) => {
                 let msg = format!("sync error: {e:#}");
-                eprintln!("{msg}");
+                crate::log::error(&msg);
                 notify(&msg);
                 Some(msg)
             }
@@ -219,6 +241,7 @@ pub async fn run<P: PGPProviderSync>(
             Err(_) => {}
         }
     }
+    crate::log::write("INFO", "daemon stopped");
     let _ = std::fs::remove_file(socket_path());
     Ok(())
 }

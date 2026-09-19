@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Dolphin overlay icons for the kpdrive sync folder. Asks the running daemon
 // over its Unix socket; see src/daemon.rs for the protocol.
 #include <KOverlayIconPlugin>

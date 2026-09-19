@@ -1,17 +1,7 @@
-mod api;
-mod drive;
-mod photos;
-mod sync;
-mod daemon;
-mod setup;
 
+use kpdrive::{account, config, daemon, log, photos, setup, sync};
 use anyhow::{Context, Result, anyhow};
-use api::{Api, Session};
-use drive::Drive;
-use proton_crypto::crypto::PGPProviderSync;
 use clap::{Parser, Subcommand};
-use std::collections::HashMap;
-use zeroize::Zeroizing;
 
 #[derive(Parser)]
 #[command(version, about = "Proton Drive sync client for KDE Plasma")]
@@ -26,6 +16,18 @@ enum Cmd {
     Login,
     /// Show the account behind the stored session.
     Status,
+    /// Show or search the activity log.
+    Logs {
+        /// Only lines containing this text (case-insensitive).
+        #[arg(long, default_value = "")]
+        search: String,
+        /// How many lines to show.
+        #[arg(long, default_value_t = 200)]
+        lines: usize,
+        /// Set how many days of log to keep, and save it.
+        #[arg(long)]
+        retention: Option<u64>,
+    },
     /// End the session server-side and forget it.
     Logout,
     /// List a remote folder.
@@ -99,7 +101,8 @@ async fn main() -> Result<()> {
     match Cli::parse().cmd {
         Cmd::Login => login().await,
         Cmd::Status => status().await,
-        Cmd::Logout => logout().await,
+        Cmd::Logs { search, lines, retention } => logs(&search, lines, retention),
+        Cmd::Logout => do_logout().await,
         Cmd::Ls { path } => ls(&path).await,
         Cmd::Get { remote, local } => get(&remote, local).await,
         Cmd::Sync { root, watch, force } => sync(root, watch, force).await,
@@ -113,8 +116,7 @@ async fn main() -> Result<()> {
 }
 
 async fn login() -> Result<()> {
-    let mut api = Api::new(None);
-    api.login_via_browser(|url, code| {
+    let username = account::login(|url, code| {
         println!("Sign in in your browser. Confirm this code there: {code}\n{url}");
         if std::process::Command::new("xdg-open").arg(url).spawn().is_err() {
             eprintln!("could not run xdg-open; open the URL above manually");
@@ -125,49 +127,66 @@ async fn login() -> Result<()> {
             .spawn();
     })
     .await?;
-    let session = api.session.take().expect("login sets session");
-    save_session(&session).await?;
-    println!("Logged in as {}. Session stored in the wallet.", session.username);
+    println!("logged in as {username}");
+    Ok(())
+}
+
+fn logs(search: &str, lines: usize, retention: Option<u64>) -> Result<()> {
+    let mut config = config::load();
+    if let Some(days) = retention {
+        config.log_retention_days = days;
+        config::save(&config)?;
+        println!("keeping {days} day(s) of logs");
+    }
+    let removed = log::prune(config.log_retention_days)?;
+    if removed > 0 {
+        println!("removed {removed} log file(s) past the {} day window", config.log_retention_days);
+    }
+    for line in log::search(search, lines)? {
+        println!("{line}");
+    }
     Ok(())
 }
 
 async fn status() -> Result<()> {
-    let session = load_session().await?.context("not logged in, run `kpdrive login`")?;
-    let mut api = Api::new(Some(session.clone()));
-    let user = api.user().await?;
-    api.key_secret()?; // present in the stored session
+    let info = account::info().await?;
     println!(
-        "{} ({}): {:.1} / {:.1} GiB used",
-        user.name,
-        user.id,
-        user.used_space as f64 / 1_073_741_824.0,
-        user.max_space as f64 / 1_073_741_824.0
+        "{}: {:.1} / {:.1} GiB used",
+        info.username,
+        info.used_bytes as f64 / 1_073_741_824.0,
+        info.total_bytes as f64 / 1_073_741_824.0
     );
-    persist(api, session).await
+    Ok(())
+}
+
+async fn do_logout() -> Result<()> {
+    account::logout().await?;
+    println!("logged out");
+    Ok(())
 }
 
 async fn ls(path: &str) -> Result<()> {
-    let (mut drive, before) = open_drive().await?;
+    let (mut drive, before) = account::open_drive().await?;
     let folder = drive.resolve(path).await?;
     for n in drive.list(&folder).await? {
         println!("{} {}", if n.is_folder { "d" } else { "-" }, n.name);
     }
-    persist(drive.api, before).await
+    account::persist(drive.api, before).await
 }
 
 async fn get(remote: &str, local: Option<std::path::PathBuf>) -> Result<()> {
-    let (mut drive, before) = open_drive().await?;
+    let (mut drive, before) = account::open_drive().await?;
     let file = drive.resolve(remote).await?;
     let dest = local.unwrap_or_else(|| std::path::PathBuf::from(&file.name));
     let mut out = std::io::BufWriter::new(std::fs::File::create(&dest).with_context(|| format!("create {}", dest.display()))?);
     let n = drive.download(&file, &mut out).await?;
     std::io::Write::flush(&mut out)?;
     println!("{} bytes -> {}", n, dest.display());
-    persist(drive.api, before).await
+    account::persist(drive.api, before).await
 }
 
 async fn put(local: &std::path::Path, remote_folder: &str) -> Result<()> {
-    let (mut drive, before) = open_drive().await?;
+    let (mut drive, before) = account::open_drive().await?;
     let folder = drive.resolve(remote_folder).await?;
     let name = local.file_name().and_then(|n| n.to_str()).context("local path has no file name")?;
     let existing = drive.list(&folder).await?.into_iter().find(|n| n.name == name && !n.is_folder);
@@ -176,12 +195,12 @@ async fn put(local: &std::path::Path, remote_folder: &str) -> Result<()> {
     let mut file = std::fs::File::open(local)?;
     let (link, rev) = drive.upload(&folder, name, existing.as_ref(), &mut file, mtime).await?;
     println!("uploaded {} ({} bytes) link={link} revision={rev}", local.display(), meta.len());
-    persist(drive.api, before).await
+    account::persist(drive.api, before).await
 }
 
 async fn share(remote: &str, copy: bool, password: Option<&str>, expires_days: Option<i64>) -> Result<()> {
     let remote = remote_path(remote)?;
-    let (mut drive, before) = open_drive().await?;
+    let (mut drive, before) = account::open_drive().await?;
     let (parent, node) = drive.resolve_with_parent(&remote).await?;
     let existing = drive.public_link(&node).await?.is_some();
     let url = drive.share(&parent, &node, password, expires_days).await?;
@@ -195,18 +214,18 @@ async fn share(remote: &str, copy: bool, password: Option<&str>, expires_days: O
     } else if let Some(p) = password.filter(|p| !p.is_empty()) {
         println!("password to send separately: {p}");
     }
-    persist(drive.api, before).await
+    account::persist(drive.api, before).await
 }
 
 async fn unshare(remote: &str) -> Result<()> {
     let remote = remote_path(remote)?;
-    let (mut drive, before) = open_drive().await?;
+    let (mut drive, before) = account::open_drive().await?;
     let (_, node) = drive.resolve_with_parent(&remote).await?;
     match drive.unshare(&node).await? {
         0 => println!("{remote} has no public link"),
-        n => println!("removed {n} public link(s) from {remote}"),
+        n => log::info(&format!("removed {n} public link(s) from {remote}")),
     }
-    persist(drive.api, before).await
+    account::persist(drive.api, before).await
 }
 
 /// Accepts either a remote path ("a/b.txt") or an absolute local path inside the
@@ -244,12 +263,12 @@ fn copy_to_clipboard(text: &str) -> bool {
 }
 
 async fn mkdir(remote: &str) -> Result<()> {
-    let (mut drive, before) = open_drive().await?;
+    let (mut drive, before) = account::open_drive().await?;
     let (parent, name) = remote.trim_end_matches('/').rsplit_once('/').unwrap_or(("", remote));
     let parent = drive.resolve(parent).await?;
     let node = drive.create_folder(&parent, name).await?;
     println!("created folder {} id={}", node.name, node.id);
-    persist(drive.api, before).await
+    account::persist(drive.api, before).await
 }
 
 fn resolve_root(state: &mut sync::State, root: Option<std::path::PathBuf>) -> Result<()> {
@@ -273,7 +292,8 @@ async fn setup(root: Option<std::path::PathBuf>) -> Result<()> {
     }
     println!("autostart: {}", setup::autostart()?.display());
     println!("Dolphin menu: {}", setup::servicemenu()?.display());
-    if load_session().await?.is_none() {
+    println!("launcher: {}", setup::launcher()?.display());
+    if account::load().await?.is_none() {
         println!("not logged in yet: run `kpdrive login`");
     }
     println!("start now with: kpdrive sync --watch   (Dolphin overlay icons: see dolphin-overlay/README.md)");
@@ -290,20 +310,20 @@ async fn photos(dest: Option<std::path::PathBuf>) -> Result<()> {
     }
     photos::check_dest(&state.dest, sync::load_state()?.map(|s| s.root).as_deref())?;
 
-    let (mut drive, before) = open_drive().await?;
+    let (mut drive, before) = account::open_drive().await?;
     match photos::run(&mut drive, &mut state).await? {
         None => println!("this account has no Proton Photos library"),
         Some(0) => println!("photos up to date in {}", state.dest.display()),
         Some(n) => println!("{n} photo(s) into {}", state.dest.display()),
     }
     photos::save_state(&state)?;
-    persist(drive.api, before).await
+    account::persist(drive.api, before).await
 }
 
 async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Result<()> {
     let mut state = sync::load_state()?.unwrap_or_default();
     resolve_root(&mut state, root)?;
-    let (mut drive, before) = open_drive().await?;
+    let (mut drive, before) = account::open_drive().await?;
     if watch {
         let mut last = before;
         return daemon::run(drive, state, move |d| {
@@ -311,7 +331,7 @@ async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Res
                 // Wallet writes are async; block briefly on a small runtime-free path.
                 let s2 = s.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = save_session(&s2).await {
+                    if let Err(e) = account::save(&s2).await {
                         eprintln!("could not store refreshed session: {e:#}");
                     }
                 });
@@ -324,55 +344,12 @@ async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Res
         Some(_) => println!("synced to {}", state.root.display()),
         None => {}
     }
-    persist(drive.api, before).await
+    account::persist(drive.api, before).await
 }
 
-async fn open_drive() -> Result<(Drive<impl PGPProviderSync>, Session)> {
-    let session = load_session().await?.context("not logged in, run `kpdrive login`")?;
-    let drive = Drive::open(Api::new(Some(session.clone())), proton_crypto::new_pgp_provider()).await?;
-    Ok((drive, session))
-}
 
-/// Persist rotated tokens if a refresh happened during the command.
-async fn persist(api: Api, before: Session) -> Result<()> {
-    if let Some(s) = api.session.filter(|s| *s != before) {
-        save_session(&s).await?;
-    }
-    Ok(())
-}
 
-async fn logout() -> Result<()> {
-    if let Some(session) = load_session().await? {
-        let mut api = Api::new(Some(session));
-        if let Err(e) = api.delete::<serde_json::Value>("auth/v4").await {
-            eprintln!("server-side logout failed ({e}); forgetting session anyway");
-        }
-    }
-    keyring().await?.delete(&attrs()).await?;
-    println!("Logged out.");
-    Ok(())
-}
 
-fn attrs() -> HashMap<&'static str, &'static str> {
-    HashMap::from([("application", "kpdrive")])
-}
 
-async fn keyring() -> Result<oo7::Keyring> {
-    oo7::Keyring::new().await.context("open Secret Service keyring (is KWallet running?)")
-}
 
-async fn load_session() -> Result<Option<Session>> {
-    let items = keyring().await?.search_items(&attrs()).await?;
-    let Some(item) = items.first() else { return Ok(None) };
-    let secret = item.secret().await?;
-    Ok(Some(serde_json::from_slice(&secret).context("stored session is corrupt")?))
-}
 
-async fn save_session(s: &Session) -> Result<()> {
-    let json = Zeroizing::new(serde_json::to_vec(s)?);
-    keyring()
-        .await?
-        .create_item("Proton Drive session (kpdrive)", &attrs(), json.as_slice(), true)
-        .await?;
-    Ok(())
-}

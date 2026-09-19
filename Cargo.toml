@@ -1,9 +1,12 @@
+[workspace]
+members = ["ui"]
+
 [package]
 name = "kpdrive"
 version = "0.1.0"
 edition = "2024"
 description = "Proton Drive sync client for KDE Plasma"
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 aes-gcm = "0.11"

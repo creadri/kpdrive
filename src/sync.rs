@@ -75,7 +75,7 @@ pub fn save_state(state: &State) -> Result<()> {
 pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, force: bool) -> Result<Option<Vec<String>>> {
     let mut notes: Vec<String> = Vec::new();
     macro_rules! note {
-        ($($arg:tt)*) => {{ let s = format!($($arg)*); eprintln!("{s}"); notes.push(s); }};
+        ($($arg:tt)*) => {{ let s = format!($($arg)*); crate::log::warn(&s); notes.push(s); }};
     }
     fs::create_dir_all(&state.root).with_context(|| format!("create {}", state.root.display()))?;
     let (cursor, remote_changed) = drive.events_since(state.event_id.as_deref()).await?;
@@ -110,7 +110,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
                 let old_local = state.root.join(&old.path);
                 if old.path != node_rel && old.revision == node.revision && old_local.exists() && !local.exists() {
                     fs::rename(&old_local, &local).with_context(|| format!("rename {}", old_local.display()))?;
-                    println!("moved {} -> {}", old.path.display(), node_rel.display());
+                    crate::log::info(&format!("moved {} -> {}", old.path.display(), node_rel.display()));
                 }
             }
 
@@ -120,7 +120,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
             if let Some(old) = old {
                 if !local.exists() {
                     if old.revision == node.revision {
-                        println!("trash {} (deleted locally)", node_rel.display());
+                        crate::log::info(&format!("trash {} (deleted locally)", node_rel.display()));
                         to_trash.push(node.id.clone());
                         continue;
                     }
@@ -176,7 +176,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
                     let parent_id = by_path[&rel].clone();
                     match drive.create_folder(&nodes[&parent_id], name).await {
                         Ok(node) => {
-                            println!("pushed {}/", item_rel.display());
+                            crate::log::info(&format!("pushed {}/", item_rel.display()));
                             seen.insert(node.id.clone(), Entry { path: item_rel.clone(), is_folder: true, revision: None, mtime: 0, size: 0 });
                             by_path.insert(item_rel.clone(), node.id.clone());
                             nodes.insert(node.id.clone(), node);
@@ -215,7 +215,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
             let existing_node = existing.as_ref().map(|id| &nodes[id]);
             match drive.upload(&nodes[&parent_id], name, existing_node, &mut file, mtime).await {
                 Ok((id, revision)) => {
-                    println!("pushed {} ({} bytes)", item_rel.display(), meta.len());
+                    crate::log::info(&format!("pushed {} ({} bytes)", item_rel.display(), meta.len()));
                     seen.insert(id.clone(), Entry { path: item_rel.clone(), is_folder: false, revision: Some(revision), mtime, size: meta.len() });
                     by_path.insert(item_rel, id);
                 }
@@ -238,13 +238,13 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
         if old.is_folder {
             if fs::read_dir(&local).map(|mut d| d.next().is_none()).unwrap_or(false) {
                 fs::remove_dir(&local)?;
-                println!("removed {}/", old.path.display());
+                crate::log::info(&format!("removed {}/", old.path.display()));
             } else {
                 note!("keep: {} removed remotely but not empty locally", old.path.display());
             }
         } else if local_matches(&meta, old) {
             fs::remove_file(&local)?;
-            println!("removed {}", old.path.display());
+            crate::log::info(&format!("removed {}", old.path.display()));
         } else {
             note!("keep: {} removed remotely but edited locally", old.path.display());
         }
@@ -341,7 +341,7 @@ async fn sync_file<P: PGPProviderSync>(
 
     fs::rename(&tmp, local)?;
     if !quiet {
-        println!("fetched {} ({size} bytes)", local.display());
+        crate::log::info(&format!("fetched {} ({size} bytes)", local.display()));
     }
     Ok(Some((mtime, size)))
 }
@@ -374,7 +374,7 @@ fn keep_local_copy(local: &Path, why: &str, notes: &mut Vec<String>) -> Result<S
     fs::rename(local, &copy).with_context(|| format!("rename {} aside", local.display()))?;
     let name = copy.file_name().unwrap_or_default().to_string_lossy().into_owned();
     let s = format!("conflict: {} {why}; local version kept as {name}", local.display());
-    eprintln!("{s}");
+    crate::log::warn(&s);
     notes.push(s);
     Ok(name)
 }
