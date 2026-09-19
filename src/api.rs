@@ -74,6 +74,20 @@ impl Api {
         Ok(resp.bytes().await?.to_vec())
     }
 
+    pub async fn put<T: DeserializeOwned>(&mut self, path: &str, body: &Value) -> Result<T> {
+        self.call(Method::PUT, path, Some(body)).await
+    }
+
+    /// Raw block upload to a storage URL: multipart field "Block", storage token, no session headers.
+    pub async fn post_block(&self, url: &str, token: &str, ciphertext: Vec<u8>) -> Result<()> {
+        let part = reqwest::multipart::Part::bytes(ciphertext).file_name("blob").mime_str("application/octet-stream")?;
+        let form = reqwest::multipart::Form::new().part("Block", part);
+        let resp = self.http.post(url).header("pm-storage-token", token).multipart(form).send().await.context("upload block")?;
+        let status = resp.status();
+        let value: Value = resp.json().await.unwrap_or(Value::Null);
+        parse_envelope::<Value>("storage block", status, value).map(|_| ())
+    }
+
     pub async fn delete<T: DeserializeOwned>(&mut self, path: &str) -> Result<T> {
         self.call(Method::DELETE, path, None).await
     }

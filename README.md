@@ -22,10 +22,29 @@ Proton Drive sync client for KDE Plasma, written in Rust.
 1. Login via browser sign-in (Proton session fork: the browser handles password, 2FA, captcha), session stored in KWallet.
 2. List root, download one file.
 3. Remote → local one-way sync driven by the event stream.
-4. Local → remote uploads.
+4. Local → remote uploads (`put`, `mkdir`); `sync` pushes new/edited local files and trashes locally deleted ones.
 5. Tray, Places entry, notifications, servicemenus, Dolphin overlay plugin.
 
 Conflicts, trash, sharing and photos wait until two-way sync is stable.
+
+## Usage
+
+```
+kpdrive login                 # browser sign-in, session stored in KWallet
+kpdrive status
+kpdrive ls [path]
+kpdrive get <remote> [local]
+kpdrive put <local> [remote-folder]   # new file, or new revision if the name exists
+kpdrive mkdir <remote>
+kpdrive sync [--root DIR] [--watch] [--force]   # two-way Drive <-> local
+kpdrive logout
+```
+
+Sync state lives in `~/.local/share/kpdrive/state.json`. Rules: a file edited
+locally is never overwritten (if the remote changed too, it is reported and
+neither side is pushed); a file deleted locally and unchanged remotely is
+trashed remotely; a file removed remotely is deleted locally only if untouched.
+Set `KPDRIVE_DEBUG=1` for event-page diagnostics.
 
 ## Build
 

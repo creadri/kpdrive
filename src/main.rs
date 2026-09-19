@@ -1,5 +1,6 @@
 mod api;
 mod drive;
+mod sync;
 
 use anyhow::{Context, Result};
 use api::{Api, Session};
@@ -29,6 +30,28 @@ enum Cmd {
         #[arg(default_value = "/")]
         path: String,
     },
+    /// Sync Drive into the local folder (one-way, remote → local).
+    Sync {
+        /// Local folder; remembered after the first run. Default: ~/ProtonDrive
+        #[arg(long)]
+        root: Option<std::path::PathBuf>,
+        /// Keep running and re-sync whenever the volume changes.
+        #[arg(long)]
+        watch: bool,
+        /// Walk the tree even if no change was reported.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Upload a local file into a remote folder (new file or new revision).
+    Put {
+        local: std::path::PathBuf,
+        #[arg(default_value = "/")]
+        remote_folder: String,
+    },
+    /// Create a remote folder.
+    Mkdir {
+        remote: String,
+    },
     /// Download a remote file.
     Get {
         remote: String,
@@ -45,6 +68,9 @@ async fn main() -> Result<()> {
         Cmd::Logout => logout().await,
         Cmd::Ls { path } => ls(&path).await,
         Cmd::Get { remote, local } => get(&remote, local).await,
+        Cmd::Sync { root, watch, force } => sync(root, watch, force).await,
+        Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
+        Cmd::Mkdir { remote } => mkdir(&remote).await,
     }
 }
 
@@ -100,6 +126,56 @@ async fn get(remote: &str, local: Option<std::path::PathBuf>) -> Result<()> {
     std::io::Write::flush(&mut out)?;
     println!("{} bytes -> {}", n, dest.display());
     persist(drive.api, before).await
+}
+
+async fn put(local: &std::path::Path, remote_folder: &str) -> Result<()> {
+    let (mut drive, before) = open_drive().await?;
+    let folder = drive.resolve(remote_folder).await?;
+    let name = local.file_name().and_then(|n| n.to_str()).context("local path has no file name")?;
+    let existing = drive.list(&folder).await?.into_iter().find(|n| n.name == name && !n.is_folder);
+    let meta = std::fs::metadata(local)?;
+    let mtime = meta.modified()?.duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
+    let mut file = std::fs::File::open(local)?;
+    let (link, rev) = drive.upload(&folder, name, existing.as_ref(), &mut file, mtime).await?;
+    println!("uploaded {} ({} bytes) link={link} revision={rev}", local.display(), meta.len());
+    persist(drive.api, before).await
+}
+
+async fn mkdir(remote: &str) -> Result<()> {
+    let (mut drive, before) = open_drive().await?;
+    let (parent, name) = remote.trim_end_matches('/').rsplit_once('/').unwrap_or(("", remote));
+    let parent = drive.resolve(parent).await?;
+    let node = drive.create_folder(&parent, name).await?;
+    println!("created folder {} id={}", node.name, node.id);
+    persist(drive.api, before).await
+}
+
+async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Result<()> {
+    let mut state = sync::load_state()?.unwrap_or_default();
+    if let Some(root) = root {
+        state.root = root;
+    }
+    if state.root.as_os_str().is_empty() {
+        state.root = std::path::PathBuf::from(std::env::var_os("HOME").context("HOME not set")?).join("ProtonDrive");
+    }
+    let (mut drive, mut before) = open_drive().await?;
+    loop {
+        match sync::run(&mut drive, &mut state, force).await {
+            Ok(true) => println!("synced to {}", state.root.display()),
+            Ok(false) => {}
+            Err(e) if watch => eprintln!("sync error: {e:#}"),
+            Err(e) => return Err(e),
+        }
+        if let Some(s) = drive.api.session.clone().filter(|s| *s != before) {
+            save_session(&s).await?;
+            before = s;
+        }
+        if !watch {
+            return Ok(());
+        }
+        // ponytail: fixed 30s poll of the latest event id; long-poll/push if Proton ever offers it.
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+    }
 }
 
 async fn open_drive() -> Result<(Drive<impl PGPProviderSync>, Session)> {
