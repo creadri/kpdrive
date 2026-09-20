@@ -162,7 +162,7 @@ control and changelog files.
 To build packages locally:
 
 ```
-rpmbuild -ba --define "kpdrive_version 0.1.0" packaging/kpdrive.spec  # needs a matching tarball in ~/rpmbuild/SOURCES
+rpmbuild -ba --define "kpdrive_version 0.2.0" packaging/kpdrive.spec  # needs a matching tarball in ~/rpmbuild/SOURCES
 dpkg-buildpackage -b -us -uc                                          # on Debian
 ```
 
