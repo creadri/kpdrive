@@ -45,6 +45,25 @@ Kirigami.ApplicationWindow {
             backend.status = "Could not open " + what + " (" + url + ")";
     }
 
+    // The log is shown as one text block so a selection can run across lines,
+    // which means the severity colours have to be markup rather than a
+    // property per row. Text read from disk is escaped before it becomes markup.
+    function renderLog(lines) {
+        const out = [];
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const safe = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            // Only the lines that need a colour get markup: a span per line
+            // costs real memory once a log runs to thousands of them, and the
+            // ordinary ones already read as the item's own colour.
+            const colour = line.indexOf(" ERROR ") >= 0 ? Kirigami.Theme.negativeTextColor
+                         : line.indexOf(" WARN ") >= 0 ? Kirigami.Theme.neutralTextColor
+                         : null;
+            out.push(colour ? '<span style="color:' + colour + '">' + safe + '</span>' : safe);
+        }
+        return out.join("<br>");
+    }
+
     function formatSize(bytes) {
         if (!bytes || bytes < 1)
             return "0 GiB";
@@ -278,41 +297,75 @@ Kirigami.ApplicationWindow {
                         onTextChanged: backend.searchLogs(text)
                     }
 
-                    Controls.ScrollView {
+                    Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        clip: true
 
-                        ListView {
-                            id: logView
-                            model: backend.logLines
-                            reuseItems: true
+                        Controls.ScrollView {
+                            id: logScroll
+                            anchors.fill: parent
+                            clip: true
+                            visible: backend.logLines.length > 0
 
                             // A log reads like a terminal: newest at the bottom.
-                            onCountChanged: positionViewAtEnd()
-                            Component.onCompleted: positionViewAtEnd()
+                            function toEnd() {
+                                const flick = logScroll.contentItem;
+                                flick.contentY = Math.max(0, flick.contentHeight - flick.height);
+                            }
 
-                            delegate: Controls.Label {
-                                required property string modelData
-                                width: ListView.view.width
-                                text: modelData
+                            // The whole log is one laid-out document rather than a
+                            // virtualised list, which is what allows a selection to
+                            // cross lines. It costs about 140 MB at the 2000-line
+                            // ceiling the backend fetches; lower that limit, or go
+                            // back to a list with per-line selection, if that bites.
+                            TextEdit {
+                                id: logView
+                                width: logScroll.availableWidth
+                                readOnly: true
+                                selectByMouse: true
+                                selectByKeyboard: true
+                                textFormat: TextEdit.RichText
+                                wrapMode: TextEdit.WrapAnywhere
                                 font.family: "monospace"
-                                wrapMode: Text.WrapAnywhere
-                                color: modelData.indexOf(" ERROR ") >= 0 ? Kirigami.Theme.negativeTextColor
-                                     : modelData.indexOf(" WARN ") >= 0 ? Kirigami.Theme.neutralTextColor
-                                     : Kirigami.Theme.textColor
-                            }
+                                color: Kirigami.Theme.textColor
+                                selectionColor: Kirigami.Theme.highlightColor
+                                selectedTextColor: Kirigami.Theme.highlightedTextColor
+                                text: root.renderLog(backend.logLines)
 
-                            Kirigami.PlaceholderMessage {
-                                anchors.centerIn: parent
-                                width: parent.width - Kirigami.Units.gridUnit * 4
-                                visible: logView.count === 0
-                                icon.name: search.text.length > 0 ? "edit-none" : "view-history"
-                                text: search.text.length > 0 ? "No lines match" : "Nothing logged yet"
-                                explanation: search.text.length > 0
-                                             ? "No log line contains “" + search.text + "”."
-                                             : "Sync activity, sign-ins and errors show up here."
+                                // The text is laid out after it is set, so the
+                                // height to scroll to is only known next tick.
+                                onTextChanged: Qt.callLater(logScroll.toEnd)
+                                Component.onCompleted: Qt.callLater(logScroll.toEnd)
+
+                                Controls.Menu {
+                                    id: logMenu
+                                    Controls.MenuItem {
+                                        text: "Copy"
+                                        enabled: logView.selectedText.length > 0
+                                        onTriggered: logView.copy()
+                                    }
+                                    Controls.MenuItem {
+                                        text: "Select all"
+                                        onTriggered: logView.selectAll()
+                                    }
+                                }
+
+                                TapHandler {
+                                    acceptedButtons: Qt.RightButton
+                                    onTapped: logMenu.popup()
+                                }
                             }
+                        }
+
+                        Kirigami.PlaceholderMessage {
+                            anchors.centerIn: parent
+                            width: parent.width - Kirigami.Units.gridUnit * 4
+                            visible: backend.logLines.length === 0
+                            icon.name: search.text.length > 0 ? "edit-none" : "view-history"
+                            text: search.text.length > 0 ? "No lines match" : "Nothing logged yet"
+                            explanation: search.text.length > 0
+                                         ? "No log line contains “" + search.text + "”."
+                                         : "Sync activity, sign-ins and errors show up here."
                         }
                     }
 
@@ -334,7 +387,7 @@ Kirigami.ApplicationWindow {
                         Item { Layout.fillWidth: true }
 
                         Controls.Label {
-                            text: logView.count + " line" + (logView.count === 1 ? "" : "s")
+                            text: backend.logLines.length + " line" + (backend.logLines.length === 1 ? "" : "s")
                             opacity: 0.7
                         }
                     }
