@@ -5,6 +5,7 @@ import QtQuick.Controls as Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import org.kde.kirigami as Kirigami
+import org.kde.kirigami.dialogs as KirigamiDialogs
 import be.otterit.kpdrive
 
 Kirigami.ApplicationWindow {
@@ -25,7 +26,35 @@ Kirigami.ApplicationWindow {
         title: "Choose the Proton Drive folder"
         currentFolder: backend.syncFolder.length > 0 ? "file://" + encodeURI(backend.syncFolder) : ""
         // The dialog hands back a URL; sync wants a plain path.
-        onAccepted: backend.changeSyncFolder(decodeURIComponent(selectedFolder.toString().replace(/^file:\/\//, "")))
+        onAccepted: root.chooseFolder(decodeURIComponent(selectedFolder.toString().replace(/^file:\/\//, "")))
+    }
+
+    // The same question the CLI asks, with the same two answers.
+    KirigamiDialogs.PromptDialog {
+        id: occupiedPrompt
+
+        property string folder: ""
+
+        title: "The folder is not empty"
+        standardButtons: Controls.Dialog.NoButton
+        customFooterActions: [
+            Kirigami.Action {
+                text: backend.folderChoices()[0]
+                icon.name: "merge"
+                onTriggered: {
+                    backend.changeSyncFolder(occupiedPrompt.folder, "merge");
+                    occupiedPrompt.close();
+                }
+            },
+            Kirigami.Action {
+                text: backend.folderChoices()[1]
+                icon.name: "edit-move"
+                onTriggered: {
+                    backend.changeSyncFolder(occupiedPrompt.folder, "rename");
+                    occupiedPrompt.close();
+                }
+            }
+        ]
     }
 
     Backend {
@@ -62,6 +91,19 @@ Kirigami.ApplicationWindow {
             out.push(colour ? '<span style="color:' + colour + '">' + safe + '</span>' : safe);
         }
         return out.join("<br>");
+    }
+
+    // Switching to a folder that already holds files is the user's call, so it
+    // is put to them in the words the CLI uses. An empty one needs no asking.
+    function chooseFolder(path) {
+        const question = backend.folderQuestion(path);
+        if (question.length === 0) {
+            backend.changeSyncFolder(path, "merge");
+            return;
+        }
+        occupiedPrompt.folder = path;
+        occupiedPrompt.subtitle = question;
+        occupiedPrompt.open();
     }
 
     function formatSize(bytes) {

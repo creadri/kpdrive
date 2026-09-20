@@ -98,22 +98,104 @@ fn worth_reporting(e: &ignore::Error) -> bool {
     e.io_error().map(|io| io.kind()) != Some(std::io::ErrorKind::NotFound)
 }
 
+/// What to do about a destination folder that already holds files.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Occupied {
+    /// Sync into it as it stands. Identical files are adopted rather than
+    /// duplicated, and anything else is uploaded.
+    #[default]
+    Merge,
+    /// Move it aside and start from an empty folder.
+    Rename,
+}
+
+impl Occupied {
+    /// The wording both front ends offer, so the terminal and the window put
+    /// the same choice to the user.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Merge => "Sync into it and keep what is already there",
+            Self::Rename => "Move it aside and start from an empty folder",
+        }
+    }
+}
+
+/// What to ask before syncing into `root`, or `None` when there is nothing to
+/// ask: the folder is empty, absent, or already the one being synced. kpdrive's
+/// own files do not count as content, or setting the same folder twice would
+/// keep asking.
+pub fn folder_question(state: &State, root: &Path) -> Option<String> {
+    if state.root == root && !state.nodes.is_empty() {
+        return None;
+    }
+    let held = fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| {
+            let name = e.file_name();
+            let name = name.to_string_lossy();
+            name != IGNORE_FILE && !name.starts_with(".kpdrive") && !name.ends_with(PART_SUFFIX)
+        })
+        .count();
+    if held == 0 {
+        return None;
+    }
+    Some(format!(
+        "{} already holds {held} item{}, which syncing will merge with Proton Drive.",
+        root.display(),
+        if held == 1 { "" } else { "s" }
+    ))
+}
+
+/// Renames `root` out of the way so syncing can start from an empty folder.
+/// Returns the note to show the user.
+pub fn move_aside(root: &Path) -> Result<String> {
+    let name = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "folder".into());
+    let parent = root.parent().unwrap_or(Path::new("."));
+    // A second run must not overwrite what the first moved aside.
+    let mut aside = parent.join(format!("{name}.before-kpdrive"));
+    let mut n = 2;
+    while aside.exists() {
+        aside = parent.join(format!("{name}.before-kpdrive-{n}"));
+        n += 1;
+    }
+    fs::rename(root, &aside).with_context(|| format!("move {} aside to {}", root.display(), aside.display()))?;
+    fs::create_dir_all(root)?;
+    let note = format!("moved {} to {}", root.display(), aside.display());
+    crate::log::write("WARN", &note);
+    Ok(note)
+}
+
 /// Points sync at `new_root`, moving what is already synced when it can.
 ///
 /// Recorded paths are relative to the root, so a plain rename keeps every entry
 /// valid. Across filesystems a rename fails, and rather than copying gigabytes
 /// this forgets what it knew and lets the next pass fetch into the new place,
 /// leaving the old folder untouched for the user to delete.
-pub fn set_folder(state: &mut State, new_root: PathBuf) -> Result<String> {
+pub fn set_folder(state: &mut State, new_root: PathBuf, occupied: Occupied) -> Result<String> {
+    // Asked for and answered before anything else: the branches below decide
+    // what to do with the old folder, and they read an emptied destination
+    // differently from an occupied one.
+    let mut aside = None;
+    if occupied == Occupied::Rename && folder_question(state, &new_root).is_some() {
+        aside = Some(move_aside(&new_root)?);
+    }
     let old = std::mem::replace(&mut state.root, new_root.clone());
     let mut config = crate::config::load();
     config.sync_folder = Some(new_root.clone());
     crate::config::save(&config)?;
 
     if old == new_root || old.as_os_str().is_empty() {
+        if aside.is_some() {
+            state.nodes.clear();
+        }
         fs::create_dir_all(&new_root)?;
         save_state(state)?;
-        return Ok(format!("syncing to {}", new_root.display()));
+        return Ok(match aside {
+            Some(note) => format!("{note}; syncing to {}", new_root.display()),
+            None => format!("syncing to {}", new_root.display()),
+        });
     }
 
     let had_content = fs::read_dir(&old).map(|mut d| d.next().is_some()).unwrap_or(false);
@@ -136,6 +218,10 @@ pub fn set_folder(state: &mut State, new_root: PathBuf) -> Result<String> {
         format!("syncing to {}", new_root.display())
     };
 
+    let note = match aside {
+        Some(moved) => format!("{moved}; {note}"),
+        None => note,
+    };
     fs::create_dir_all(&new_root)?;
     save_state(state)?;
     crate::log::write("INFO", &note);
@@ -831,6 +917,39 @@ mod tests {
         assert!(!worth_reporting(&e), "absent ignore file logged as: {e}");
         let bad = ignore::Error::Glob { glob: Some("[".into()), err: "unclosed".into() };
         assert!(worth_reporting(&bad), "a real parse error must still be logged");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn asks_only_when_the_folder_holds_someone_elses_files() {
+        let dir = std::env::temp_dir().join(format!("kpdrive-occ-{}", std::process::id()));
+        let root = dir.join("dest");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&root).unwrap();
+        let mut state = State { root: root.clone(), ..State::default() };
+
+        assert!(folder_question(&state, &root).is_none(), "an empty folder needs no question");
+        assert!(folder_question(&state, &dir.join("absent")).is_none(), "nor does one that is not there");
+
+        fs::write(root.join(IGNORE_FILE), "*.tmp\n").unwrap();
+        fs::write(root.join(format!("half-done{PART_SUFFIX}")), "").unwrap();
+        assert!(folder_question(&state, &root).is_none(), "our own files are not the user's");
+
+        fs::write(root.join("theirs.txt"), "hello").unwrap();
+        let question = folder_question(&state, &root).expect("a file of theirs is worth asking about");
+        assert!(question.contains("1 item"), "{question}");
+
+        state.nodes.insert("id".into(), Entry { path: PathBuf::from("theirs.txt"), is_folder: false, revision: None, mtime: 0, size: 5 });
+        assert!(folder_question(&state, &root).is_none(), "a folder already being synced is not a question");
+
+        // Moving aside leaves an empty folder behind and never overwrites.
+        state.nodes.clear();
+        move_aside(&root).unwrap();
+        assert!(root.exists() && fs::read_dir(&root).unwrap().next().is_none());
+        assert!(dir.join("dest.before-kpdrive").join("theirs.txt").exists());
+        fs::write(root.join("again.txt"), "x").unwrap();
+        move_aside(&root).unwrap();
+        assert!(dir.join("dest.before-kpdrive-2").join("again.txt").exists(), "the first move is kept");
         fs::remove_dir_all(&dir).unwrap();
     }
 

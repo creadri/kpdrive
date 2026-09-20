@@ -26,7 +26,15 @@ fn href(path: &Path) -> String {
 /// Adds a "Proton Drive" entry to Dolphin's Places unless one already points at `root`.
 pub fn places_entry(root: &Path) -> Result<bool> {
     let file = xdg("XDG_DATA_HOME", ".local/share")?.join("user-places.xbel");
-    let xml = std::fs::read_to_string(&file).with_context(|| format!("read {}", file.display()))?;
+    // A profile where Dolphin has never saved a place has no file yet; start
+    // one rather than failing the whole setup over it.
+    let xml = match std::fs::read_to_string(&file) {
+        Ok(xml) => xml,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE xbel>\n<xbel xmlns:bookmark=\"http://www.freedesktop.org/standards/desktop-bookmarks\" xmlns:kdepriv=\"http://www.kde.org/kdepriv\" xmlns:mime=\"http://www.freedesktop.org/standards/shared-mime-info\">\n</xbel>\n".to_owned()
+        }
+        Err(e) => return Err(anyhow::Error::from(e).context(format!("read {}", file.display()))),
+    };
     let href = href(root);
     if xml.contains(&format!("href=\"{href}\"")) {
         return Ok(false);
@@ -38,6 +46,9 @@ pub fn places_entry(root: &Path) -> Result<bool> {
     let updated = xml.replacen("</xbel>", &entry, 1);
     if updated == xml {
         anyhow::bail!("{} has no </xbel> closing tag", file.display());
+    }
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent)?;
     }
     let tmp = file.with_extension("xbel.kpdrive-tmp");
     std::fs::write(&tmp, updated)?;

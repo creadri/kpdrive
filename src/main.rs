@@ -288,9 +288,37 @@ async fn mkdir(remote: &str) -> Result<()> {
 /// Where to sync: an explicit `--root` wins, then the configured folder, then
 /// `~/ProtonDrive`. A folder set by an older version lives in the sync state
 /// instead, so it is adopted into the config on first sight.
+/// Puts the occupied-folder choice to the user, in the same words the window
+/// uses. Anything that is not a terminal (the autostarted daemon, a script)
+/// takes the answer that changes nothing.
+fn ask_about(state: &sync::State, root: &std::path::Path) -> Result<sync::Occupied> {
+    use std::io::{BufRead, IsTerminal, Write};
+    let Some(question) = sync::folder_question(state, root) else { return Ok(sync::Occupied::Merge) };
+    println!("{question}");
+    if !std::io::stdin().is_terminal() {
+        println!("{}", sync::Occupied::Merge.label());
+        return Ok(sync::Occupied::Merge);
+    }
+    let mut line = String::new();
+    loop {
+        print!("[m] {}\n[r] {}\nm/r? ", sync::Occupied::Merge.label(), sync::Occupied::Rename.label());
+        std::io::stdout().flush()?;
+        line.clear();
+        if std::io::stdin().lock().read_line(&mut line)? == 0 {
+            return Ok(sync::Occupied::Merge); // stdin closed
+        }
+        match line.trim().to_ascii_lowercase().as_str() {
+            "" | "m" | "merge" => return Ok(sync::Occupied::Merge),
+            "r" | "rename" | "move" => return Ok(sync::Occupied::Rename),
+            _ => println!("answer m or r."),
+        }
+    }
+}
+
 fn resolve_root(state: &mut sync::State, root: Option<std::path::PathBuf>) -> Result<()> {
     if let Some(root) = root {
-        println!("{}", sync::set_folder(state, root)?);
+        let choice = ask_about(state, &root)?;
+        println!("{}", sync::set_folder(state, root, choice)?);
         return Ok(());
     }
     let mut config = config::load();
@@ -305,6 +333,13 @@ fn resolve_root(state: &mut sync::State, root: Option<std::path::PathBuf>) -> Re
             config.sync_folder = Some(state.root.clone());
             config::save(&config)?;
         }
+    }
+    // The remembered folder can have gained files of its own, or be one the
+    // user filled before kpdrive ever ran.
+    if ask_about(state, &state.root.clone())? == sync::Occupied::Rename {
+        println!("{}", sync::move_aside(&state.root)?);
+        state.nodes.clear();
+        sync::save_state(state)?;
     }
     Ok(())
 }

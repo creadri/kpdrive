@@ -41,9 +41,20 @@ pub mod qobject {
         fn open_url_requested(self: Pin<&mut Self>, url: QString);
 
         /// Sync somewhere else. Moves what is already synced when it can.
+        /// `choice` answers [`folderQuestion`]: "merge" or "rename".
         #[qinvokable]
         #[cxx_name = "changeSyncFolder"]
-        fn change_sync_folder(self: Pin<&mut Self>, folder: &QString);
+        fn change_sync_folder(self: Pin<&mut Self>, folder: &QString, choice: &QString);
+
+        /// What to ask before syncing into `folder`; empty when nothing needs asking.
+        #[qinvokable]
+        #[cxx_name = "folderQuestion"]
+        fn folder_question(self: Pin<&mut Self>, folder: &QString) -> QString;
+
+        /// The answers to that question, worded as the CLI words them.
+        #[qinvokable]
+        #[cxx_name = "folderChoices"]
+        fn folder_choices(self: Pin<&mut Self>) -> QStringList;
 
         /// Open the ignore file for editing, writing a commented starter first
         /// if there is none.
@@ -206,13 +217,33 @@ impl qobject::Backend {
         self.as_mut().set_ignore_file(QString::from(&ignore));
     }
 
-    pub fn change_sync_folder(mut self: Pin<&mut Self>, folder: &QString) {
+    /// The question to put before syncing into `folder`, empty when there is
+    /// nothing to ask. The wording comes from the same place the CLI reads it.
+    pub fn folder_question(self: Pin<&mut Self>, folder: &QString) -> QString {
+        let folder = std::path::PathBuf::from(folder.to_string());
+        let state = kpdrive::sync::load_state().ok().flatten().unwrap_or_default();
+        QString::from(&kpdrive::sync::folder_question(&state, &folder).unwrap_or_default())
+    }
+
+    /// The two answers, in the order the window should offer them.
+    pub fn folder_choices(self: Pin<&mut Self>) -> QStringList {
+        let mut list = QStringList::default();
+        list.append(QString::from(kpdrive::sync::Occupied::Merge.label()));
+        list.append(QString::from(kpdrive::sync::Occupied::Rename.label()));
+        list
+    }
+
+    pub fn change_sync_folder(mut self: Pin<&mut Self>, folder: &QString, choice: &QString) {
         let folder = std::path::PathBuf::from(folder.to_string());
         if folder.as_os_str().is_empty() {
             return;
         }
         let mut state = kpdrive::sync::load_state().ok().flatten().unwrap_or_default();
-        match kpdrive::sync::set_folder(&mut state, folder) {
+        let occupied = match choice.to_string().as_str() {
+            "rename" => kpdrive::sync::Occupied::Rename,
+            _ => kpdrive::sync::Occupied::Merge,
+        };
+        match kpdrive::sync::set_folder(&mut state, folder, occupied) {
             Ok(note) => {
                 // A running daemon holds the old path in memory.
                 let running = kpdrive::daemon::socket_path().exists();
