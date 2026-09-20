@@ -315,9 +315,8 @@ Kirigami.ApplicationWindow {
 
                             // The whole log is one laid-out document rather than a
                             // virtualised list, which is what allows a selection to
-                            // cross lines. It costs about 140 MB at the 2000-line
-                            // ceiling the backend fetches; lower that limit, or go
-                            // back to a list with per-line selection, if that bites.
+                            // cross lines. Laying it out costs memory per line, so
+                            // the backend hands over only its newest hundred.
                             TextEdit {
                                 id: logView
                                 width: logScroll.availableWidth

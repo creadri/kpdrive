@@ -79,6 +79,11 @@ use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::{QString, QStringList};
 use std::sync::mpsc::{Sender, channel};
 
+/// How many log lines the window shows, newest last. The whole log is laid
+/// out at once so a selection can cross lines, so this is also what bounds
+/// what that costs.
+const LOG_LINES: usize = 100;
+
 /// What the window asks the worker to do.
 enum Task {
     Refresh,
@@ -251,10 +256,11 @@ impl qobject::Backend {
     }
 
     /// Log reads are local files and bounded by the line limit, so they run
-    /// straight on the UI thread.
+    /// straight on the UI thread. The window shows the newest [`LOG_LINES`];
+    /// older ones are reached by searching for them.
     fn reload_logs(mut self: Pin<&mut Self>, term: &str) {
         let mut list = QStringList::default();
-        match kpdrive::log::search(term, 2000) {
+        match kpdrive::log::search(term, LOG_LINES) {
             Ok(lines) => {
                 for line in lines {
                     list.append(QString::from(&line));
