@@ -97,6 +97,8 @@ struct Link {
     trash_time: Option<i64>,
     #[serde(rename = "ModifyTime")]
     modify_time: i64,
+    #[serde(rename = "ParentLinkID", default)]
+    parent_id: Option<String>,
     #[serde(rename = "NodeKey")]
     node_key: String,
     #[serde(rename = "NodePassphrase")]
@@ -128,6 +130,8 @@ pub struct Node<K> {
     pub modify_time: i64,
     /// Active revision id for files; changes when content changes.
     pub revision: Option<String>,
+    /// `None` for the root of a share.
+    pub parent_id: Option<String>,
     key: K,
     file: Option<File>,
     hash_key: Option<String>,
@@ -151,6 +155,10 @@ pub struct Drive<P: PGPProviderSync> {
     signing_key: P::PrivateKey,
     /// Every unlocked key of that address, for reading what other clients wrote.
     address_keys: Vec<P::PrivateKey>,
+    /// Unlocked folder nodes by id, kept for the life of the client so that a
+    /// changed link can be decrypted with its parent's key without walking
+    /// the tree. Folders only: files are many and never anyone's parent.
+    folders: std::sync::RwLock<HashMap<String, Node<P::PrivateKey>>>,
 }
 
 impl<P: PGPProviderSync> Drive<P> {
@@ -218,7 +226,45 @@ impl<P: PGPProviderSync> Drive<P> {
             email,
             signing_key,
             address_keys,
+            folders: std::sync::RwLock::new(HashMap::new()),
         })
+    }
+
+    /// A copy of a node. Keys are not `Clone` in the provider API, so the
+    /// unlocked key is round-tripped, which costs microseconds.
+    pub fn dup(&self, node: &Node<P::PrivateKey>) -> Result<Node<P::PrivateKey>> {
+        Ok(Node {
+            id: node.id.clone(),
+            volume_id: node.volume_id.clone(),
+            name: node.name.clone(),
+            is_folder: node.is_folder,
+            modify_time: node.modify_time,
+            revision: node.revision.clone(),
+            parent_id: node.parent_id.clone(),
+            key: self.reimport(&node.key)?,
+            file: node.file.as_ref().map(|f| File {
+                content_key_packet: f.content_key_packet.clone(),
+                active_revision: f.active_revision.as_ref().map(|r| ActiveRevision { id: r.id.clone() }),
+            }),
+            hash_key: node.hash_key.clone(),
+            passphrase: node.passphrase.clone(),
+            name_armored: node.name_armored.clone(),
+            share_id: node.share_id.clone(),
+        })
+    }
+
+    fn remember(&self, node: &Node<P::PrivateKey>) {
+        if node.is_folder {
+            if let Ok(copy) = self.dup(node) {
+                self.folders.write().expect("folder cache").insert(node.id.clone(), copy);
+            }
+        }
+    }
+
+    /// A folder seen earlier by this client, if any.
+    pub fn cached_folder(&self, id: &str) -> Option<Node<P::PrivateKey>> {
+        let cache = self.folders.read().expect("folder cache");
+        cache.get(id).and_then(|n| self.dup(n).ok())
     }
 
     fn decrypt_link(pgp: &P, volume_id: &str, parent: &P::PrivateKey, d: LinkDetails) -> Result<Node<P::PrivateKey>> {
@@ -243,6 +289,7 @@ impl<P: PGPProviderSync> Drive<P> {
             is_folder: d.link.kind == 1,
             modify_time: d.link.modify_time,
             revision: d.file.as_ref().and_then(|f| f.active_revision.as_ref()).map(|r| r.id.clone()),
+            parent_id: d.link.parent_id.clone(),
             key,
             file: d.file,
             hash_key: d.folder.map(|f| f.hash_key),
@@ -300,17 +347,21 @@ impl<P: PGPProviderSync> Drive<P> {
                 if d.link.state != 1 || d.link.trash_time.is_some() {
                     continue; // trashed, draft or deleted
                 }
-                nodes.push(Self::decrypt_link(&self.pgp, &folder.volume_id, &folder.key, d)?);
+                let node = Self::decrypt_link(&self.pgp, &folder.volume_id, &folder.key, d)?;
+                self.remember(&node);
+                nodes.push(node);
             }
         }
         nodes.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(nodes)
     }
 
-    /// Advances the event cursor. Returns the new cursor and whether anything
-    /// happened since `cursor`. A `None` cursor (first sync) always counts as changed.
-    /// The "latest" id is opaque and differs per call, so only the events list is trusted.
-    pub async fn events_since(&self, cursor: Option<&str>) -> Result<(String, bool)> {
+    /// What the event stream says happened since `cursor`. A `None` cursor
+    /// (first sync) reports `refresh`, as does the API when the cursor is too
+    /// old: both mean "walk the tree". Several events for one link collapse to
+    /// its latest state, in the order links were first mentioned, so a folder
+    /// still comes before what was created inside it.
+    pub async fn events(&self, cursor: Option<&str>) -> Result<Events> {
         #[derive(Deserialize)]
         struct Latest {
             #[serde(rename = "EventID")]
@@ -321,29 +372,111 @@ impl<P: PGPProviderSync> Drive<P> {
             #[serde(rename = "EventID")]
             event_id: String,
             #[serde(rename = "Events", default)]
-            events: Vec<serde_json::Value>,
+            events: Vec<Event>,
             #[serde(rename = "More", default)]
             more: bool,
             #[serde(rename = "Refresh", default)]
             refresh: bool,
         }
+        #[derive(Deserialize)]
+        struct Event {
+            /// 0 deleted; 1 created, 2 updated, 3 moved.
+            #[serde(rename = "EventType")]
+            kind: i32,
+            #[serde(rename = "Link")]
+            link: EventLink,
+        }
+        #[derive(Deserialize)]
+        struct EventLink {
+            #[serde(rename = "LinkID")]
+            id: String,
+            #[serde(rename = "ParentLinkID", default)]
+            parent_id: Option<String>,
+            #[serde(rename = "IsTrashed", default)]
+            trashed: bool,
+        }
         let Some(mut cursor) = cursor.map(str::to_owned) else {
             let path = format!("drive/volumes/{}/events/latest", self.volume_id);
-            return Ok((self.api.get::<Latest>(&path).await?.event_id, true));
+            let cursor = self.api.get::<Latest>(&path).await?.event_id;
+            return Ok(Events { cursor, refresh: true, changes: Vec::new() });
         };
-        let mut changed = false;
+        let mut order: Vec<String> = Vec::new();
+        let mut latest: HashMap<String, Change> = HashMap::new();
+        let mut refresh = false;
         loop {
             let path = format!("drive/v2/volumes/{}/events/{cursor}", self.volume_id);
             let page: Page = self.api.get(&path).await?;
             if std::env::var_os("KPDRIVE_DEBUG").is_some() {
                 eprintln!("events page: {} events, more={}, refresh={}, next={}", page.events.len(), page.more, page.refresh, page.event_id);
             }
-            changed |= page.refresh || !page.events.is_empty();
+            for e in page.events {
+                let change = Change { link_id: e.link.id.clone(), parent_id: e.link.parent_id, gone: e.kind == 0 || e.link.trashed };
+                if latest.insert(e.link.id.clone(), change).is_none() {
+                    order.push(e.link.id);
+                }
+            }
+            refresh |= page.refresh;
             cursor = page.event_id;
             if page.refresh || !page.more {
-                return Ok((cursor, changed));
+                break;
             }
         }
+        let changes = order.into_iter().filter_map(|id| latest.remove(&id)).collect();
+        Ok(Events { cursor, refresh, changes })
+    }
+
+    /// Fetches and decrypts nodes by id, in the files volume. Trashed or
+    /// deleted links come back as `None`. Parents are found in the folder
+    /// cache, or fetched and cached on the way up.
+    pub async fn nodes_by_ids(&self, ids: &[String]) -> Result<Vec<(String, Option<Node<P::PrivateKey>>)>> {
+        #[derive(Deserialize)]
+        struct Links {
+            #[serde(rename = "Links")]
+            links: Vec<LinkDetails>,
+        }
+        let mut out = Vec::with_capacity(ids.len());
+        for chunk in ids.chunks(150) {
+            let path = format!("drive/v2/volumes/{}/links", self.volume_id);
+            let links: Links = self.api.post(&path, &json!({ "LinkIDs": chunk })).await?;
+            let mut found: HashMap<String, LinkDetails> = links.links.into_iter().map(|d| (d.link.id.clone(), d)).collect();
+            for id in chunk {
+                let Some(d) = found.remove(id) else {
+                    out.push((id.clone(), None));
+                    continue;
+                };
+                if d.link.state != 1 || d.link.trash_time.is_some() {
+                    out.push((id.clone(), None));
+                    continue;
+                }
+                let node = match &d.link.parent_id {
+                    None => Self::decrypt_link(&self.pgp, &self.volume_id, &self.root.key, d)?, // a share root
+                    Some(p) => {
+                        let Some(parent) = self.folder(p).await? else {
+                            out.push((id.clone(), None));
+                            continue;
+                        };
+                        Self::decrypt_link(&self.pgp, &self.volume_id, &parent.key, d)?
+                    }
+                };
+                self.remember(&node);
+                out.push((id.clone(), Some(node)));
+            }
+        }
+        Ok(out)
+    }
+
+    /// A folder by id: the root, the cache, or a fetch that recurses upward
+    /// through parents that are not cached yet.
+    async fn folder(&self, id: &str) -> Result<Option<Node<P::PrivateKey>>> {
+        if id == self.root.id {
+            return self.root().map(Some);
+        }
+        if let Some(cached) = self.cached_folder(id) {
+            return Ok(Some(cached));
+        }
+        // Recursion in async needs a box; depth is the tree's depth.
+        let fetched = Box::pin(self.nodes_by_ids(std::slice::from_ref(&id.to_owned()))).await?;
+        Ok(fetched.into_iter().next().and_then(|(_, n)| n).filter(|n| n.is_folder))
     }
 
     /// Resolves `path` to its parent folder and the node itself. The root has
@@ -391,6 +524,7 @@ impl<P: PGPProviderSync> Drive<P> {
             is_folder: true,
             modify_time: self.root.modify_time,
             revision: None,
+            parent_id: None,
             key: self.reimport(&self.root.key)?,
             file: None,
             hash_key: self.root.hash_key.clone(),
@@ -508,6 +642,7 @@ impl<P: PGPProviderSync> Drive<P> {
             is_folder: true,
             modify_time: now(),
             revision: None,
+            parent_id: Some(parent.id.clone()),
             key,
             file: None,
             hash_key: Some(hash_key_armored),
@@ -530,7 +665,7 @@ impl<P: PGPProviderSync> Drive<P> {
     /// Uploads `data` as a new file under `parent`, or as a new revision of
     /// `existing`. Returns (link id, revision id).
     pub async fn upload(
-        &mut self,
+        &self,
         parent: &Node<P::PrivateKey>,
         name: &str,
         existing: Option<&Node<P::PrivateKey>>,
@@ -939,7 +1074,7 @@ impl<P: PGPProviderSync> Drive<P> {
     /// The share hanging off `node`, created if it has none. A public link is
     /// always attached to such a share, never to the node directly.
     async fn ensure_share(
-        &mut self,
+        &self,
         parent: &Node<P::PrivateKey>,
         node: &Node<P::PrivateKey>,
     ) -> Result<(String, P::SessionKey)> {
@@ -1047,7 +1182,7 @@ impl<P: PGPProviderSync> Drive<P> {
     /// `custom_password` is appended to the generated half and is *not* part of
     /// the URL, so it has to be sent to the recipient separately.
     pub async fn share(
-        &mut self,
+        &self,
         parent: &Node<P::PrivateKey>,
         node: &Node<P::PrivateKey>,
         custom_password: Option<&str>,
@@ -1161,6 +1296,22 @@ struct ShareUrl {
 /// Proton's alphabet and length for the generated half of a link password.
 const LINK_PASSWORD_LEN: usize = 12;
 const LINK_PASSWORD_CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+/// What changed on the volume since a cursor.
+pub struct Events {
+    pub cursor: String,
+    /// The cursor was too old (or absent): walk the tree instead.
+    pub refresh: bool,
+    pub changes: Vec<Change>,
+}
+
+/// One link's latest state in an event batch.
+pub struct Change {
+    pub link_id: String,
+    pub parent_id: Option<String>,
+    /// Deleted or trashed; nothing to fetch.
+    pub gone: bool,
+}
 
 /// One timeline entry. The capture time is what orders the timeline, and it is
 /// what a photo is filed under locally.

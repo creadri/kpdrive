@@ -152,19 +152,27 @@ matters for the smaller numbers.
 | Download, 20 MiB | 5.5 s | 2.6–3.6 s | 1 |
 | Upload, 20 MiB | 18.7–24.2 s | 8.6–8.8 s | 2 |
 | `ls`, one folder (CLI startup) | 1.8–2.0 s | 1.3 s | 7 |
-| Local create → pushed | ≤ 30 s (next poll) | 7.8 s | 5, see below |
+| Local create → pushed | ≤ 30 s (next poll) | 5.9 s, 6 calls | 5 + 6 |
+| Local delete → trashed (file / folder tree) | ≤ 30 s + walk | 2.5 s / 2.1 s, 2–3 calls | 6 |
+| Remote change → applied locally | next poll + walk (≈40 calls) | next poll, 2–5 calls | 6 |
+| Idle daemon, 62 s | 2 events calls | 2 events calls | — |
+| 40 s after own pushes | 87 calls (walks on echoed events) | 1 call | 6 |
 | Concurrent 401s | second refresh logged the user out | one refresh, proven by test | 3 |
 
 The download now sits at the line's speed: about 1.8 s of the 3.5 s is
 account bootstrap plus fetching the block list. The upload is likewise close to
 the uplink's ceiling now that all five blocks are in flight together.
 
-Item 5's 7.8 s is 2 s of debounce plus a **full walk**, because until item 6
-lands every pass that finds anything to do walks the whole tree. The same
-cause showed in the idle test: the daemon's own pushes come back as remote
-events and each one triggered another walk, so a 40 s window right after
-activity saw 87 calls rather than one. Item 6 is what turns both into a
-handful of calls; item 5 on its own only moves *when* a pass starts.
+Before item 6, item 5's create took 7.8 s: 2 s of debounce plus a **full
+walk**, because every pass that found anything to do walked the whole tree,
+and the daemon's own pushes came back as remote events that each triggered
+another walk (87 calls in the 40 s after a push). With item 6 a pass applies
+only the links the event stream names, resolves their parents from the
+in-memory folder cache, and trashes tracked paths that vanished locally without
+listing anything. The remaining create cost is the upload itself (draft,
+prepare, PUT, seal) plus the 2 s debounce. A walk still happens on `--force`,
+on a stale cursor (`Refresh: true`), and when an event names a parent the pass
+has never seen; the log says so when it does.
 
 Seeding cost a number worth keeping: 361 small files pushed in 894 s, 2.5 s
 each, because every file is a sequential create, verification, prepare, PUT and

@@ -191,7 +191,7 @@ async fn get(remote: &str, local: Option<std::path::PathBuf>) -> Result<()> {
 }
 
 async fn put(local: &std::path::Path, remote_folder: &str) -> Result<()> {
-    let (mut drive, before) = account::open_drive().await?;
+    let (drive, before) = account::open_drive().await?;
     let folder = drive.resolve(remote_folder).await?;
     let name = local.file_name().and_then(|n| n.to_str()).context("local path has no file name")?;
     let existing = drive.list(&folder).await?.into_iter().find(|n| n.name == name && !n.is_folder);
@@ -205,7 +205,7 @@ async fn put(local: &std::path::Path, remote_folder: &str) -> Result<()> {
 
 async fn share(remote: &str, copy: bool, password: Option<&str>, expires_days: Option<i64>) -> Result<()> {
     let remote = remote_path(remote)?;
-    let (mut drive, before) = account::open_drive().await?;
+    let (drive, before) = account::open_drive().await?;
     let (parent, node) = drive.resolve_with_parent(&remote).await?;
     let existing = drive.public_link(&node).await?.is_some();
     let url = drive.share(&parent, &node, password, expires_days).await?;
