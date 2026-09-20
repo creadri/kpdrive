@@ -13,10 +13,12 @@ aes-gcm = "0.11"
 anyhow = "1.0.104"
 base64 = "0.23.1"
 clap = { version = "4.6.7", features = ["derive"] }
+futures-util = "0.3.34"
 hex = "0.4"
 hmac = "0.12"
 ignore = "0.4"
 ksni = "0.3"
+notify = "8"
 oo7 = "0.6.0"
 # Proton's own crypto: SRP login, user/address keys. Pinned commit, pure-Rust backend.
 proton-crypto = { git = "https://github.com/ProtonMail/proton-crypto-rs", rev = "7797aacf5ae39b0982e594eb12b26489c2e77b48", default-features = false, features = ["rustpgp"] }

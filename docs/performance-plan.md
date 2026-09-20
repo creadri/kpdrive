@@ -138,3 +138,34 @@ guard correctness, and item 3's fake-server test guards the refresh rule.
 
 Delivery order: 1, 2, 3, 4, each a commit and each measured; then 5; then 6;
 7 as soon as 3 is in.
+
+## Results so far
+
+Same seeded tree for every row: 22 folders, 361 files, one 20 MiB file, one
+folder of 160 entries. Each item was measured from its own release binary, so
+the numbers are attributable. Network jitter on this line is about ±1 s, which
+matters for the smaller numbers.
+
+| Number | Before | After | Item |
+|---|---|---|---|
+| Forced full walk | 7.1–10.6 s | 3.1–3.9 s | 4 |
+| Download, 20 MiB | 5.5 s | 2.6–3.6 s | 1 |
+| Upload, 20 MiB | 18.7–24.2 s | 8.6–8.8 s | 2 |
+| `ls`, one folder (CLI startup) | 1.8–2.0 s | 1.3 s | 7 |
+| Local create → pushed | ≤ 30 s (next poll) | 7.8 s | 5, see below |
+| Concurrent 401s | second refresh logged the user out | one refresh, proven by test | 3 |
+
+The download now sits at the line's speed: about 1.8 s of the 3.5 s is
+account bootstrap plus fetching the block list. The upload is likewise close to
+the uplink's ceiling now that all five blocks are in flight together.
+
+Item 5's 7.8 s is 2 s of debounce plus a **full walk**, because until item 6
+lands every pass that finds anything to do walks the whole tree. The same
+cause showed in the idle test: the daemon's own pushes come back as remote
+events and each one triggered another walk, so a 40 s window right after
+activity saw 87 calls rather than one. Item 6 is what turns both into a
+handful of calls; item 5 on its own only moves *when* a pass starts.
+
+Seeding cost a number worth keeping: 361 small files pushed in 894 s, 2.5 s
+each, because every file is a sequential create, verification, prepare, PUT and
+seal. Uploading files concurrently in the push phase is a natural item 8.

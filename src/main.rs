@@ -84,6 +84,10 @@ enum Cmd {
     Unshare {
         remote: String,
     },
+    /// Move a remote file or folder to the trash.
+    Rm {
+        remote: String,
+    },
     /// Create a remote folder.
     Mkdir {
         remote: String,
@@ -110,6 +114,7 @@ async fn main() -> Result<()> {
         Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
         Cmd::Setup { root } => setup(root).await,
         Cmd::Mkdir { remote } => mkdir(&remote).await,
+        Cmd::Rm { remote } => rm(&remote).await,
         Cmd::Share { remote, copy, password, expires_days } => share(&remote, copy, password.as_deref(), expires_days).await,
         Cmd::Unshare { remote } => unshare(&remote).await,
     }
@@ -166,7 +171,7 @@ async fn do_logout() -> Result<()> {
 }
 
 async fn ls(path: &str) -> Result<()> {
-    let (mut drive, before) = account::open_drive().await?;
+    let (drive, before) = account::open_drive().await?;
     let folder = drive.resolve(path).await?;
     for n in drive.list(&folder).await? {
         println!("{} {}", if n.is_folder { "d" } else { "-" }, n.name);
@@ -175,7 +180,7 @@ async fn ls(path: &str) -> Result<()> {
 }
 
 async fn get(remote: &str, local: Option<std::path::PathBuf>) -> Result<()> {
-    let (mut drive, before) = account::open_drive().await?;
+    let (drive, before) = account::open_drive().await?;
     let file = drive.resolve(remote).await?;
     let dest = local.unwrap_or_else(|| std::path::PathBuf::from(&file.name));
     let mut out = std::io::BufWriter::new(std::fs::File::create(&dest).with_context(|| format!("create {}", dest.display()))?);
@@ -219,7 +224,7 @@ async fn share(remote: &str, copy: bool, password: Option<&str>, expires_days: O
 
 async fn unshare(remote: &str) -> Result<()> {
     let remote = remote_path(remote)?;
-    let (mut drive, before) = account::open_drive().await?;
+    let (drive, before) = account::open_drive().await?;
     let (_, node) = drive.resolve_with_parent(&remote).await?;
     match drive.unshare(&node).await? {
         0 => println!("{remote} has no public link"),
@@ -262,8 +267,17 @@ fn copy_to_clipboard(text: &str) -> bool {
     false
 }
 
+async fn rm(remote: &str) -> Result<()> {
+    let remote = remote_path(remote)?;
+    let (drive, before) = account::open_drive().await?;
+    let (_, node) = drive.resolve_with_parent(&remote).await?;
+    drive.trash(std::slice::from_ref(&node.id)).await?;
+    log::info(&format!("trashed {remote}"));
+    account::persist(drive.api, before).await
+}
+
 async fn mkdir(remote: &str) -> Result<()> {
-    let (mut drive, before) = account::open_drive().await?;
+    let (drive, before) = account::open_drive().await?;
     let (parent, name) = remote.trim_end_matches('/').rsplit_once('/').unwrap_or(("", remote));
     let parent = drive.resolve(parent).await?;
     let node = drive.create_folder(&parent, name).await?;
@@ -345,7 +359,7 @@ async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Res
     if watch {
         let mut last = before;
         return daemon::run(drive, state, move |d| {
-            if let Some(s) = d.api.session.clone().filter(|s| *s != last) {
+            if let Some(s) = d.api.session().filter(|s| *s != last) {
                 // Wallet writes are async; block briefly on a small runtime-free path.
                 let s2 = s.clone();
                 tokio::spawn(async move {

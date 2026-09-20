@@ -38,9 +38,9 @@ pub async fn save(session: &Session) -> Result<()> {
 /// Signs in through the browser. `show` receives the URL to open and the code
 /// the user must confirm there. Returns the username.
 pub async fn login(show: impl FnOnce(&str, &str)) -> Result<String> {
-    let mut api = Api::new(None);
+    let api = Api::new(None);
     api.login_via_browser(show).await?;
-    let session = api.session.take().expect("login sets session");
+    let session = api.take_session().expect("login sets session");
     save(&session).await?;
     crate::log::write("INFO", &format!("logged in as {}", session.username));
     Ok(session.username)
@@ -50,7 +50,7 @@ pub async fn login(show: impl FnOnce(&str, &str)) -> Result<String> {
 /// even if the server call fails, or a revoked session would be stuck here.
 pub async fn logout() -> Result<()> {
     if let Some(session) = load().await? {
-        let mut api = Api::new(Some(session));
+        let api = Api::new(Some(session));
         if let Err(e) = api.delete::<serde_json::Value>("auth/v4").await {
             crate::log::warn(&format!("server-side logout failed ({e}); forgetting the session anyway"));
         }
@@ -69,7 +69,7 @@ pub struct Info {
 
 pub async fn info() -> Result<Info> {
     let session = load().await?.context("not logged in")?;
-    let mut api = Api::new(Some(session.clone()));
+    let api = Api::new(Some(session.clone()));
     let user = api.user().await?;
     api.key_secret()?; // the stored session must still carry the key secret
     let info = Info { username: user.name, used_bytes: user.used_space, total_bytes: user.max_space };
@@ -85,7 +85,7 @@ pub async fn open_drive() -> Result<(Drive<impl PGPProviderSync>, Session)> {
 
 /// Stores rotated tokens if a refresh happened during a command.
 pub async fn persist(api: Api, before: Session) -> Result<()> {
-    if let Some(s) = api.session.filter(|s| *s != before) {
+    if let Some(s) = api.session().filter(|s| *s != before) {
         save(&s).await?;
     }
     Ok(())

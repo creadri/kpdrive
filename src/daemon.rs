@@ -14,6 +14,14 @@ use crate::drive::Drive;
 use crate::sync::{self, Entry, State, local_matches};
 
 const POLL: std::time::Duration = std::time::Duration::from_secs(30);
+/// How long a burst of filesystem events must be quiet before a pass starts:
+/// an editor's write-temp-then-rename, or a lock file, then counts as one edit.
+const DEBOUNCE: std::time::Duration = std::time::Duration::from_secs(2);
+/// A burst that never goes quiet still gets a pass this often.
+const DEBOUNCE_CAP: std::time::Duration = std::time::Duration::from_secs(30);
+/// Even with inotify, sweep the folder now and then: network mounts and watch
+/// limits can lose events.
+const SWEEP_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
 
 /// What the tray and the socket see; refreshed after every pass.
 #[derive(Default)]
@@ -179,6 +187,34 @@ fn refresh(snap: &Shared, state: &State, syncing: bool, error: Option<String>) {
     s.last_error = error;
 }
 
+/// Watches the sync folder; every relevant change sends one `()`. `None` when
+/// the watch could not be set up, in which case the caller sweeps instead.
+fn watch(root: &Path, changed: mpsc::UnboundedSender<()>) -> Option<notify::RecommendedWatcher> {
+    use notify::{EventKind, RecursiveMode, Watcher};
+    let root_owned = root.to_owned();
+    let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+        let Ok(event) = event else { return };
+        // Reads and metadata-only events (atime) say nothing about content.
+        if matches!(event.kind, EventKind::Access(_)) {
+            return;
+        }
+        let relevant = event.paths.iter().any(|p| {
+            p.starts_with(&root_owned)
+                && !p.to_string_lossy().ends_with(sync::PART_SUFFIX)
+                && !p.file_name().map(|n| n.to_string_lossy().starts_with(".kpdrive")).unwrap_or(false)
+        });
+        if relevant {
+            let _ = changed.send(());
+        }
+    })
+    .ok()?;
+    if let Err(e) = watcher.watch(root, RecursiveMode::Recursive) {
+        crate::log::warn(&format!("cannot watch {}: {e}; falling back to periodic sweeps", root.display()));
+        return None;
+    }
+    Some(watcher)
+}
+
 /// Runs until Quit. `persist` is called with the session after each pass so
 /// rotated tokens reach the wallet.
 pub async fn run<P: PGPProviderSync>(
@@ -200,8 +236,25 @@ pub async fn run<P: PGPProviderSync>(
     };
 
     crate::log::write("INFO", "daemon started");
+    let (fs_tx, mut fs_rx) = mpsc::unbounded_channel::<()>();
+    let watcher = watch(&state.root, fs_tx);
+    if watcher.is_some() {
+        crate::log::write("INFO", &format!("watching {}", state.root.display()));
+    }
+    let mut last_sweep = std::time::Instant::now();
+    let mut fs_dirty = false;
     let mut force = false;
+    // Consecutive failed passes: the wait grows and the user hears about the
+    // outage once, not every 30 seconds.
+    let mut failures: u32 = 0;
     loop {
+        // Sweep the folder only when something says to: a burst of events, no
+        // watcher at all, the hourly safety net, or an explicit Sync now.
+        let check_local = force || fs_dirty || watcher.is_none() || last_sweep.elapsed() >= SWEEP_EVERY;
+        if check_local {
+            last_sweep = std::time::Instant::now();
+        }
+        fs_dirty = false;
         // Cheap: a directory listing, once per pass.
         if let Err(e) = crate::log::prune(crate::config::load().log_retention_days) {
             crate::log::error(&format!("log retention: {e:#}"));
@@ -210,7 +263,7 @@ pub async fn run<P: PGPProviderSync>(
         if let Some(t) = &tray {
             t.update(|_| {}).await;
         }
-        let error = match sync::run(&mut drive, &mut state, force).await {
+        let error = match sync::run_with(&mut drive, &mut state, force, check_local).await {
             Ok(Some(notes)) => {
                 crate::log::write("INFO", &format!("synced to {}", state.root.display()));
                 println!("synced to {}", state.root.display());
@@ -223,10 +276,17 @@ pub async fn run<P: PGPProviderSync>(
             Err(e) => {
                 let msg = format!("sync error: {e:#}");
                 crate::log::error(&msg);
-                notify(&msg);
+                if failures == 0 {
+                    notify(&msg);
+                }
+                failures += 1;
                 Some(msg)
             }
         };
+        if error.is_none() && failures > 0 {
+            notify("Sync resumed");
+            failures = 0;
+        }
         force = false;
         persist(&drive);
         refresh(&snap, &state, false, error);
@@ -234,13 +294,33 @@ pub async fn run<P: PGPProviderSync>(
             t.update(|_| {}).await;
         }
 
-        // ponytail: fixed 30s poll of the event stream; long-poll/push if Proton ever offers it.
-        match tokio::time::timeout(POLL, rx.recv()).await {
-            Ok(Some(Cmd::Sync)) => force = true,
-            Ok(Some(Cmd::Quit)) | Ok(None) => break,
-            Err(_) => {}
+        // A fixed 30 s poll of the event stream while healthy (nothing pushes
+        // from Proton), doubling per failed pass up to 16 minutes.
+        let wait = POLL * 2u32.pow(failures.min(5));
+        tokio::select! {
+            cmd = rx.recv() => match cmd {
+                Some(Cmd::Sync) => {
+                    force = true;
+                    // Several clicks during one pass mean one forced pass, not several.
+                    while let Ok(Cmd::Sync) = rx.try_recv() {}
+                }
+                Some(Cmd::Quit) | None => break,
+            },
+            Some(()) = fs_rx.recv() => {
+                // Debounce: wait for the burst to go quiet, but not forever.
+                let started = std::time::Instant::now();
+                while started.elapsed() < DEBOUNCE_CAP {
+                    match tokio::time::timeout(DEBOUNCE, fs_rx.recv()).await {
+                        Ok(Some(())) => continue,
+                        _ => break,
+                    }
+                }
+                fs_dirty = true;
+            }
+            _ = tokio::time::sleep(wait) => {}
         }
     }
+    drop(watcher);
     crate::log::write("INFO", "daemon stopped");
     let _ = std::fs::remove_file(socket_path());
     Ok(())

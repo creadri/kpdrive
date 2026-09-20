@@ -10,6 +10,7 @@ use proton_crypto_account::keys::UserKeys;
 use proton_crypto_account::salts::KeySecret;
 use zeroize::Zeroizing;
 use reqwest::{Method, StatusCode};
+use std::sync::{Arc, RwLock};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
@@ -46,35 +47,96 @@ pub struct User {
     pub keys: UserKeys,
 }
 
+/// Cheap to clone; clones share one session and one connection pool, so a
+/// token refresh done by any request is seen by all of them.
+#[derive(Clone)]
 pub struct Api {
     http: reqwest::Client,
-    pub session: Option<Session>,
+    base: String,
+    /// Held only to copy or replace the session, never across an await.
+    session: Arc<RwLock<Option<Session>>>,
+    /// Serialises refreshes: the one that gets here first does the work, the
+    /// rest find the token already rotated and just retry.
+    refreshing: Arc<tokio::sync::Mutex<()>>,
 }
+
+/// Attempts for a call that is safe to repeat, including the first.
+const ATTEMPTS: u32 = 3;
 
 impl Api {
     pub fn new(session: Option<Session>) -> Self {
-        let http = reqwest::Client::builder().gzip(true).user_agent(USER_AGENT).build().expect("reqwest client");
-        Self { http, session }
+        Self::with_base(BASE_URL, session)
     }
 
-    pub async fn get<T: DeserializeOwned>(&mut self, path: &str) -> Result<T> {
+    fn with_base(base: &str, session: Option<Session>) -> Self {
+        let http = reqwest::Client::builder().gzip(true).user_agent(USER_AGENT).build().expect("reqwest client");
+        Self {
+            http,
+            base: base.to_owned(),
+            session: Arc::new(RwLock::new(session)),
+            refreshing: Arc::new(tokio::sync::Mutex::new(())),
+        }
+    }
+
+    /// A copy of the current session, tokens as of now.
+    pub fn session(&self) -> Option<Session> {
+        self.session.read().expect("session lock").clone()
+    }
+
+    pub fn take_session(&self) -> Option<Session> {
+        self.session.write().expect("session lock").take()
+    }
+
+    fn set_session(&self, session: Option<Session>) {
+        *self.session.write().expect("session lock") = session;
+    }
+
+    /// The session id, which the API wants echoed as `ClientUID` on drafts.
+    pub fn uid(&self) -> String {
+        self.session().map(|s| s.uid).unwrap_or_default()
+    }
+
+    pub async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         self.call(Method::GET, path, None).await
     }
 
-    pub async fn post<T: DeserializeOwned>(&mut self, path: &str, body: &Value) -> Result<T> {
+    pub async fn post<T: DeserializeOwned>(&self, path: &str, body: &Value) -> Result<T> {
         self.call(Method::POST, path, Some(body)).await
     }
 
     /// Raw block download: authorised by the per-block storage token, no session headers.
     pub async fn fetch_block(&self, url: &str, token: &str) -> Result<Vec<u8>> {
-        let resp = self.http.get(url).header("pm-storage-token", token).send().await.context("fetch block")?;
-        if !resp.status().is_success() {
-            bail!("block fetch failed: HTTP {}", resp.status());
+        let mut attempt = 1;
+        let resp = loop {
+            match self.http.get(url).header("pm-storage-token", token).send().await {
+                Ok(r) if (r.status() == StatusCode::TOO_MANY_REQUESTS || r.status().is_server_error()) && attempt < ATTEMPTS => {
+                    let retry_after = r.headers().get(reqwest::header::RETRY_AFTER).and_then(|v| v.to_str().ok()).and_then(|v| v.parse().ok());
+                    backoff(attempt, retry_after).await;
+                }
+                Ok(r) => break r,
+                Err(e) if attempt < ATTEMPTS => {
+                    let _ = e;
+                    backoff(attempt, None).await;
+                }
+                Err(e) => return Err(e).context("fetch block"),
+            }
+            attempt += 1;
+        };
+        let status = resp.status();
+        if !status.is_success() {
+            // Typed, so a caller can tell an expired URL (401/403/404) from the rest.
+            return Err(ApiError {
+                code: 0,
+                status: status.as_u16(),
+                message: "block fetch failed".into(),
+                path: "storage block".into(),
+            }
+            .into());
         }
         Ok(resp.bytes().await?.to_vec())
     }
 
-    pub async fn put<T: DeserializeOwned>(&mut self, path: &str, body: &Value) -> Result<T> {
+    pub async fn put<T: DeserializeOwned>(&self, path: &str, body: &Value) -> Result<T> {
         self.call(Method::PUT, path, Some(body)).await
     }
 
@@ -88,29 +150,54 @@ impl Api {
         parse_envelope::<Value>("storage block", status, value).map(|_| ())
     }
 
-    pub async fn delete<T: DeserializeOwned>(&mut self, path: &str) -> Result<T> {
+    pub async fn delete<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         self.call(Method::DELETE, path, None).await
     }
 
-    async fn call<T: DeserializeOwned>(&mut self, method: Method, path: &str, body: Option<&Value>) -> Result<T> {
-        let (status, value) = self.send(method.clone(), path, body).await?;
-        if status == StatusCode::UNAUTHORIZED && self.session.is_some() {
-            self.refresh().await?;
-            let (status, value) = self.send(method, path, body).await?;
+    async fn call<T: DeserializeOwned>(&self, method: Method, path: &str, body: Option<&Value>) -> Result<T> {
+        // Only calls that can safely run twice are retried. A POST that creates
+        // something would come back "already exists" on the second try.
+        let repeatable = matches!(method, Method::GET | Method::PUT | Method::DELETE);
+        let mut attempt = 1;
+        let mut refreshed = false;
+        loop {
+            let used_token = self.session().map(|s| s.access_token);
+            let sent = self.send(method.clone(), path, body).await;
+            let (status, value, retry_after) = match sent {
+                Ok(x) => x,
+                Err(_) if repeatable && attempt < ATTEMPTS => {
+                    backoff(attempt, None).await;
+                    attempt += 1;
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
+            if status == StatusCode::UNAUTHORIZED && !refreshed {
+                if let Some(used) = used_token {
+                    self.refresh_if_stale(&used).await?;
+                    refreshed = true;
+                    continue;
+                }
+            }
+            let throttled = status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error();
+            if throttled && repeatable && attempt < ATTEMPTS {
+                backoff(attempt, retry_after).await;
+                attempt += 1;
+                continue;
+            }
             return parse_envelope(path, status, value);
         }
-        parse_envelope(path, status, value)
     }
 
-    async fn send(&self, method: Method, path: &str, body: Option<&Value>) -> Result<(StatusCode, Value)> {
+    async fn send(&self, method: Method, path: &str, body: Option<&Value>) -> Result<(StatusCode, Value, Option<u64>)> {
         let started = std::time::Instant::now();
         let debug = std::env::var_os("KPDRIVE_DEBUG").is_some();
         let mut req = self
             .http
-            .request(method.clone(), format!("{BASE_URL}{path}"))
+            .request(method.clone(), format!("{}{path}", self.base))
             .header("x-pm-appversion", APP_VERSION)
             .header(reqwest::header::ACCEPT, ACCEPT);
-        if let Some(s) = &self.session {
+        if let Some(s) = self.session() {
             req = req.header("x-pm-uid", &s.uid).bearer_auth(&s.access_token);
         }
         if let Some(b) = body {
@@ -118,29 +205,43 @@ impl Api {
         }
         let resp = req.send().await.with_context(|| format!("request {path}"))?;
         let status = resp.status();
+        let retry_after = resp
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.trim().parse().ok());
         let value = resp.json().await.unwrap_or(Value::Null);
         if debug {
             eprintln!("api {method} {path} -> {} in {} ms", status.as_u16(), started.elapsed().as_millis());
         }
-        Ok((status, value))
+        Ok((status, value, retry_after))
     }
 
-    async fn refresh(&mut self) -> Result<()> {
-        let s = self.session.as_ref().ok_or_else(|| anyhow!("no session"))?;
+    /// Rotates the tokens, unless another request already did. Proton hands
+    /// out a new refresh token with every refresh, so two refreshes racing
+    /// would have the second spend a token that no longer exists and log the
+    /// user out. `used` is the access token the failed request carried: if the
+    /// current one differs, the refresh has happened and the caller need only
+    /// retry.
+    async fn refresh_if_stale(&self, used: &str) -> Result<()> {
+        let _serialised = self.refreshing.lock().await;
+        let current = self.session().ok_or_else(|| anyhow!("no session"))?;
+        if current.access_token != used {
+            return Ok(());
+        }
         let body = json!({
-            "UID": s.uid,
-            "RefreshToken": s.refresh_token,
+            "UID": current.uid,
+            "RefreshToken": current.refresh_token,
             "ResponseType": "token",
             "GrantType": "refresh_token",
             "RedirectURI": "https://proton.me",
         });
-        // No bearer on the refresh call: the access token is what's being replaced.
         let resp = self
             .http
-            .post(format!("{BASE_URL}auth/v4/refresh"))
+            .post(format!("{}auth/v4/refresh", self.base))
             .header("x-pm-appversion", APP_VERSION)
             .header(reqwest::header::ACCEPT, ACCEPT)
-            .header("x-pm-uid", &s.uid)
+            .header("x-pm-uid", &current.uid)
             .json(&body)
             .send()
             .await
@@ -155,16 +256,17 @@ impl Api {
             refresh_token: String,
         }
         let r: R = parse_envelope("auth/v4/refresh", status, value).context("session expired, run `kpdrive login`")?;
-        let s = self.session.as_mut().expect("checked above");
-        s.access_token = r.access_token;
-        s.refresh_token = r.refresh_token;
+        let mut rotated = current;
+        rotated.access_token = r.access_token;
+        rotated.refresh_token = r.refresh_token;
+        self.set_session(Some(rotated));
         Ok(())
     }
 
     /// Browser sign-in (session fork), the flow Proton's own CLI uses. The
     /// browser handles password, 2FA and captcha; the fork payload carries the
     /// key password. `show` gets the URL to open and the code the user must confirm.
-    pub async fn login_via_browser(&mut self, show: impl FnOnce(&str, &str)) -> Result<()> {
+    pub async fn login_via_browser(&self, show: impl FnOnce(&str, &str)) -> Result<()> {
         #[derive(Deserialize)]
         struct Init {
             #[serde(rename = "Selector")]
@@ -184,7 +286,7 @@ impl Api {
             refresh_token: String,
         }
 
-        self.session = None;
+        self.set_session(None);
         let init: Init = self.get("auth/v4/sessions/forks").await?;
         let key = Zeroizing::new(proton_crypto::generate_secure_random_bytes::<32>());
         show(&sign_in_url(&init.user_code, &key), &init.user_code);
@@ -195,7 +297,7 @@ impl Api {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(600);
         let status: Status = loop {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let (http, value) = self.send(Method::GET, &path, None).await?;
+            let (http, value, _) = self.send(Method::GET, &path, None).await?;
             if http != StatusCode::UNPROCESSABLE_ENTITY {
                 break parse_envelope(&path, http, value)?;
             }
@@ -205,13 +307,13 @@ impl Api {
         };
 
         let key_secret = decrypt_fork_key_password(&key, &status.payload)?;
-        self.session = Some(Session {
+        self.set_session(Some(Session {
             username: String::new(),
             uid: status.uid,
             access_token: status.access_token,
             refresh_token: status.refresh_token,
             key_secret: key_secret.as_bytes().to_vec(),
-        });
+        }));
 
         // Prove the key password by unlocking a user key, and learn the username.
         let user = self.user().await?;
@@ -219,11 +321,13 @@ impl Api {
         if unlocked.unlocked_keys.is_empty() {
             bail!("fork payload key password does not unlock any user key");
         }
-        self.session.as_mut().expect("set above").username = user.name;
+        let mut session = self.session().expect("set above");
+        session.username = user.name;
+        self.set_session(Some(session));
         Ok(())
     }
 
-    pub async fn user(&mut self) -> Result<User> {
+    pub async fn user(&self) -> Result<User> {
         #[derive(Deserialize)]
         struct R {
             #[serde(rename = "User")]
@@ -233,8 +337,8 @@ impl Api {
     }
 
     pub fn key_secret(&self) -> Result<KeySecret> {
-        let s = self.session.as_ref().ok_or_else(|| anyhow!("not logged in"))?;
-        Ok(KeySecret::new(s.key_secret.clone()))
+        let s = self.session().ok_or_else(|| anyhow!("not logged in"))?;
+        Ok(KeySecret::new(s.key_secret))
     }
 }
 
@@ -269,6 +373,12 @@ fn decrypt_fork_key_password(key: &[u8; 32], payload: &str) -> Result<Zeroizing<
         .ok_or_else(|| anyhow!("fork payload has no keyPassword"))
 }
 
+/// 1 s, 2 s, 4 s between attempts, or what `Retry-After` asked for.
+async fn backoff(attempt: u32, retry_after: Option<u64>) {
+    let secs = retry_after.unwrap_or(1u64 << (attempt - 1)).min(60);
+    tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
+}
+
 /// A failed Proton API call. Carries the code so callers can tell apart the ones
 /// that are ordinary answers, such as 2501 for "no such thing".
 #[derive(Debug)]
@@ -295,6 +405,11 @@ pub fn api_code(error: &anyhow::Error) -> Option<i64> {
     error.downcast_ref::<ApiError>().map(|e| e.code)
 }
 
+/// The HTTP status of a failed call, when the failure came from the API at all.
+pub fn api_status(error: &anyhow::Error) -> Option<u16> {
+    error.downcast_ref::<ApiError>().map(|e| e.status)
+}
+
 /// Every Proton response is `{Code, Error?, ...}`; 1000/1001 mean success.
 fn parse_envelope<T: DeserializeOwned>(path: &str, status: StatusCode, value: Value) -> Result<T> {
     let code = value.get("Code").and_then(Value::as_i64).unwrap_or(0);
@@ -313,6 +428,95 @@ fn parse_envelope<T: DeserializeOwned>(path: &str, status: StatusCode, value: Va
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A minimal HTTP/1.1 server on a thread. Returns 401 to every request that
+    /// carries the stale bearer token, rotates tokens on `auth/v4/refresh`, and
+    /// counts how many refreshes it performed.
+    fn fake_proton() -> (String, Arc<AtomicUsize>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let refreshes = Arc::new(AtomicUsize::new(0));
+        let counter = refreshes.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let counter = counter.clone();
+                std::thread::spawn(move || {
+                    let mut stream = stream.unwrap();
+                    let mut reader = BufReader::new(stream.try_clone().unwrap());
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    let path = line.split_whitespace().nth(1).unwrap_or("").to_owned();
+                    let (mut bearer, mut len) = (String::new(), 0usize);
+                    loop {
+                        let mut h = String::new();
+                        reader.read_line(&mut h).unwrap();
+                        let h = h.trim_end();
+                        if h.is_empty() {
+                            break;
+                        }
+                        if let Some(v) = h.strip_prefix("authorization: Bearer ") {
+                            bearer = v.to_owned();
+                        }
+                        if let Some(v) = h.strip_prefix("content-length: ") {
+                            len = v.parse().unwrap_or(0);
+                        }
+                    }
+                    let mut body = vec![0u8; len];
+                    reader.read_exact(&mut body).unwrap();
+                    let (status, json) = if path.ends_with("auth/v4/refresh") {
+                        let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                        // A second refresh would be spending a token that no longer exists.
+                        if n == 1 {
+                            ("200 OK", r#"{"Code":1000,"AccessToken":"fresh","RefreshToken":"fresh-r"}"#.to_owned())
+                        } else {
+                            ("400 Bad Request", r#"{"Code":10013,"Error":"Invalid refresh token"}"#.to_owned())
+                        }
+                    } else if bearer == "fresh" {
+                        ("200 OK", r#"{"Code":1000,"Answer":42}"#.to_owned())
+                    } else {
+                        ("401 Unauthorized", r#"{"Code":401,"Error":"Invalid access token"}"#.to_owned())
+                    };
+                    let _ = write!(
+                        stream,
+                        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{json}",
+                        json.len()
+                    );
+                });
+            }
+        });
+        (format!("http://{addr}/"), refreshes)
+    }
+
+    /// Eight requests all start with the stale token and all get 401. Exactly
+    /// one of them may refresh; the rest must notice the rotation and retry.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_401s_refresh_once() {
+        let (base, refreshes) = fake_proton();
+        let api = Api::with_base(
+            &base,
+            Some(Session {
+                username: "u".into(),
+                uid: "uid".into(),
+                access_token: "stale".into(),
+                refresh_token: "stale-r".into(),
+                key_secret: vec![],
+            }),
+        );
+        let calls: Vec<_> = (0..8)
+            .map(|_| {
+                let api = api.clone();
+                tokio::spawn(async move { api.get::<Value>("core/v4/users").await })
+            })
+            .collect();
+        for c in calls {
+            let v = c.await.unwrap().expect("every request must succeed after the one refresh");
+            assert_eq!(v["Answer"], 42);
+        }
+        assert_eq!(refreshes.load(Ordering::SeqCst), 1, "exactly one refresh for eight concurrent 401s");
+        assert_eq!(api.session().unwrap().refresh_token, "fresh-r", "the rotated tokens are what is kept");
+    }
 
     #[test]
     fn envelope() {

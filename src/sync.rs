@@ -25,6 +25,10 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
 use crate::drive::{Drive, Node};
+use futures_util::{StreamExt, stream};
+
+/// Folders listed at once during a walk.
+const LIST_IN_FLIGHT: usize = 8;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct State {
@@ -45,7 +49,7 @@ pub struct Entry {
     pub size: u64,
 }
 
-const PART_SUFFIX: &str = ".kpdrive-part";
+pub const PART_SUFFIX: &str = ".kpdrive-part";
 
 /// Patterns for paths sync should leave alone, in the root of the sync folder.
 /// Same syntax as `.gitignore`, matched by the same library, so anchoring,
@@ -155,6 +159,18 @@ pub fn save_state(state: &State) -> Result<()> {
 /// One sync pass. `None` when nothing needed doing; otherwise the notable
 /// lines (conflicts, errors) of the pass that ran.
 pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, force: bool) -> Result<Option<Vec<String>>> {
+    run_with(drive, state, force, true).await
+}
+
+/// As [`run`], but `check_local` says whether the local folder needs sweeping.
+/// The daemon watches it with inotify and only sweeps when something fired,
+/// on a timer, or when it cannot watch; the CLI always sweeps.
+pub async fn run_with<P: PGPProviderSync>(
+    drive: &mut Drive<P>,
+    state: &mut State,
+    force: bool,
+    check_local: bool,
+) -> Result<Option<Vec<String>>> {
     let mut notes: Vec<String> = Vec::new();
     macro_rules! note {
         ($($arg:tt)*) => {{ let s = format!($($arg)*); crate::log::warn(&s); notes.push(s); }};
@@ -162,7 +178,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
     fs::create_dir_all(&state.root).with_context(|| format!("create {}", state.root.display()))?;
     let ignores = Ignores::load(&state.root);
     let (cursor, remote_changed) = drive.events_since(state.event_id.as_deref()).await?;
-    if !force && !remote_changed && !local_changed(state, &ignores) {
+    if !force && !remote_changed && !(check_local && local_changed(state, &ignores)) {
         state.event_id = Some(cursor);
         save_state(state)?;
         return Ok(None);
@@ -176,68 +192,83 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State, fo
     let root = drive.root()?;
     let root_id = root.id.clone();
     nodes.insert(root_id.clone(), root);
-    let mut stack = vec![(root_id.clone(), PathBuf::new())];
-    while let Some((folder_id, rel)) = stack.pop() {
-        let children = drive.list(&nodes[&folder_id]).await?;
-        for node in children {
-            let Some(name) = safe_name(&node.name) else {
-                eprintln!("skip: unsafe name {:?}", node.name);
-                continue;
-            };
-            let node_rel = rel.join(name);
-            if ignores.is_ignored(&node_rel, node.is_folder) {
-                continue;
-            }
-            let local = state.root.join(&node_rel);
-            let old = state.nodes.get(&node.id);
-
-            // Same content under a new name or parent: rename instead of re-fetching.
-            if let Some(old) = old {
-                let old_local = state.root.join(&old.path);
-                if old.path != node_rel && old.revision == node.revision && old_local.exists() && !local.exists() {
-                    fs::rename(&old_local, &local).with_context(|| format!("rename {}", old_local.display()))?;
-                    crate::log::info(&format!("moved {} -> {}", old.path.display(), node_rel.display()));
+    // Breadth first: every folder on one level is listed concurrently, then
+    // its children are handled in order. Only the listing is parallel; the
+    // bookkeeping and downloads below stay sequential, as they must.
+    let mut level = vec![(root_id.clone(), PathBuf::new())];
+    while !level.is_empty() {
+        let listed: Vec<Result<Vec<Node<P::PrivateKey>>>> = {
+            let drive: &Drive<P> = &*drive;
+            let nodes = &nodes;
+            stream::iter(level.iter())
+                .map(|(id, _)| async move { drive.list(&nodes[id]).await })
+                .buffered(LIST_IN_FLIGHT)
+                .collect()
+                .await
+        };
+        let mut next_level = Vec::new();
+        for ((_, rel), children) in level.into_iter().zip(listed) {
+            for node in children? {
+                let Some(name) = safe_name(&node.name) else {
+                    eprintln!("skip: unsafe name {:?}", node.name);
+                    continue;
+                };
+                let node_rel = rel.join(name);
+                if ignores.is_ignored(&node_rel, node.is_folder) {
+                    continue;
                 }
-            }
-
-            // Gone locally: the user deleted it. Trash it remotely, unless the
-            // remote also changed — then the remote version comes back instead,
-            // because a delete must not discard someone else's edit.
-            if let Some(old) = old {
-                if !local.exists() {
-                    if old.revision == node.revision {
-                        crate::log::info(&format!("trash {} (deleted locally)", node_rel.display()));
-                        to_trash.push(node.id.clone());
-                        continue;
-                    }
-                    note!("{} was deleted locally but changed remotely; restoring the remote version", node_rel.display());
-                }
-            }
-
-            let entry = if node.is_folder {
-                if local.is_file() {
-                    let copy = keep_local_copy(&local, "is a folder remotely", &mut notes)?;
-                    note!("conflict: {} kept as {}", node_rel.display(), copy);
-                }
-                fs::create_dir_all(&local)?;
-                stack.push((node.id.clone(), node_rel.clone()));
-                Entry { path: node_rel, is_folder: true, revision: None, mtime: 0, size: 0 }
-            } else {
-                match sync_file(drive, &node, &local, old, &mut notes).await {
-                    Ok(Some((mtime, size))) => Entry { path: node_rel, is_folder: false, revision: node.revision.clone(), mtime, size },
-                    Ok(None) => {
-                        nodes.insert(node.id.clone(), node);
-                        continue; // conflict: kept local, not tracked this round
-                    }
-                    Err(e) => {
-                        note!("error: {}: {e:#}", node_rel.display());
-                        continue;
+                let local = state.root.join(&node_rel);
+                let old = state.nodes.get(&node.id);
+    
+                // Same content under a new name or parent: rename instead of re-fetching.
+                if let Some(old) = old {
+                    let old_local = state.root.join(&old.path);
+                    if old.path != node_rel && old.revision == node.revision && old_local.exists() && !local.exists() {
+                        fs::rename(&old_local, &local).with_context(|| format!("rename {}", old_local.display()))?;
+                        crate::log::info(&format!("moved {} -> {}", old.path.display(), node_rel.display()));
                     }
                 }
-            };
-            seen.insert(node.id.clone(), entry);
-            nodes.insert(node.id.clone(), node);
+    
+                // Gone locally: the user deleted it. Trash it remotely, unless the
+                // remote also changed — then the remote version comes back instead,
+                // because a delete must not discard someone else's edit.
+                if let Some(old) = old {
+                    if !local.exists() {
+                        if old.revision == node.revision {
+                            crate::log::info(&format!("trash {} (deleted locally)", node_rel.display()));
+                            to_trash.push(node.id.clone());
+                            continue;
+                        }
+                        note!("{} was deleted locally but changed remotely; restoring the remote version", node_rel.display());
+                    }
+                }
+    
+                let entry = if node.is_folder {
+                    if local.is_file() {
+                        let copy = keep_local_copy(&local, "is a folder remotely", &mut notes)?;
+                        note!("conflict: {} kept as {}", node_rel.display(), copy);
+                    }
+                    fs::create_dir_all(&local)?;
+                    next_level.push((node.id.clone(), node_rel.clone()));
+                    Entry { path: node_rel, is_folder: true, revision: None, mtime: 0, size: 0 }
+                } else {
+                    match sync_file(drive, &node, &local, old, &mut notes).await {
+                        Ok(Some((mtime, size))) => Entry { path: node_rel, is_folder: false, revision: node.revision.clone(), mtime, size },
+                        Ok(None) => {
+                            nodes.insert(node.id.clone(), node);
+                            continue; // conflict: kept local, not tracked this round
+                        }
+                        Err(e) => {
+                            note!("error: {}: {e:#}", node_rel.display());
+                            continue;
+                        }
+                    }
+                };
+                seen.insert(node.id.clone(), entry);
+                nodes.insert(node.id.clone(), node);
+            }
         }
+        level = next_level;
     }
 
     // ---- local → remote ---------------------------------------------------

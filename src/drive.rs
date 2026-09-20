@@ -8,6 +8,7 @@
 use anyhow::{Context, Result, anyhow, bail};
 use base64::Engine as _;
 use base64::prelude::BASE64_STANDARD as B64;
+use futures_util::{StreamExt, stream};
 use hmac::{Hmac, Mac};
 use proton_crypto::crypto::{
     DataEncoding, Decryptor, DecryptorSync, Encryptor, EncryptorSync, KeyGenerator, KeyGeneratorSync, PGPMessage,
@@ -153,14 +154,7 @@ pub struct Drive<P: PGPProviderSync> {
 }
 
 impl<P: PGPProviderSync> Drive<P> {
-    pub async fn open(mut api: Api, pgp: P) -> Result<Self> {
-        let secret = api.key_secret()?;
-        let user = api.user().await?;
-        let user_keys = user.keys.unlock(&pgp, &secret).unlocked_keys;
-        if user_keys.is_empty() {
-            bail!("could not unlock user keys; run `kpdrive login` again");
-        }
-
+    pub async fn open(api: Api, pgp: P) -> Result<Self> {
         #[derive(Deserialize)]
         struct Addresses {
             #[serde(rename = "Addresses")]
@@ -175,7 +169,19 @@ impl<P: PGPProviderSync> Drive<P> {
             #[serde(rename = "Keys")]
             keys: AddressKeys,
         }
-        let addresses: Addresses = api.get("core/v4/addresses").await?;
+        let secret = api.key_secret()?;
+        // The three bootstrap calls do not depend on each other; only the key
+        // unlocking below does, so it is the calls that run side by side.
+        let (user, addresses, my_files) = tokio::try_join!(
+            api.user(),
+            api.get::<Addresses>("core/v4/addresses"),
+            api.get::<ShareBootstrap>("drive/v2/shares/my-files"),
+        )?;
+        let user_keys = user.keys.unlock(&pgp, &secret).unlocked_keys;
+        if user_keys.is_empty() {
+            bail!("could not unlock user keys; run `kpdrive login` again");
+        }
+
         // address id → (email, primary key, all keys)
         let mut address_keys: HashMap<String, (String, Option<P::PrivateKey>, Vec<P::PrivateKey>)> = HashMap::new();
         for a in addresses.addresses {
@@ -192,7 +198,6 @@ impl<P: PGPProviderSync> Drive<P> {
             address_keys.insert(a.id, (a.email, primary, keys));
         }
 
-        let my_files: ShareBootstrap = api.get("drive/v2/shares/my-files").await?;
         let ShareBootstrap { volume, share, link } = my_files;
         let (email, signing_key) = address_keys
             .get(&share.address_id)
@@ -247,7 +252,7 @@ impl<P: PGPProviderSync> Drive<P> {
         })
     }
 
-    pub async fn list(&mut self, folder: &Node<P::PrivateKey>) -> Result<Vec<Node<P::PrivateKey>>> {
+    pub async fn list(&self, folder: &Node<P::PrivateKey>) -> Result<Vec<Node<P::PrivateKey>>> {
         #[derive(Deserialize)]
         struct Page {
             #[serde(rename = "LinkIDs")]
@@ -277,11 +282,21 @@ impl<P: PGPProviderSync> Drive<P> {
             #[serde(rename = "Links")]
             links: Vec<LinkDetails>,
         }
+        // The detail chunks do not depend on each other; a big folder is
+        // several of them, so fetch them side by side.
+        let path = format!("drive/v2/volumes/{}/links", folder.volume_id);
+        let api = &self.api;
+        let pages: Vec<Result<Links>> = stream::iter(ids.chunks(150))
+            .map(|chunk| {
+                let path = path.clone();
+                async move { api.post(&path, &json!({ "LinkIDs": chunk })).await }
+            })
+            .buffered(4)
+            .collect()
+            .await;
         let mut nodes = Vec::with_capacity(ids.len());
-        for chunk in ids.chunks(150) {
-            let path = format!("drive/v2/volumes/{}/links", folder.volume_id);
-            let links: Links = self.api.post(&path, &json!({ "LinkIDs": chunk })).await?;
-            for d in links.links {
+        for links in pages {
+            for d in links?.links {
                 if d.link.state != 1 || d.link.trash_time.is_some() {
                     continue; // trashed, draft or deleted
                 }
@@ -295,7 +310,7 @@ impl<P: PGPProviderSync> Drive<P> {
     /// Advances the event cursor. Returns the new cursor and whether anything
     /// happened since `cursor`. A `None` cursor (first sync) always counts as changed.
     /// The "latest" id is opaque and differs per call, so only the events list is trusted.
-    pub async fn events_since(&mut self, cursor: Option<&str>) -> Result<(String, bool)> {
+    pub async fn events_since(&self, cursor: Option<&str>) -> Result<(String, bool)> {
         #[derive(Deserialize)]
         struct Latest {
             #[serde(rename = "EventID")]
@@ -333,7 +348,7 @@ impl<P: PGPProviderSync> Drive<P> {
 
     /// Resolves `path` to its parent folder and the node itself. The root has
     /// no parent, so it is rejected.
-    pub async fn resolve_with_parent(&mut self, path: &str) -> Result<(Node<P::PrivateKey>, Node<P::PrivateKey>)> {
+    pub async fn resolve_with_parent(&self, path: &str) -> Result<(Node<P::PrivateKey>, Node<P::PrivateKey>)> {
         let trimmed = path.trim_matches('/');
         let (parent_path, name) = trimmed.rsplit_once('/').unwrap_or(("", trimmed));
         if name.is_empty() {
@@ -350,7 +365,7 @@ impl<P: PGPProviderSync> Drive<P> {
     }
 
     /// Walks `path` ("a/b/c", leading slash optional) from the root.
-    pub async fn resolve(&mut self, path: &str) -> Result<Node<P::PrivateKey>> {
+    pub async fn resolve(&self, path: &str) -> Result<Node<P::PrivateKey>> {
         let mut node = self.root()?;
         for part in path.split('/').filter(|s| !s.is_empty()) {
             if !node.is_folder {
@@ -469,7 +484,7 @@ impl<P: PGPProviderSync> Drive<P> {
         Ok((key, m))
     }
 
-    pub async fn create_folder(&mut self, parent: &Node<P::PrivateKey>, name: &str) -> Result<Node<P::PrivateKey>> {
+    pub async fn create_folder(&self, parent: &Node<P::PrivateKey>, name: &str) -> Result<Node<P::PrivateKey>> {
         let (key, mut body) = self.node_material(parent, name)?;
         let hash_key_armored = self.encrypt_to(&key, &proton_crypto::generate_secure_random_bytes::<32>(), Some(&key), false)?;
         body.insert("NodeHashKey".into(), hash_key_armored.clone().into());
@@ -503,7 +518,7 @@ impl<P: PGPProviderSync> Drive<P> {
     }
 
     /// Moves nodes to the trash (the user can restore them in the web app).
-    pub async fn trash(&mut self, ids: &[String]) -> Result<()> {
+    pub async fn trash(&self, ids: &[String]) -> Result<()> {
         if ids.is_empty() {
             return Ok(());
         }
@@ -545,7 +560,7 @@ impl<P: PGPProviderSync> Drive<P> {
                     id: String,
                 }
                 let path = format!("drive/v2/volumes/{}/files/{}/revisions", node.volume_id, node.id);
-                let uid = self.api.session.as_ref().map(|s| s.uid.clone()).unwrap_or_default();
+                let uid = self.api.uid();
                 let r: R = self.api.post(&path, &json!({ "CurrentRevisionID": current, "ClientUID": uid })).await?;
                 (node.id.clone(), r.revision.id, self.reimport(&node.key)?, session_key)
             }
@@ -566,7 +581,7 @@ impl<P: PGPProviderSync> Drive<P> {
                 body.insert("ContentKeyPacket".into(), B64.encode(&packet).into());
                 body.insert("ContentKeyPacketSignature".into(), self.sign_detached(&key, session_key.export().as_ref())?.into());
                 body.insert("SignatureAddress".into(), self.email.clone().into());
-                body.insert("ClientUID".into(), self.api.session.as_ref().map(|s| s.uid.clone()).unwrap_or_default().into());
+                body.insert("ClientUID".into(), self.api.uid().into());
                 #[derive(Deserialize)]
                 struct R {
                     #[serde(rename = "File")]
@@ -595,7 +610,35 @@ impl<P: PGPProviderSync> Drive<P> {
         let path = format!("drive/v2/volumes/{}/links/{link_id}/revisions/{revision_id}/verification", parent.volume_id);
         let code = B64.decode(self.api.get::<Verification>(&path).await?.code).context("verification code base64")?;
 
-        // 3. Blocks. ponytail: one prepare request and one upload per block, sequential.
+        // 3. Blocks, in batches: encrypt a batch sequentially (the manifest is
+        //    extended in that order, so its order is safe by construction), ask
+        //    for all its upload targets in one call, then PUT them concurrently.
+        /// Blocks per prepare call and upload burst; bounds memory at about
+        /// this many 4 MiB ciphertexts plus one plaintext buffer.
+        const BATCH: usize = 16;
+        const IN_FLIGHT: usize = 6;
+
+        #[derive(Deserialize)]
+        struct Prep {
+            #[serde(rename = "UploadLinks")]
+            links: Vec<Target>,
+        }
+        #[derive(Deserialize)]
+        struct Target {
+            #[serde(rename = "BareURL")]
+            bare_url: String,
+            #[serde(rename = "Token")]
+            token: String,
+            /// Present in current responses; older ones matched by position.
+            #[serde(rename = "Index", default)]
+            index: Option<i64>,
+        }
+        struct Prepared {
+            index: i64,
+            ciphertext: Vec<u8>,
+            entry: serde_json::Value,
+        }
+
         let mut manifest = Vec::new();
         let mut block_sizes = Vec::new();
         let mut sha1 = Sha1::new();
@@ -603,39 +646,47 @@ impl<P: PGPProviderSync> Drive<P> {
         let mut buf = vec![0u8; BLOCK_SIZE];
         let mut index = 1i64;
         loop {
-            let n = read_full(data, &mut buf)?;
-            if n == 0 {
+            let mut batch: Vec<Prepared> = Vec::with_capacity(BATCH);
+            while batch.len() < BATCH {
+                let n = read_full(data, &mut buf)?;
+                if n == 0 {
+                    break;
+                }
+                let plain = &buf[..n];
+                sha1.update(plain);
+                total += n as u64;
+                block_sizes.push(n);
+
+                let ciphertext = self
+                    .pgp
+                    .new_encryptor()
+                    .with_session_key_ref(&session_key)
+                    .encrypt_raw(plain, DataEncoding::Bytes)
+                    .map_err(|e| anyhow!("encrypt block {index}: {e}"))?;
+                let digest = Sha256::digest(&ciphertext);
+                manifest.extend_from_slice(&digest);
+                let token: Vec<u8> = code.iter().enumerate().map(|(i, c)| c ^ ciphertext.get(i).copied().unwrap_or(0)).collect();
+                let plain_sig = self.sign_detached(&self.signing_key, plain)?;
+                let enc_sig = self.encrypt_to(&node_key, plain_sig.as_bytes(), None, false)?;
+                batch.push(Prepared {
+                    index,
+                    entry: json!({
+                        "Index": index,
+                        "Size": ciphertext.len(),
+                        "EncSignature": enc_sig,
+                        "Hash": B64.encode(digest),
+                        "Verifier": { "Token": B64.encode(&token) },
+                    }),
+                    ciphertext,
+                });
+                index += 1;
+            }
+            if batch.is_empty() {
                 break;
             }
-            let plain = &buf[..n];
-            sha1.update(plain);
-            total += n as u64;
-            block_sizes.push(n);
+            let last_batch = batch.len() < BATCH;
 
-            let ciphertext = self
-                .pgp
-                .new_encryptor()
-                .with_session_key_ref(&session_key)
-                .encrypt_raw(plain, DataEncoding::Bytes)
-                .map_err(|e| anyhow!("encrypt block {index}: {e}"))?;
-            let digest = Sha256::digest(&ciphertext);
-            manifest.extend_from_slice(&digest);
-            let token: Vec<u8> = code.iter().enumerate().map(|(i, c)| c ^ ciphertext.get(i).copied().unwrap_or(0)).collect();
-            let plain_sig = self.sign_detached(&self.signing_key, plain)?;
-            let enc_sig = self.encrypt_to(&node_key, plain_sig.as_bytes(), None, false)?;
-
-            #[derive(Deserialize)]
-            struct Prep {
-                #[serde(rename = "UploadLinks")]
-                links: Vec<Target>,
-            }
-            #[derive(Deserialize)]
-            struct Target {
-                #[serde(rename = "BareURL")]
-                bare_url: String,
-                #[serde(rename = "Token")]
-                token: String,
-            }
+            let entries: Vec<&serde_json::Value> = batch.iter().map(|p| &p.entry).collect();
             let prep: Prep = self
                 .api
                 .post(
@@ -645,20 +696,40 @@ impl<P: PGPProviderSync> Drive<P> {
                         "VolumeID": parent.volume_id,
                         "LinkID": link_id,
                         "RevisionID": revision_id,
-                        "BlockList": [{
-                            "Index": index,
-                            "Size": ciphertext.len(),
-                            "EncSignature": enc_sig,
-                            "Hash": B64.encode(digest),
-                            "Verifier": { "Token": B64.encode(&token) },
-                        }],
+                        "BlockList": entries,
                         "ThumbnailList": [],
                     }),
                 )
                 .await?;
-            let target = prep.links.into_iter().next().ok_or_else(|| anyhow!("no upload link for block {index}"))?;
-            self.api.post_block(&target.bare_url, &target.token, ciphertext).await?;
-            index += 1;
+
+            // Pair each block with its target: by Index when the API says which,
+            // else by position, as the reference client does.
+            let mut targets = prep.links;
+            let mut jobs = Vec::with_capacity(batch.len());
+            for p in batch {
+                let at = targets
+                    .iter()
+                    .position(|t| t.index == Some(p.index))
+                    .or_else(|| targets.iter().position(|t| t.index.is_none()))
+                    .ok_or_else(|| anyhow!("no upload link for block {}", p.index))?;
+                jobs.push((targets.remove(at), p));
+            }
+
+            let api = &self.api;
+            let outcomes: Vec<Result<()>> = stream::iter(jobs)
+                .map(|(t, p)| async move {
+                    api.post_block(&t.bare_url, &t.token, p.ciphertext)
+                        .await
+                        .with_context(|| format!("upload block {}", p.index))
+                })
+                .buffer_unordered(IN_FLIGHT)
+                .collect()
+                .await;
+            outcomes.into_iter().collect::<Result<Vec<()>>>()?;
+
+            if last_batch {
+                break;
+            }
         }
 
         // 4. Seal the revision: signed manifest plus encrypted extended attributes.
@@ -685,7 +756,7 @@ impl<P: PGPProviderSync> Drive<P> {
     }
 
     /// Streams the active revision of `file` into `out`, block by block.
-    pub async fn download(&mut self, file: &Node<P::PrivateKey>, out: &mut impl Write) -> Result<u64> {
+    pub async fn download(&self, file: &Node<P::PrivateKey>, out: &mut impl Write) -> Result<u64> {
         let f = file.file.as_ref().ok_or_else(|| anyhow!("{} is not a file", file.name))?;
         let revision = f.active_revision.as_ref().ok_or_else(|| anyhow!("{} has no active revision", file.name))?;
         let packet = B64.decode(&f.content_key_packet).context("content key packet base64")?;
@@ -716,8 +787,11 @@ impl<P: PGPProviderSync> Drive<P> {
             token: String,
         }
         const PAGE: usize = 50;
+        /// Blocks in flight at once; bounds memory at this many 4 MiB ciphertexts.
+        const IN_FLIGHT: usize = 6;
         let mut written = 0u64;
         let mut next_index = 1i64;
+        let mut urls_renewed = false;
         loop {
             let path = format!(
                 "drive/v2/volumes/{}/files/{}/revisions/{}?FromBlockIndex={next_index}&PageSize={PAGE}&NoBlockUrls=0",
@@ -725,23 +799,47 @@ impl<P: PGPProviderSync> Drive<P> {
             );
             let mut blocks = self.api.get::<R>(&path).await?.revision.blocks;
             blocks.sort_by_key(|b| b.index);
-            // ponytail: blocks fetched sequentially; parallelise when download speed matters.
-            for b in &blocks {
-                if b.index != next_index {
-                    bail!("block table gap: expected {next_index}, got {}", b.index);
-                }
-                let ciphertext = self.api.fetch_block(&b.bare_url, &b.token).await?;
+            let page_len = blocks.len();
+            if let Some((b, want)) = blocks.iter().zip(next_index..).find(|(b, want)| b.index != *want) {
+                bail!("block table gap: expected {want}, got {}", b.index);
+            }
+
+            // Fetch ahead concurrently. `buffered` (not `buffer_unordered`) hands
+            // results back in index order, so the file is still written
+            // sequentially and no more than IN_FLIGHT blocks sit in memory.
+            let api = &self.api;
+            let mut fetched = stream::iter(blocks)
+                .map(|b| async move { (b.index, api.fetch_block(&b.bare_url, &b.token).await) })
+                .buffered(IN_FLIGHT);
+
+            let mut renew = false;
+            while let Some((index, result)) = fetched.next().await {
+                let ciphertext = match result {
+                    Ok(c) => c,
+                    // Storage URLs expire. Refetching the block list renews every
+                    // URL at once; blocks already written are skipped by next_index.
+                    Err(e) if !urls_renewed && matches!(crate::api::api_status(&e), Some(401 | 403 | 404)) => {
+                        urls_renewed = true;
+                        renew = true;
+                        break;
+                    }
+                    Err(e) => return Err(e.context(format!("block {index}"))),
+                };
                 let plain = self
                     .pgp
                     .new_decryptor()
                     .with_session_key_ref(&session_key)
                     .decrypt(&ciphertext, DataEncoding::Bytes)
-                    .map_err(|e| anyhow!("decrypt block {}: {e}", b.index))?;
+                    .map_err(|e| anyhow!("decrypt block {index}: {e}"))?;
                 out.write_all(plain.as_bytes())?;
                 written += plain.as_bytes().len() as u64;
                 next_index += 1;
             }
-            if blocks.len() < PAGE {
+            drop(fetched);
+            if renew {
+                continue;
+            }
+            if page_len < PAGE {
                 break;
             }
         }
@@ -751,7 +849,7 @@ impl<P: PGPProviderSync> Drive<P> {
 
     /// The photos timeline root, or `None` when the account has no photos
     /// volume. Photos live in their own volume with their own share.
-    pub async fn photos_root(&mut self) -> Result<Option<Node<P::PrivateKey>>> {
+    pub async fn photos_root(&self) -> Result<Option<Node<P::PrivateKey>>> {
         let bootstrap: ShareBootstrap = match self.api.get("drive/v2/shares/photos").await {
             Ok(b) => b,
             Err(e) if crate::api::api_code(&e) == Some(crate::api::DOES_NOT_EXIST) => return Ok(None),
@@ -763,7 +861,7 @@ impl<P: PGPProviderSync> Drive<P> {
 
     /// Every photo on the timeline, newest first, with its capture time. The
     /// timeline is flat: it is not the folder tree.
-    pub async fn timeline(&mut self, root: &Node<P::PrivateKey>) -> Result<Vec<TimelinePhoto>> {
+    pub async fn timeline(&self, root: &Node<P::PrivateKey>) -> Result<Vec<TimelinePhoto>> {
         #[derive(Deserialize)]
         struct Page {
             #[serde(rename = "Photos", default)]
@@ -791,7 +889,7 @@ impl<P: PGPProviderSync> Drive<P> {
     }
 
     /// Decrypts photo nodes by id. Photos have their own link-details route.
-    pub async fn photo_nodes(&mut self, root: &Node<P::PrivateKey>, ids: &[String]) -> Result<Vec<Node<P::PrivateKey>>> {
+    pub async fn photo_nodes(&self, root: &Node<P::PrivateKey>, ids: &[String]) -> Result<Vec<Node<P::PrivateKey>>> {
         #[derive(Deserialize)]
         struct Links {
             #[serde(rename = "Links")]
@@ -917,7 +1015,7 @@ impl<P: PGPProviderSync> Drive<P> {
     }
 
     /// The public link already on `node`, if any, password fragment included.
-    pub async fn public_link(&mut self, node: &Node<P::PrivateKey>) -> Result<Option<String>> {
+    pub async fn public_link(&self, node: &Node<P::PrivateKey>) -> Result<Option<String>> {
         let Some(share_id) = &node.share_id else { return Ok(None) };
         let path = format!("drive/shares/{share_id}/urls");
         let Some(url) = self.api.get::<ShareUrls>(&path).await?.urls.into_iter().next() else {
@@ -1031,7 +1129,7 @@ impl<P: PGPProviderSync> Drive<P> {
     }
 
     /// Removes every public link on `node`. Returns how many were removed.
-    pub async fn unshare(&mut self, node: &Node<P::PrivateKey>) -> Result<usize> {
+    pub async fn unshare(&self, node: &Node<P::PrivateKey>) -> Result<usize> {
         let Some(share_id) = node.share_id.clone() else { return Ok(0) };
         let path = format!("drive/shares/{share_id}/urls");
         let urls = self.api.get::<ShareUrls>(&path).await?.urls;
