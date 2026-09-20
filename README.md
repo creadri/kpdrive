@@ -2,6 +2,8 @@
 
 Simple KDE Proton Drive sync Client designed to have a simple solution.
 
+![Main Window](docs/screenshots/kpdrive-main-ui-0.2.0.png)
+
 ## Decisions
 
 - **Not a FUSE mount**: only synching folders, no 
@@ -123,6 +125,18 @@ The Dolphin overlay plugin in `dolphin-overlay/` uses that socket; see its READM
 cargo build                 # CLI and daemon
 cargo build -p kpdrive-ui   # the window; needs qt6-qtdeclarative-devel and kf6-kirigami
 ```
+
+## Install
+
+### RPM
+
+1. Download rpm files from release that matches your distribution, ex: fc43 or fc44 for Fedora 43 & 44
+2. ``sudo rpm -i kpdrive*fc44*.rpm`` install packages
+3. ``kpdrive-ui`` to set-up your account in GUI (or see usage for CLI)
+3. ``kpdrive sync --watch`` to have daemon with tray
+
+> Don't forget to reload Dolphin to see icon overlay.
+> Check Autostart to add kpdrive.
 
 ## Releases
 
