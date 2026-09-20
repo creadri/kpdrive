@@ -23,6 +23,8 @@ override_dh_auto_install:
 	        debian/tmp/usr/share/applications/be.otterit.kpdrive.desktop
 	install -Dpm0644 packaging/kpdrive-share.desktop \
 	        debian/tmp/usr/share/kio/servicemenus/kpdrive-share.desktop
+	install -Dpm0644 assets/icon.svg \
+	        debian/tmp/usr/share/icons/hicolor/scalable/apps/be.otterit.kpdrive.svg
 	DESTDIR=$(CURDIR)/debian/tmp cmake --install obj-dolphin
 
 # Cargo release binaries carry nothing for dwz to compress.

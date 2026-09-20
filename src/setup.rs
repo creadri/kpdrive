@@ -91,6 +91,20 @@ fn packaged(rel: &str) -> Option<PathBuf> {
     system.is_file().then_some(system)
 }
 
+/// The application icon, carried in the binary so a build-tree install gets the
+/// same launcher as a packaged one. Returns the name to use in `Icon=`.
+fn install_icon() -> Result<&'static str> {
+    const NAME: &str = "be.otterit.kpdrive";
+    // A package already put it in the system theme.
+    if Path::new("/usr/share/icons/hicolor/scalable/apps").join(format!("{NAME}.svg")).is_file() {
+        return Ok(NAME);
+    }
+    let dir = xdg("XDG_DATA_HOME", ".local/share")?.join("icons/hicolor/scalable/apps");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(dir.join(format!("{NAME}.svg")), include_str!("../assets/icon.svg"))?;
+    Ok(NAME)
+}
+
 /// Puts the account window in the application launcher.
 pub fn launcher() -> Result<PathBuf> {
     if let Some(system) = packaged("applications/be.otterit.kpdrive.desktop") {
@@ -99,12 +113,14 @@ pub fn launcher() -> Result<PathBuf> {
     let dir = xdg("XDG_DATA_HOME", ".local/share")?.join("applications");
     std::fs::create_dir_all(&dir)?;
     let exe = ui_binary()?;
+    let icon = install_icon()?;
     let file = dir.join("be.otterit.kpdrive.desktop");
     std::fs::write(
         &file,
         format!(
-            "[Desktop Entry]\nType=Application\nName=Proton Drive\nGenericName=Cloud storage\nComment=Account, storage and activity log for Proton Drive\nExec={} %u\nIcon=folder-cloud\nTerminal=false\nCategories=Utility;Network;FileTools;\nStartupNotify=true\n",
-            exe.display()
+            "[Desktop Entry]\nType=Application\nName=Proton Drive\nGenericName=Cloud storage\nComment=Account, storage and activity log for Proton Drive\nExec={} %u\nIcon={}\nTerminal=false\nCategories=Utility;FileTools;\nStartupNotify=true\n",
+            exe.display(),
+            icon
         ),
     )?;
     Ok(file)

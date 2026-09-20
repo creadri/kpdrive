@@ -166,6 +166,15 @@ rpmbuild -ba --define "kpdrive_version 0.1.0" packaging/kpdrive.spec  # needs a 
 dpkg-buildpackage -b -us -uc                                          # on Debian
 ```
 
+## Icon
+
+`assets/icon.svg` is the application icon: pure vector, under a kilobyte, with
+the letter drawn as a path so it does not depend on an installed font. It reads
+down to 16px and looks the same against light and dark backgrounds. Packages
+install it as `be.otterit.kpdrive` in the hicolor theme, and `kpdrive setup`
+drops a copy under the user's icon directory so a build-tree install gets the
+same launcher. `assets/icon-draft.svg` is the earlier sketch it came from.
+
 ## Licence
 
 GNU GPL v3 **or later** (`GPL-3.0-or-later`); see [LICENSE](LICENSE).

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+ <!-- kpdrive. Pure vector on purpose: no embedded bitmap, and the letter is a
+      path rather than a <text> element, so it does not depend on a font being
+      installed. Reads down to 16px and looks the same on light and dark. -->
+ <defs>
+  <linearGradient id="face" x1="0" y1="0" x2="0.35" y2="1">
+   <stop offset="0" stop-color="#8F73FF"/><stop offset="1" stop-color="#4B2AE0"/>
+  </linearGradient>
+  <linearGradient id="tab" x1="0" y1="0" x2="0.35" y2="1">
+   <stop offset="0" stop-color="#6D4AFF"/><stop offset="1" stop-color="#3A1FB8"/>
+  </linearGradient>
+ </defs>
+ <path fill="url(#tab)" d="M22 86V64a16 16 0 0 1 16-16h50a14 14 0 0 1 11.2 5.6L112 70h-90z"/>
+ <rect x="22" y="68" width="212" height="146" rx="18" fill="url(#face)"/>
+ <path fill="#ffffff" fill-rule="evenodd" transform="translate(96 98)"
+       d="M0 0h38a28 28 0 0 1 0 56H19v30H0Z M19 16h17a13 13 0 0 1 0 26H19Z"/>
+</svg>

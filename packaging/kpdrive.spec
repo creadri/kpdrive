@@ -81,6 +81,8 @@ install -Dpm0644 packaging/be.otterit.kpdrive.desktop \
                  %{buildroot}%{_datadir}/applications/be.otterit.kpdrive.desktop
 install -Dpm0644 packaging/kpdrive-share.desktop \
                  %{buildroot}%{_datadir}/kio/servicemenus/kpdrive-share.desktop
+install -Dpm0644 assets/icon.svg \
+                 %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/be.otterit.kpdrive.svg
 DESTDIR=%{buildroot} cmake --install build-dolphin
 
 %check
@@ -94,6 +96,7 @@ cargo test --release --workspace
 %files ui
 %{_bindir}/kpdrive-ui
 %{_datadir}/applications/be.otterit.kpdrive.desktop
+%{_datadir}/icons/hicolor/scalable/apps/be.otterit.kpdrive.svg
 
 %files dolphin
 %{_qt6_plugindir}/kf6/overlayicon/kpdriveoverlay.so
