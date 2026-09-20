@@ -59,10 +59,13 @@ jobs:
       - name: Install build dependencies
         run: |
           dnf -y install --setopt=install_weak_deps=False \
-            git rust cargo gcc-c++ cmake extra-cmake-modules lld perl-interpreter \
+            git ca-certificates rust cargo gcc-c++ cmake extra-cmake-modules lld perl-interpreter \
             qt6-qtbase-devel qt6-qtdeclarative-devel \
             kf6-kcoreaddons-devel kf6-kio-devel kf6-kirigami-devel \
             rpm-build tar gzip
+
+          # The base image ships no trust bundle, so git over https fails.
+          update-ca-trust
 
       - uses: actions/checkout@v4
         with:

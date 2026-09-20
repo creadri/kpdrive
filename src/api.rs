@@ -103,9 +103,11 @@ impl Api {
     }
 
     async fn send(&self, method: Method, path: &str, body: Option<&Value>) -> Result<(StatusCode, Value)> {
+        let started = std::time::Instant::now();
+        let debug = std::env::var_os("KPDRIVE_DEBUG").is_some();
         let mut req = self
             .http
-            .request(method, format!("{BASE_URL}{path}"))
+            .request(method.clone(), format!("{BASE_URL}{path}"))
             .header("x-pm-appversion", APP_VERSION)
             .header(reqwest::header::ACCEPT, ACCEPT);
         if let Some(s) = &self.session {
@@ -117,6 +119,9 @@ impl Api {
         let resp = req.send().await.with_context(|| format!("request {path}"))?;
         let status = resp.status();
         let value = resp.json().await.unwrap_or(Value::Null);
+        if debug {
+            eprintln!("api {method} {path} -> {} in {} ms", status.as_u16(), started.elapsed().as_millis());
+        }
         Ok((status, value))
     }
 

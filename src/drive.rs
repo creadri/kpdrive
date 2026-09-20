@@ -1197,6 +1197,32 @@ mod tests {
         assert!(pgp.new_decryptor().with_passphrase(&wrong).decrypt_session_key(&packet).is_err());
     }
 
+    /// `cargo test --release -- --ignored --nocapture unlock_cost`: what one
+    /// node costs to unlock. Drives the decision on caching node keys.
+    #[test]
+    #[ignore]
+    fn unlock_cost() {
+        let pgp = proton_crypto::new_pgp_provider();
+        let passphrase = B64.encode(proton_crypto::generate_secure_random_bytes::<32>()).into_bytes();
+        let key = pgp.new_key_generator().with_user_id("Drive key", "no-reply@proton.me").generate().unwrap();
+        let locked = pgp.private_key_export(&key, &passphrase, DataEncoding::Armor).unwrap();
+        let locked = locked.as_ref().to_vec();
+        let public = pgp.private_key_to_public_key(&key).unwrap();
+        let name = pgp.new_encryptor().with_encryption_key(&public).encrypt_raw(b"a name", DataEncoding::Armor).unwrap();
+        let n = 50;
+        let t = std::time::Instant::now();
+        for _ in 0..n {
+            let _ = pgp.private_key_import(&locked, &passphrase, DataEncoding::Armor).unwrap();
+        }
+        let import = t.elapsed() / n;
+        let t = std::time::Instant::now();
+        for _ in 0..n {
+            let _ = pgp.new_decryptor().with_decryption_key(&key).decrypt(&name, DataEncoding::Armor).unwrap();
+        }
+        let decrypt = t.elapsed() / n;
+        println!("private_key_import (S2K): {import:?} per node; small decrypt: {decrypt:?} each; per listed node ~{:?}", import + decrypt * 2);
+    }
+
     #[test]
     fn link_passwords() {
         let a = generated_password();
