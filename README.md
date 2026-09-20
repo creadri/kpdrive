@@ -1,10 +1,10 @@
 # kpdrive
 
-Proton Drive sync client for KDE Plasma, written in Rust.
+Simple KDE Proton Drive sync Client designed to have a simple solution.
 
 ## Decisions
 
-- **Shape:** sync folder (default `~/ProtonDrive`), Nextcloud-style. Not a FUSE mount.
+- **Not a FUSE mount**: only synching folders, no 
 - **API client:** our own thin client over the Drive REST API. Crypto comes from
   Proton's official [proton-crypto-rs](https://github.com/ProtonMail/proton-crypto-rs)
   (MIT, pure-Rust `rustpgp` backend, pinned commit). No third-party SDK ports.
@@ -21,7 +21,11 @@ Proton Drive sync client for KDE Plasma, written in Rust.
   thread and results are posted back to the Qt thread.
 - **The one C++ piece:** Dolphin overlay icons (`KOverlayIconPlugin`). Lives in its own
   directory, talks to the daemon socket, optional package.
-- **Packaging:** `cargo install` now; RPM, deb, AUR later.
+- **Packaging:** 
+  - Manual install: `cargo install`
+  - RPM targetting Fedora
+  - deb
+  - AUR depending on demand
 - **Terms:** Proton permits personal, non-commercial third-party use of its SDK/API today.
 
 ## Milestones
