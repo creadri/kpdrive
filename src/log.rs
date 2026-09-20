@@ -42,9 +42,23 @@ fn stamp(secs: i64) -> String {
     format!("{y:04}-{m:02}-{d:02}T{hh:02}:{mi:02}:{ss:02}Z")
 }
 
+/// Whether a line of `level` is kept when the configured minimum is `min`. A
+/// level this build does not know is always kept: dropping something that
+/// cannot be ranked would hide it for good.
+fn stores(level: &str, min: crate::config::LogLevel) -> bool {
+    crate::config::LogLevel::parse(level).is_none_or(|l| l >= min)
+}
+
 /// Appends one line. Never fails the caller: losing a log line must not take
 /// down a sync.
+///
+/// The threshold is read per line rather than cached, so changing it in the
+/// window takes effect in a running daemon; the read is a small file next to
+/// the append this function already does.
 pub fn write(level: &str, message: &str) {
+    if !stores(level, crate::config::load().log_level) {
+        return;
+    }
     let secs = now();
     let mut line = String::new();
     let _ = write!(line, "{} {level} {}", stamp(secs), message.replace('\n', " "));
@@ -138,6 +152,18 @@ pub fn search_in(dir: &std::path::Path, term: &str, limit: usize) -> Result<Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::config::LogLevel;
+
+    #[test]
+    fn levels_are_stored_from_the_threshold_up() {
+        assert!(stores("WARN", LogLevel::Warn));
+        assert!(stores("ERROR", LogLevel::Warn));
+        assert!(!stores("INFO", LogLevel::Warn), "the default drops ordinary activity");
+        assert!(stores("INFO", LogLevel::Info), "asking for everything keeps it");
+        assert!(!stores("WARN", LogLevel::Error));
+        assert!(stores("TRACE", LogLevel::Error), "an unknown level is never dropped");
+    }
 
     #[test]
     fn day_names_sort_as_dates() {

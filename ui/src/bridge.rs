@@ -27,6 +27,7 @@ pub mod qobject {
         #[qproperty(QString, status)]
         #[qproperty(QStringList, log_lines, cxx_name = "logLines")]
         #[qproperty(i32, retention_days, cxx_name = "retentionDays")]
+        #[qproperty(QString, log_level, cxx_name = "logLevel")]
         #[qproperty(QString, sync_folder, cxx_name = "syncFolder")]
         #[qproperty(QString, ignore_file, cxx_name = "ignoreFile")]
         #[qproperty(QString, version)]
@@ -71,6 +72,12 @@ pub mod qobject {
         #[cxx_name = "setRetention"]
         fn set_retention(self: Pin<&mut Self>, days: i32);
 
+        /// Store only lines of this level or worse. Named apart from the
+        /// property's own generated setter, which would otherwise clash.
+        #[qinvokable]
+        #[cxx_name = "changeLogLevel"]
+        fn change_log_level(self: Pin<&mut Self>, level: &QString);
+
     }
 }
 
@@ -100,6 +107,7 @@ pub struct BackendRust {
     status: QString,
     log_lines: QStringList,
     retention_days: i32,
+    log_level: QString,
     sync_folder: QString,
     ignore_file: QString,
     version: QString,
@@ -118,6 +126,7 @@ impl Default for BackendRust {
             status: QString::from("Starting…"),
             log_lines: QStringList::default(),
             retention_days: 30,
+            log_level: QString::from("WARN"),
             sync_folder: QString::default(),
             ignore_file: QString::default(),
             version: QString::from(env!("CARGO_PKG_VERSION")),
@@ -178,7 +187,9 @@ impl cxx_qt::Initialize for qobject::Backend {
             }
         });
 
-        self.as_mut().set_retention_days(kpdrive::config::load().log_retention_days as i32);
+        let config = kpdrive::config::load();
+        self.as_mut().set_retention_days(config.log_retention_days as i32);
+        self.as_mut().set_log_level(QString::from(config.log_level.name()));
         self.as_mut().show_folder();
         self.as_mut().reload_logs("");
         self.refresh();
@@ -269,6 +280,25 @@ impl qobject::Backend {
             Err(e) => list.append(QString::from(&format!("cannot read the log: {e:#}"))),
         }
         self.as_mut().set_log_lines(list);
+    }
+
+    pub fn change_log_level(mut self: Pin<&mut Self>, level: &QString) {
+        let level = level.to_string();
+        let Some(parsed) = kpdrive::config::LogLevel::parse(&level) else { return };
+        // Load and amend: building a fresh Config would drop the other settings.
+        let mut config = kpdrive::config::load();
+        config.log_level = parsed;
+        if let Err(e) = kpdrive::config::save(&config) {
+            self.as_mut().set_status(QString::from(&format!("cannot save the setting: {e:#}")));
+            return;
+        }
+        self.as_mut().set_log_level(QString::from(parsed.name()));
+        let told = match parsed {
+            kpdrive::config::LogLevel::Info => "Storing everything from now on",
+            kpdrive::config::LogLevel::Warn => "Storing warnings and errors from now on",
+            kpdrive::config::LogLevel::Error => "Storing errors from now on",
+        };
+        self.as_mut().set_status(QString::from(told));
     }
 
     pub fn set_retention(mut self: Pin<&mut Self>, days: i32) {

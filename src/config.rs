@@ -4,6 +4,36 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// How much of the activity log is worth keeping on disk. Ordered, so a line
+/// is stored when its level is at least the configured one.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum LogLevel {
+    Info,
+    Warn,
+    Error,
+}
+
+impl LogLevel {
+    /// The name as it appears in a log line and in the config file.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Info => "INFO",
+            Self::Warn => "WARN",
+            Self::Error => "ERROR",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        match name.to_ascii_uppercase().as_str() {
+            "INFO" => Some(Self::Info),
+            "WARN" => Some(Self::Warn),
+            "ERROR" => Some(Self::Error),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
     /// Days of activity log to keep. Older day-files are deleted.
@@ -12,6 +42,14 @@ pub struct Config {
     /// Where Drive is mirrored. Unset until the first `setup` or `--root`.
     #[serde(default)]
     pub sync_folder: Option<PathBuf>,
+    /// The least severe line worth storing. Ordinary activity is still printed
+    /// by the CLI, it just does not reach the log file below this.
+    #[serde(default = "default_level")]
+    pub log_level: LogLevel,
+}
+
+fn default_level() -> LogLevel {
+    LogLevel::Warn
 }
 
 fn default_retention() -> u64 {
@@ -20,7 +58,7 @@ fn default_retention() -> u64 {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { log_retention_days: default_retention(), sync_folder: None }
+        Self { log_retention_days: default_retention(), sync_folder: None, log_level: default_level() }
     }
 }
 

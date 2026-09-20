@@ -383,6 +383,23 @@ Kirigami.ApplicationWindow {
 
                         Controls.Label { text: "days" }
 
+                        Item { width: Kirigami.Units.largeSpacing }
+
+                        Controls.Label { text: "Store" }
+
+                        Controls.ComboBox {
+                            id: levelBox
+                            textRole: "text"
+                            valueRole: "value"
+                            model: [
+                                { text: "Warnings and errors", value: "WARN" },
+                                { text: "Everything", value: "INFO" },
+                                { text: "Errors only", value: "ERROR" },
+                            ]
+                            currentIndex: Math.max(0, indexOfValue(backend.logLevel))
+                            onActivated: backend.changeLogLevel(currentValue)
+                        }
+
                         Item { Layout.fillWidth: true }
 
                         Controls.Label {
