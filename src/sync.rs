@@ -70,7 +70,7 @@ impl Ignores {
         let mut builder = GitignoreBuilder::new(root);
         // A parse error names the offending line; the rest of the file still applies.
         if let Some(e) = builder.add(root.join(IGNORE_FILE)) {
-            if !matches!(e, ignore::Error::Io(ref io) if io.kind() == std::io::ErrorKind::NotFound) {
+            if worth_reporting(&e) {
                 crate::log::warn(&format!("{IGNORE_FILE}: {e}"));
             }
         }
@@ -89,6 +89,13 @@ impl Ignores {
         }
         self.matcher.matched_path_or_any_parents(self.root.join(rel), is_dir).is_ignore()
     }
+}
+
+/// Whether an ignore-file error is worth a log line. Having no ignore file is
+/// the normal state, and the error for it arrives wrapped in the path, so the
+/// io kind has to be dug out rather than matched on the outer variant.
+fn worth_reporting(e: &ignore::Error) -> bool {
+    e.io_error().map(|io| io.kind()) != Some(std::io::ErrorKind::NotFound)
 }
 
 /// Points sync at `new_root`, moving what is already synced when it can.
@@ -815,6 +822,17 @@ fn safe_name(name: &str) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_ignore_file_is_not_worth_a_warning() {
+        let dir = std::env::temp_dir().join(format!("kpdrive-noign-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let e = GitignoreBuilder::new(&dir).add(dir.join(IGNORE_FILE)).expect("absent file errors");
+        assert!(!worth_reporting(&e), "absent ignore file logged as: {e}");
+        let bad = ignore::Error::Glob { glob: Some("[".into()), err: "unclosed".into() };
+        assert!(worth_reporting(&bad), "a real parse error must still be logged");
+        fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn ignore_rules() {
