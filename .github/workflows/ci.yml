@@ -67,12 +67,15 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git dpkg-dev debhelper
+            git ca-certificates dpkg-dev debhelper
 
       - uses: actions/checkout@v4
 
       - name: Validate debian/
         run: |
           dpkg-parsechangelog --file debian/changelog
-          dpkg-checkbuilddeps || echo "::notice::build dependencies are not installed here, which is expected"
           test -x debian/rules || { echo "::error::debian/rules must be executable"; exit 1; }
+          # Resolves every build dependency against the archive without
+          # installing any, so a package name that does not exist fails here
+          # rather than halfway through a release build.
+          apt-get build-dep --dry-run ./
