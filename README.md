@@ -122,7 +122,7 @@ cargo build -p kpdrive-ui   # the window; needs qt6-qtdeclarative-devel and kf6-
 
 ## Releases
 
-Pushing a version tag builds the RPMs and publishes them as a GitHub release.
+Pushing a version tag builds packages and publishes them as a GitHub release.
 The tag is the single source of truth for the version, and the workflow refuses
 to build if the crates disagree with it:
 
@@ -133,24 +133,34 @@ git tag -a v0.2.0 -m "kpdrive 0.2.0"
 git push origin dev v0.2.0
 ```
 
-A tag containing a hyphen (`v0.2.0-rc1`) is published as a pre-release.
+A tag containing a hyphen (`v0.2.0-rc1`) is published as a pre-release, and
 `.github/workflows/release.yml` can also be run by hand against an existing tag.
-Every push and pull request runs the build and the tests through
-`.github/workflows/ci.yml`. Both use a Fedora container, because the window
-needs Qt 6 and KDE Frameworks 6.
 
-Three packages come out: `kpdrive` (the CLI and daemon), `kpdrive-ui` (the
-window), and `kpdrive-dolphin` (overlay icons and the context-menu entry).
-Installing them does *not* start syncing on its own; `kpdrive setup` is still
-how you choose a folder and opt into autostart.
+| Target | Built in | Packages |
+| --- | --- | --- |
+| Fedora, current and previous release | `fedora:44`, `fedora:43` | `kpdrive`, `kpdrive-ui`, `kpdrive-dolphin` (plus the source RPM) |
+| Debian stable | `debian:trixie` | the same three as `.deb` |
 
-To build one locally:
+Bump the Fedora numbers in both workflows when Fedora moves on; every filename
+carries its dist tag, so which is which is never in doubt. The Debian build
+installs Rust through rustup rather than using the distro package, because
+Debian stable ships 1.85 while some dependencies want 1.92.
+
+`kpdrive` holds the CLI and the daemon, `kpdrive-ui` the window, and
+`kpdrive-dolphin` the overlay icons and the context-menu entry. Installing them
+does *not* start syncing on its own; `kpdrive setup` is still how you choose a
+folder and opt into autostart.
+
+Every push and pull request runs the build, the tests, the Dolphin plugin and a
+spec parse check on both Fedora releases, plus a fast validation of the Debian
+control and changelog files.
+
+To build packages locally:
 
 ```
-rpmbuild -ba --define "kpdrive_version 0.1.0" packaging/kpdrive.spec
+rpmbuild -ba --define "kpdrive_version 0.1.0" packaging/kpdrive.spec  # needs a matching tarball in ~/rpmbuild/SOURCES
+dpkg-buildpackage -b -us -uc                                          # on Debian
 ```
-
-after putting a matching source tarball in `~/rpmbuild/SOURCES`.
 
 ## Licence
 

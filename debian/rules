@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	cmake -S dolphin-overlay -B obj-dolphin \
+	      -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+
+override_dh_auto_build:
+	cargo build --release --workspace
+	cmake --build obj-dolphin --parallel
+
+override_dh_auto_test:
+	cargo test --release --workspace
+
+override_dh_auto_install:
+	install -Dpm0755 target/release/kpdrive debian/tmp/usr/bin/kpdrive
+	install -Dpm0755 target/release/kpdrive-ui debian/tmp/usr/bin/kpdrive-ui
+	install -Dpm0644 packaging/be.otterit.kpdrive.desktop \
+	        debian/tmp/usr/share/applications/be.otterit.kpdrive.desktop
+	install -Dpm0644 packaging/kpdrive-share.desktop \
+	        debian/tmp/usr/share/kio/servicemenus/kpdrive-share.desktop
+	DESTDIR=$(CURDIR)/debian/tmp cmake --install obj-dolphin
+
+# Cargo release binaries carry nothing for dwz to compress.
+override_dh_dwz:
+
+override_dh_auto_clean:
+	rm -rf obj-dolphin

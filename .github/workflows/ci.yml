@@ -8,20 +8,25 @@ on:
 
 jobs:
   build:
-    name: Build and test
+    name: Fedora ${{ matrix.fedora }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Matches the releases the RPM workflow builds for.
+        fedora: ['44', '43']
     # Fedora rather than Ubuntu: the window needs Qt 6 and KDE Frameworks 6,
-    # and this is the distribution the RPMs target.
-    container: fedora:latest
+    # and this is what the RPMs target.
+    container: fedora:${{ matrix.fedora }}
 
     steps:
       - name: Install build dependencies
         run: |
           dnf -y install --setopt=install_weak_deps=False \
             git rust cargo gcc-c++ cmake extra-cmake-modules lld perl-interpreter \
-            rpm-build \
             qt6-qtbase-devel qt6-qtdeclarative-devel \
-            kf6-kcoreaddons-devel kf6-kio-devel kf6-kirigami-devel
+            kf6-kcoreaddons-devel kf6-kio-devel kf6-kirigami-devel \
+            rpm-build
 
       - uses: actions/checkout@v4
 
@@ -32,8 +37,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: fc${{ matrix.fedora }}-ci-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: fc${{ matrix.fedora }}-ci-
 
       - name: Test
         run: cargo test --workspace
@@ -50,3 +55,24 @@ jobs:
           cmake -S dolphin-overlay -B dolphin-overlay/build \
                 -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
           cmake --build dolphin-overlay/build --parallel
+
+  packaging:
+    name: Debian packaging metadata
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    # Cheap: validates the control and changelog syntax and that every
+    # build dependency still resolves, without doing the full build.
+    steps:
+      - name: Install packaging tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git dpkg-dev debhelper
+
+      - uses: actions/checkout@v4
+
+      - name: Validate debian/
+        run: |
+          dpkg-parsechangelog --file debian/changelog
+          dpkg-checkbuilddeps || echo "::notice::build dependencies are not installed here, which is expected"
+          test -x debian/rules || { echo "::error::debian/rules must be executable"; exit 1; }

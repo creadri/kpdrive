@@ -15,33 +15,24 @@ permissions:
   contents: write
 
 jobs:
-  rpm:
-    name: Build RPMs and publish
+  version:
+    name: Check the version
     runs-on: ubuntu-latest
-    container: fedora:latest
-
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
     steps:
-      - name: Install build dependencies
-        run: |
-          dnf -y install --setopt=install_weak_deps=False \
-            git rust cargo gcc-c++ cmake extra-cmake-modules lld perl-interpreter \
-            qt6-qtbase-devel qt6-qtdeclarative-devel \
-            kf6-kcoreaddons-devel kf6-kio-devel kf6-kirigami-devel \
-            rpm-build tar gzip gh
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
-          fetch-depth: 0
 
-      - name: Take the version from the tag
-        id: version
+      - id: v
         run: |
           tag="${{ inputs.tag || github.ref_name }}"
           version="${tag#v}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          # A tag that disagrees with the crates would ship an RPM whose
+          # A tag that disagrees with the crates would ship packages whose
           # version does not match what the binary reports about itself.
           for manifest in Cargo.toml ui/Cargo.toml; do
             declared=$(grep -m1 '^version = ' "$manifest" | cut -d'"' -f2)
@@ -50,6 +41,33 @@ jobs:
               exit 1
             fi
           done
+          echo "Building $tag as version $version"
+
+  rpm:
+    name: RPM (Fedora ${{ matrix.fedora }})
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The current Fedora release and the one before it. Bump both when
+        # Fedora moves on; the dist tag in each filename says which is which.
+        fedora: ['44', '43']
+    container: fedora:${{ matrix.fedora }}
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf -y install --setopt=install_weak_deps=False \
+            git rust cargo gcc-c++ cmake extra-cmake-modules lld perl-interpreter \
+            qt6-qtbase-devel qt6-qtdeclarative-devel \
+            kf6-kcoreaddons-devel kf6-kio-devel kf6-kirigami-devel \
+            rpm-build tar gzip
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -57,38 +75,111 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-release-
+          key: fc${{ matrix.fedora }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: fc${{ matrix.fedora }}-cargo-
 
-      - name: Build the RPMs
+      - name: Build
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          mkdir -p ~/rpmbuild/SOURCES
+          mkdir -p ~/rpmbuild/SOURCES dist
           git config --global --add safe.directory "$PWD"
           git archive --format=tar.gz --prefix="kpdrive-$VERSION/" \
             -o ~/rpmbuild/SOURCES/"kpdrive-$VERSION.tar.gz" HEAD
           rpmbuild -ba --define "kpdrive_version $VERSION" packaging/kpdrive.spec
-          mkdir -p dist
           find ~/rpmbuild/RPMS ~/rpmbuild/SRPMS -name '*.rpm' -exec cp {} dist/ \;
           ls -la dist/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: rpms
+          name: rpm-fc${{ matrix.fedora }}
           path: dist/*.rpm
 
-      - name: Publish the release
+  deb:
+    name: DEB (Debian ${{ matrix.debian }})
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        debian: [trixie]
+    container: debian:${{ matrix.debian }}
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates curl build-essential debhelper devscripts \
+            cmake extra-cmake-modules perl pkgconf lld \
+            qt6-base-dev qt6-declarative-dev \
+            libkf6coreaddons-dev libkf6kio-dev libkirigami-dev
+
+      # Debian stable ships Rust 1.85 while some dependencies want 1.92.
+      - name: Install a current Rust toolchain
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --default-toolchain stable --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ matrix.debian }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ matrix.debian }}-cargo-
+
+      - name: Build
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          git config --global --add safe.directory "$PWD"
+          # The tag is the source of truth, so stamp it onto the changelog.
+          sed -i "1s/(.*)/($VERSION)/" debian/changelog
+          head -1 debian/changelog
+          dpkg-buildpackage -b -us -uc
+          mkdir -p dist
+          cp ../*.deb dist/
+          ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.debian }}
+          path: dist/*.deb
+
+  publish:
+    name: Publish the release
+    needs: [version, rpm, deb]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach the packages to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ needs.version.outputs.tag }}
         run: |
+          ls -la dist/
           # A tag like v0.2.0-rc1 is a pre-release; a plain v0.2.0 is not.
           prerelease=""
           case "$TAG" in *-*) prerelease="--prerelease" ;; esac
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.rpm --clobber
+            gh release upload "$TAG" dist/* --clobber
           else
-            gh release create "$TAG" dist/*.rpm \
+            gh release create "$TAG" dist/* \
               --title "kpdrive ${TAG#v}" --generate-notes $prerelease
           fi

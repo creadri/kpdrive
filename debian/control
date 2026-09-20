@@ -1,0 +1,48 @@
+Source: kpdrive
+Section: utils
+Priority: optional
+Maintainer: Adrien Nelis <adrien.nelis@otterit.be>
+# rustc and cargo are deliberately absent: Debian stable ships Rust 1.85 while
+# some dependencies need 1.92, so the workflow installs a toolchain instead.
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               extra-cmake-modules,
+               perl,
+               pkgconf,
+               qt6-base-dev,
+               qt6-declarative-dev,
+               libkf6coreaddons-dev,
+               libkf6kio-dev,
+               libkirigami-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/creadri/kpdrive
+Rules-Requires-Root: no
+
+Package: kpdrive
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: kwalletmanager | gnome-keyring, kdialog, wl-clipboard
+Description: Proton Drive sync client for KDE Plasma
+ kpdrive keeps a local folder in step with Proton Drive, in both directions
+ and end to end encrypted. It runs as a daemon with a Plasma tray icon,
+ creates public links, downloads the Photos timeline, and honours a
+ .protonignore file.
+ .
+ This package holds the command line tool and the sync daemon.
+
+Package: kpdrive-ui
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+         kpdrive (= ${binary:Version}),
+         qml6-module-org-kde-kirigami
+Description: Proton Drive account and log window
+ A Kirigami window showing the signed-in account, storage in use, the sync
+ folder, and the activity log with search and a retention setting.
+
+Package: kpdrive-dolphin
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, kpdrive (= ${binary:Version})
+Enhances: dolphin
+Description: Proton Drive integration for Dolphin
+ Overlay icons marking which files in the sync folder are up to date, and a
+ "Copy Proton Drive link" entry in the context menu.

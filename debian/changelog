@@ -1,0 +1,6 @@
+kpdrive (0.1.0) unstable; urgency=medium
+
+  * Initial packaging. The release workflow rewrites this version from the
+    git tag, so editing it by hand is not needed.
+
+ -- Adrien Nelis <adrien.nelis@otterit.be>  Sun, 20 Sep 2026 00:00:00 +0000
