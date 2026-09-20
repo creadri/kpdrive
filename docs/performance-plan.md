@@ -114,6 +114,12 @@ Proton's guidelines ask for: sync from events, do not traverse.
 **Expected:** steady-state passes cost the events call plus one `links` call
 per batch of changes, regardless of tree size.
 
+### 8. Concurrent small-file uploads   (small; needs 3, 6)
+Seeding showed each small file costing 2.5 s: draft, verification, prepare,
+PUT and seal, one file at a time. The push phase now uploads the changed files
+of one folder together, four in flight. **Expected:** small-file batches at
+roughly a quarter of the sequential time.
+
 ### 7. Faster CLI startup   (small; needs 3)
 `users`, `addresses` and `my-files` do not depend on each other; fetch them
 concurrently. 1.5 s → ~0.7 s on every `ls`, `get`, `put`, `share`.
@@ -158,6 +164,7 @@ matters for the smaller numbers.
 | Idle daemon, 62 s | 2 events calls | 2 events calls | — |
 | 40 s after own pushes | 87 calls (walks on echoed events) | 1 call | 6 |
 | Concurrent 401s | second refresh logged the user out | one refresh, proven by test | 3 |
+| Small files pushed, per file | 1.7 s (10 files in 17.3 s) | 0.55 s (40 files in 23.5 s) | 8 |
 
 The download now sits at the line's speed: about 1.8 s of the 3.5 s is
 account bootstrap plus fetching the block list. The upload is likewise close to
@@ -175,5 +182,6 @@ on a stale cursor (`Refresh: true`), and when an event names a parent the pass
 has never seen; the log says so when it does.
 
 Seeding cost a number worth keeping: 361 small files pushed in 894 s, 2.5 s
-each, because every file is a sequential create, verification, prepare, PUT and
-seal. Uploading files concurrently in the push phase is a natural item 8.
+each, because every file was a sequential create, verification, prepare, PUT
+and seal. Item 8 runs four of a folder's files at once; the per-file figures
+above include about 1.3 s of CLI startup in each run.

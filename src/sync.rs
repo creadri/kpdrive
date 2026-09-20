@@ -29,6 +29,9 @@ use futures_util::{StreamExt, stream};
 
 /// Folders listed at once during a walk.
 const LIST_IN_FLIGHT: usize = 8;
+/// Files of one folder uploaded together. Each upload already keeps up to six
+/// block PUTs in flight, so this is for many small files, not one big one.
+const UPLOAD_IN_FLIGHT: usize = 4;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct State {
@@ -213,6 +216,7 @@ pub async fn run_with<P: PGPProviderSync>(
     let old_paths: HashMap<&PathBuf, &String> = state.nodes.iter().map(|(id, e)| (&e.path, id)).collect();
 
     let mut queue = VecDeque::from([PathBuf::new()]);
+    let mut uploads: Vec<(PathBuf, String, String, Option<String>, PathBuf, i64, u64)> = Vec::new();
     while let Some(rel) = queue.pop_front() {
         let mut items: Vec<_> = fs::read_dir(state.root.join(&rel))?.filter_map(|e| e.ok()).collect();
         items.sort_by_key(|e| e.file_name());
@@ -275,18 +279,30 @@ pub async fn run_with<P: PGPProviderSync>(
                     existing = None;
                 }
             }
-            let mut file = match fs::File::open(item.path()) {
-                Ok(f) => f,
-                Err(e) => {
-                    note(&mut notes, format!("error: open {}: {e}", item_rel.display()));
-                    continue;
-                }
-            };
-            let existing_node = existing.as_ref().map(|id| &nodes[id]);
-            match drive.upload(&nodes[&parent_id], name, existing_node, &mut file, mtime).await {
+            uploads.push((item_rel, name.to_owned(), parent_id, existing, item.path(), mtime, meta.len()));
+        }
+        // Each file is a draft, a prepare, a PUT and a seal in sequence, so a
+        // few small files in flight together cost what one did alone.
+        let results: Vec<_> = {
+            let nodes = &nodes;
+            stream::iter(uploads.drain(..))
+                .map(|(item_rel, name, parent_id, existing, path, mtime, size)| async move {
+                    let existing_node = existing.as_ref().map(|id| &nodes[id]);
+                    let r = match fs::File::open(&path) {
+                        Ok(mut f) => drive.upload(&nodes[&parent_id], &name, existing_node, &mut f, mtime).await,
+                        Err(e) => Err(anyhow::Error::from(e).context("open")),
+                    };
+                    (item_rel, mtime, size, r)
+                })
+                .buffer_unordered(UPLOAD_IN_FLIGHT)
+                .collect()
+                .await
+        };
+        for (item_rel, mtime, size, r) in results {
+            match r {
                 Ok((id, revision)) => {
-                    crate::log::info(&format!("pushed {} ({} bytes)", item_rel.display(), meta.len()));
-                    seen.insert(id.clone(), Entry { path: item_rel.clone(), is_folder: false, revision: Some(revision), mtime, size: meta.len() });
+                    crate::log::info(&format!("pushed {} ({size} bytes)", item_rel.display()));
+                    seen.insert(id.clone(), Entry { path: item_rel.clone(), is_folder: false, revision: Some(revision), mtime, size });
                     by_path.insert(item_rel, id);
                 }
                 Err(e) => note(&mut notes, format!("error: push {}: {e:#}", item_rel.display())),
