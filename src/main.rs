@@ -55,6 +55,10 @@ enum Cmd {
         /// Keep running and re-sync whenever the volume changes.
         #[arg(long)]
         watch: bool,
+        /// Forget what was synced and re-adopt this folder for the account
+        /// signed in. Files are compared by content, so nothing is lost.
+        #[arg(long)]
+        adopt: bool,
         /// Walk the tree even if no change was reported.
         #[arg(long)]
         force: bool,
@@ -109,7 +113,7 @@ async fn main() -> Result<()> {
         Cmd::Logout => do_logout().await,
         Cmd::Ls { path } => ls(&path).await,
         Cmd::Get { remote, local } => get(&remote, local).await,
-        Cmd::Sync { root, watch, force } => sync(root, watch, force).await,
+        Cmd::Sync { root, watch, force, adopt } => sync(root, watch, force, adopt).await,
         Cmd::Photos { dest } => photos(dest).await,
         Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
         Cmd::Setup { root } => setup(root).await,
@@ -154,6 +158,9 @@ fn logs(search: &str, lines: usize, retention: Option<u64>) -> Result<()> {
 }
 
 async fn status() -> Result<()> {
+    // The daemon first: when the session is gone, that is what explains the
+    // account line failing, and it is the same sentence the window shows.
+    println!("{}", daemon::ask().sentence());
     let info = account::info().await?;
     println!(
         "{}: {:.1} / {:.1} GiB used",
@@ -338,7 +345,7 @@ fn resolve_root(state: &mut sync::State, root: Option<std::path::PathBuf>) -> Re
     // user filled before kpdrive ever ran.
     if ask_about(state, &state.root.clone())? == sync::Occupied::Rename {
         println!("{}", sync::move_aside(&state.root)?);
-        state.nodes.clear();
+        state.untrack();
         sync::save_state(state)?;
     }
     Ok(())
@@ -387,9 +394,16 @@ async fn photos(dest: Option<std::path::PathBuf>) -> Result<()> {
     account::persist(drive.api, before).await
 }
 
-async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Result<()> {
+async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool, adopt: bool) -> Result<()> {
     let mut state = sync::load_state()?.unwrap_or_default();
     resolve_root(&mut state, root)?;
+    if adopt {
+        // Whatever was tracked belonged to another account, or to nobody we
+        // can name. Contents decide what is already there.
+        state.untrack();
+        sync::save_state(&state)?;
+        println!("re-adopting {} for the account signed in", state.root.display());
+    }
     let (mut drive, before) = account::open_drive().await?;
     if watch {
         let mut last = before;
@@ -404,7 +418,11 @@ async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool) -> Res
                 });
                 last = s;
             }
-        })
+        },
+        // Signing out and back in through the window replaces the stored
+        // session; this is how the daemon gets hold of the new one.
+        || async { account::open_drive().await.map(|(drive, _)| drive) },
+        )
         .await;
     }
     match sync::run(&mut drive, &mut state, force).await? {

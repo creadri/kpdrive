@@ -247,6 +247,35 @@ Kirigami.ApplicationWindow {
                         }
                     }
 
+                    // What the sync daemon is doing. It is a separate process,
+                    // so without this the window can only guess.
+                    Kirigami.InlineMessage {
+                        Layout.fillWidth: true
+                        visible: backend.syncStatus.length > 0
+                        position: Kirigami.InlineMessage.Position.Inline
+                        type: backend.syncFailed ? Kirigami.MessageType.Error
+                            : !backend.daemonRunning ? Kirigami.MessageType.Warning
+                            : Kirigami.MessageType.Information
+                        text: backend.syncStatus
+                        actions: [
+                            Kirigami.Action {
+                                text: "Sync now"
+                                icon.name: "view-refresh"
+                                visible: backend.daemonRunning && !backend.syncBusy
+                                onTriggered: backend.syncNow()
+                            }
+                        ]
+                    }
+
+                    // The daemon has no way to push, so ask it now and then.
+                    Timer {
+                        interval: 3000
+                        running: root.visible
+                        repeat: true
+                        triggeredOnStart: true
+                        onTriggered: backend.refreshSyncStatus()
+                    }
+
                     Flow {
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing

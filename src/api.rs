@@ -392,6 +392,17 @@ pub struct ApiError {
 /// "does not exist" — an answer, not always a failure.
 pub const DOES_NOT_EXIST: i64 = 2501;
 
+/// "Invalid refresh token": this session is finished. It happens when the
+/// account is signed out somewhere else, which for kpdrive means the window
+/// signed out or signed in again while a daemon was holding the old session.
+pub const INVALID_REFRESH: i64 = 10013;
+
+/// Whether a failure means the session is dead rather than the call being bad.
+/// The cure is a session from the keyring, not a retry.
+pub fn session_expired(error: &anyhow::Error) -> bool {
+    api_code(error) == Some(INVALID_REFRESH) || api_status(error) == Some(401)
+}
+
 impl std::fmt::Display for ApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: Proton API error {} (HTTP {}): {}", self.path, self.code, self.status, self.message)

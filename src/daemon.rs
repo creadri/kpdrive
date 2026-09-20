@@ -23,13 +23,33 @@ const DEBOUNCE_CAP: std::time::Duration = std::time::Duration::from_secs(30);
 /// limits can lose events.
 const SWEEP_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
 
-/// What the tray and the socket see; refreshed after every pass.
+/// What the tray, the socket and the window see; refreshed after every pass.
 #[derive(Default)]
 struct Snapshot {
     root: PathBuf,
     entries: HashMap<PathBuf, Entry>,
     syncing: bool,
     last_error: Option<String>,
+    /// No usable session: waiting for a sign-in rather than failing every pass.
+    signed_out: bool,
+    /// When the last pass finished, seconds since the epoch.
+    last_sync: Option<i64>,
+}
+
+impl Snapshot {
+    /// One line of JSON for the window, which has no other way to know what
+    /// this daemon is doing.
+    fn report(&self) -> String {
+        serde_json::json!({
+            "root": self.root.display().to_string(),
+            "items": self.entries.len(),
+            "syncing": self.syncing,
+            "signedOut": self.signed_out,
+            "lastSync": self.last_sync,
+            "error": self.last_error,
+        })
+        .to_string()
+    }
 }
 
 type Shared = Arc<RwLock<Snapshot>>;
@@ -56,14 +76,15 @@ impl ksni::Tray for Tray {
     }
     fn overlay_icon_name(&self) -> String {
         let s = self.snap.read().expect("snapshot lock");
-        if s.last_error.is_some() { "emblem-error".into() } else { String::new() }
+        if s.last_error.is_some() || s.signed_out { "emblem-error".into() } else { String::new() }
     }
     fn tool_tip(&self) -> ksni::ToolTip {
         let s = self.snap.read().expect("snapshot lock");
-        let description = match (&s.last_error, s.syncing) {
-            (Some(e), _) => e.clone(),
-            (None, true) => "Syncing…".into(),
-            (None, false) => format!("{} items in sync", s.entries.len()),
+        let description = match (s.signed_out, &s.last_error, s.syncing) {
+            (true, ..) => "Signed out. Sign in from the account window.".into(),
+            (_, Some(e), _) => e.clone(),
+            (_, None, true) => "Syncing…".into(),
+            (_, None, false) => format!("{} items in sync", s.entries.len()),
         };
         ksni::ToolTip { title: "Proton Drive".into(), description, ..Default::default() }
     }
@@ -155,6 +176,7 @@ async fn serve_socket(snap: Shared, cmds: mpsc::UnboundedSender<Cmd>) -> Result<
                 let reply = match line.split_once(' ') {
                     Some(("STATUS", p)) => status(&snap.read().expect("snapshot lock"), Path::new(p)).to_string(),
                     _ if line == "ROOT" => snap.read().expect("snapshot lock").root.display().to_string(),
+                    _ if line == "STATE" => snap.read().expect("snapshot lock").report(),
                     _ if line == "SYNC" => {
                         let _ = cmds.send(Cmd::Sync);
                         "OK".into()
@@ -173,18 +195,145 @@ async fn serve_socket(snap: Shared, cmds: mpsc::UnboundedSender<Cmd>) -> Result<
     }
 }
 
+/// What a daemon is doing, as anything outside it sees it. `running: false`
+/// is the answer when there is no daemon to ask.
+#[derive(Default, Debug, Clone)]
+pub struct Report {
+    pub running: bool,
+    /// Whether it answered the question. An older daemon holds the socket but
+    /// does not know this command.
+    pub answered: bool,
+    pub syncing: bool,
+    pub signed_out: bool,
+    pub items: usize,
+    pub last_sync: Option<i64>,
+    pub error: Option<String>,
+}
+
+impl Report {
+    /// One sentence, worded once, so the window and `kpdrive status` say the
+    /// same thing about the same daemon.
+    pub fn sentence(&self) -> String {
+        if !self.running {
+            return "The sync daemon is not running. Start it with: kpdrive sync --watch".into();
+        }
+        if !self.answered {
+            return "A sync daemon is running but is too old to say what it is doing. Restart it.".into();
+        }
+        if self.signed_out {
+            return "Signed out. Syncing resumes once you sign in.".into();
+        }
+        if let Some(e) = &self.error {
+            return format!("Last sync failed: {e}");
+        }
+        if self.syncing {
+            return "Syncing…".into();
+        }
+        let items = format!("{} item{} in sync", self.items, if self.items == 1 { "" } else { "s" });
+        match self.last_sync.map(|t| now() - t) {
+            Some(secs) if secs < 90 => format!("{items}, checked just now"),
+            Some(secs) if secs < 5400 => format!("{items}, checked {} minutes ago", secs / 60),
+            Some(secs) => format!("{items}, checked {} hours ago", secs / 3600),
+            None => items,
+        }
+    }
+}
+
+/// Asks a running daemon what it is doing. A local socket with a short
+/// timeout, so a wedged daemon reads as one that is not answering.
+pub fn ask() -> Report {
+    use std::io::{BufRead, BufReader, Write};
+    let deadline = std::time::Duration::from_millis(300);
+    let Ok(stream) = std::os::unix::net::UnixStream::connect(socket_path()) else {
+        return Report::default();
+    };
+    // Answering the socket is what proves a daemon is there. A version that
+    // does not know this command still counts as running.
+    let mut report = Report { running: true, ..Default::default() };
+    let spoke = || -> Option<serde_json::Value> {
+        stream.set_read_timeout(Some(deadline)).ok()?;
+        stream.set_write_timeout(Some(deadline)).ok()?;
+        let mut writer = stream.try_clone().ok()?;
+        writer.write_all(b"STATE\n").ok()?;
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).ok()?;
+        serde_json::from_str(&line).ok()
+    };
+    if let Some(v) = spoke() {
+        report.answered = true;
+        report.syncing = v["syncing"].as_bool().unwrap_or(false);
+        report.signed_out = v["signedOut"].as_bool().unwrap_or(false);
+        report.items = v["items"].as_u64().unwrap_or(0) as usize;
+        report.last_sync = v["lastSync"].as_i64();
+        report.error = v["error"].as_str().map(str::to_owned);
+    }
+    report
+}
+
+/// Tells a running daemon to sync now, which is also how it is nudged to pick
+/// up a session that has just changed. Silent when there is no daemon.
+pub fn poke() {
+    use std::io::Write;
+    if let Ok(mut stream) = std::os::unix::net::UnixStream::connect(socket_path()) {
+        let _ = stream.set_write_timeout(Some(std::time::Duration::from_millis(300)));
+        let _ = stream.write_all(b"SYNC\n");
+    }
+}
+
 pub fn notify(body: &str) {
     let _ = std::process::Command::new("notify-send")
         .args(["-a", "kpdrive", "-i", "folder-cloud", "Proton Drive", body])
         .spawn();
 }
 
-fn refresh(snap: &Shared, state: &State, syncing: bool, error: Option<String>) {
+fn refresh(snap: &Shared, state: &State, syncing: bool, error: Option<String>, signed_out: bool) {
     let mut s = snap.write().expect("snapshot lock");
     s.root = state.root.clone();
     s.entries = state.nodes.values().map(|e| (e.path.clone(), e.clone())).collect();
     s.syncing = syncing;
     s.last_error = error;
+    s.signed_out = signed_out;
+}
+
+fn now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// Waits for whichever comes first: a command, a settled burst of filesystem
+/// events, or the timer. `false` means Quit.
+async fn wait_for_work(
+    rx: &mut mpsc::UnboundedReceiver<Cmd>,
+    fs_rx: &mut mpsc::UnboundedReceiver<()>,
+    wait: std::time::Duration,
+    force: &mut bool,
+    fs_dirty: &mut bool,
+) -> Result<bool> {
+    tokio::select! {
+        cmd = rx.recv() => match cmd {
+            Some(Cmd::Sync) => {
+                *force = true;
+                // Several clicks during one pass mean one forced pass, not several.
+                while let Ok(Cmd::Sync) = rx.try_recv() {}
+            }
+            Some(Cmd::Quit) | None => return Ok(false),
+        },
+        Some(()) = fs_rx.recv() => {
+            // Debounce: wait for the burst to go quiet, but not forever.
+            let started = std::time::Instant::now();
+            while started.elapsed() < DEBOUNCE_CAP {
+                match tokio::time::timeout(DEBOUNCE, fs_rx.recv()).await {
+                    Ok(Some(())) => continue,
+                    _ => break,
+                }
+            }
+            *fs_dirty = true;
+        }
+        _ = tokio::time::sleep(wait) => {}
+    }
+    Ok(true)
 }
 
 /// Watches the sync folder; every relevant change sends one `()`. `None` when
@@ -215,18 +364,37 @@ fn watch(root: &Path, changed: mpsc::UnboundedSender<()>) -> Option<notify::Reco
     Some(watcher)
 }
 
-/// Runs until Quit. `persist` is called with the session after each pass so
-/// rotated tokens reach the wallet.
-pub async fn run<P: PGPProviderSync>(
+/// Runs until Quit.
+///
+/// `persist` is called with the session after each pass so rotated tokens
+/// reach the keyring. `reopen` builds a fresh [`Drive`] from whatever session
+/// the keyring holds now: the window can sign out and back in while this is
+/// running, which leaves the session in hand dead, and only the keyring knows
+/// the new one.
+pub async fn run<P, F, Fut>(
     mut drive: Drive<P>,
     mut state: State,
     mut persist: impl FnMut(&Drive<P>),
-) -> Result<()> {
+    reopen: F,
+) -> Result<()>
+where
+    P: PGPProviderSync,
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<Drive<P>>>,
+{
     let snap: Shared = Arc::default();
-    refresh(&snap, &state, false, None);
+    refresh(&snap, &state, false, None, false);
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    tokio::spawn(serve_socket(snap.clone(), tx.clone()));
+    {
+        let (snap, tx) = (snap.clone(), tx.clone());
+        tokio::spawn(async move {
+            if let Err(e) = serve_socket(snap, tx).await {
+                // Without it the overlay icons and the window learn nothing.
+                crate::log::error(&format!("status socket unavailable: {e:#}"));
+            }
+        });
+    }
     let tray = match ksni::TrayMethods::spawn(Tray { snap: snap.clone(), cmds: tx.clone() }).await {
         Ok(handle) => Some(handle),
         Err(e) => {
@@ -247,7 +415,34 @@ pub async fn run<P: PGPProviderSync>(
     // Consecutive failed passes: the wait grows and the user hears about the
     // outage once, not every 30 seconds.
     let mut failures: u32 = 0;
+    // Set when the keyring has no session to work with. Passes stop until one
+    // appears rather than failing every thirty seconds.
+    let mut signed_out = false;
     loop {
+        let mut retry_now = false;
+        if signed_out {
+            match reopen().await {
+                Ok(fresh) => {
+                    drive = fresh;
+                    signed_out = false;
+                    failures = 0;
+                    crate::log::write("INFO", "signed in again; syncing resumed");
+                    notify("Signed in again. Syncing resumed.");
+                }
+                Err(_) => {
+                    // Still nothing. Wait for a sign-in, quietly, but stay as
+                    // ready to quit as any other wait is.
+                    refresh(&snap, &state, false, None, true);
+                    if let Some(t) = &tray {
+                        t.update(|_| {}).await;
+                    }
+                    if !wait_for_work(&mut rx, &mut fs_rx, POLL, &mut force, &mut fs_dirty).await? {
+                        break;
+                    }
+                    continue;
+                }
+            }
+        }
         // Sweep the folder only when something says to: a burst of events, no
         // watcher at all, the hourly safety net, or an explicit Sync now.
         let check_local = force || fs_dirty || watcher.is_none() || last_sweep.elapsed() >= SWEEP_EVERY;
@@ -259,7 +454,7 @@ pub async fn run<P: PGPProviderSync>(
         if let Err(e) = crate::log::prune(crate::config::load().log_retention_days) {
             crate::log::error(&format!("log retention: {e:#}"));
         }
-        refresh(&snap, &state, true, None);
+        refresh(&snap, &state, true, None, false);
         if let Some(t) = &tray {
             t.update(|_| {}).await;
         }
@@ -273,9 +468,26 @@ pub async fn run<P: PGPProviderSync>(
                 None
             }
             Ok(None) => None,
+            // A session that died under us is not a sync failure: the window
+            // signed out, or signed in again and stored a different session.
+            // Take whatever the keyring holds now and carry on.
+            Err(e) if crate::api::session_expired(&e) => match reopen().await {
+                Ok(fresh) => {
+                    drive = fresh;
+                    retry_now = true;
+                    crate::log::write("INFO", "the session changed; picked up the new one");
+                    None
+                }
+                Err(_) => {
+                    signed_out = true;
+                    crate::log::warn("signed out elsewhere; waiting for a sign-in");
+                    notify("Signed out. Sign in from the account window to resume syncing.");
+                    continue;
+                }
+            },
             Err(e) => {
-                let msg = format!("sync error: {e:#}");
-                crate::log::error(&msg);
+                let msg = format!("{e:#}");
+                crate::log::error(&format!("sync error: {msg}"));
                 if failures == 0 {
                     notify(&msg);
                 }
@@ -289,35 +501,23 @@ pub async fn run<P: PGPProviderSync>(
         }
         force = false;
         persist(&drive);
-        refresh(&snap, &state, false, error);
+        refresh(&snap, &state, false, error, false);
+        // A pass happened, whatever it found: that is what "checked" means.
+        snap.write().expect("snapshot lock").last_sync = Some(now());
         if let Some(t) = &tray {
             t.update(|_| {}).await;
+        }
+        // A pass that ended only to take on a new session runs again at once.
+        if retry_now {
+            force = true;
+            continue;
         }
 
         // A fixed 30 s poll of the event stream while healthy (nothing pushes
         // from Proton), doubling per failed pass up to 16 minutes.
         let wait = POLL * 2u32.pow(failures.min(5));
-        tokio::select! {
-            cmd = rx.recv() => match cmd {
-                Some(Cmd::Sync) => {
-                    force = true;
-                    // Several clicks during one pass mean one forced pass, not several.
-                    while let Ok(Cmd::Sync) = rx.try_recv() {}
-                }
-                Some(Cmd::Quit) | None => break,
-            },
-            Some(()) = fs_rx.recv() => {
-                // Debounce: wait for the burst to go quiet, but not forever.
-                let started = std::time::Instant::now();
-                while started.elapsed() < DEBOUNCE_CAP {
-                    match tokio::time::timeout(DEBOUNCE, fs_rx.recv()).await {
-                        Ok(Some(())) => continue,
-                        _ => break,
-                    }
-                }
-                fs_dirty = true;
-            }
-            _ = tokio::time::sleep(wait) => {}
+        if !wait_for_work(&mut rx, &mut fs_rx, wait, &mut force, &mut fs_dirty).await? {
+            break;
         }
     }
     drop(watcher);
@@ -329,6 +529,31 @@ pub async fn run<P: PGPProviderSync>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_sentence_says_what_matters_most_first() {
+        let running = Report { running: true, answered: true, items: 3, last_sync: Some(now()), ..Default::default() };
+        let mute = Report { running: true, ..Default::default() };
+        assert!(mute.sentence().contains("too old"), "{}", mute.sentence());
+        assert!(Report::default().sentence().contains("not running"));
+        assert!(running.sentence().contains("3 items in sync"), "{}", running.sentence());
+        assert!(running.sentence().contains("just now"));
+
+        let stale = Report { last_sync: Some(now() - 600), ..running.clone() };
+        assert!(stale.sentence().contains("10 minutes ago"), "{}", stale.sentence());
+
+        let failed = Report { error: Some("boom".into()), ..running.clone() };
+        assert!(failed.sentence().contains("boom"));
+
+        let syncing = Report { syncing: true, ..failed.clone() };
+        assert!(syncing.sentence().contains("boom"), "a failure outranks being busy");
+
+        let out = Report { signed_out: true, ..failed.clone() };
+        assert!(out.sentence().contains("Signed out"), "being signed out outranks the error it caused");
+
+        let gone = Report { running: false, ..out.clone() };
+        assert!(gone.sentence().contains("not running"), "nothing else matters if it is not there");
+    }
 
     #[test]
     fn status_classification() {

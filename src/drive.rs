@@ -232,6 +232,17 @@ impl<P: PGPProviderSync> Drive<P> {
 
     /// A copy of a node. Keys are not `Clone` in the provider API, so the
     /// unlocked key is round-tripped, which costs microseconds.
+    /// The account's Drive volume. Stable for an account, so it is what says
+    /// whether a sync folder belongs to whoever is signed in now.
+    pub fn volume_id(&self) -> &str {
+        &self.volume_id
+    }
+
+    /// The address the account writes as, for saying whose Drive this is.
+    pub fn email(&self) -> &str {
+        &self.email
+    }
+
     pub fn dup(&self, node: &Node<P::PrivateKey>) -> Result<Node<P::PrivateKey>> {
         Ok(Node {
             id: node.id.clone(),

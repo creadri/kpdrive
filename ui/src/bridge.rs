@@ -28,6 +28,10 @@ pub mod qobject {
         #[qproperty(QStringList, log_lines, cxx_name = "logLines")]
         #[qproperty(i32, retention_days, cxx_name = "retentionDays")]
         #[qproperty(QString, log_level, cxx_name = "logLevel")]
+        #[qproperty(QString, sync_status, cxx_name = "syncStatus")]
+        #[qproperty(bool, sync_busy, cxx_name = "syncBusy")]
+        #[qproperty(bool, daemon_running, cxx_name = "daemonRunning")]
+        #[qproperty(bool, sync_failed, cxx_name = "syncFailed")]
         #[qproperty(QString, sync_folder, cxx_name = "syncFolder")]
         #[qproperty(QString, ignore_file, cxx_name = "ignoreFile")]
         #[qproperty(QString, version)]
@@ -61,6 +65,16 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "openIgnoreFile"]
         fn open_ignore_file(self: Pin<&mut Self>);
+
+        /// Ask the sync daemon what it is doing. Cheap: a local socket.
+        #[qinvokable]
+        #[cxx_name = "refreshSyncStatus"]
+        fn refresh_sync_status(self: Pin<&mut Self>);
+
+        /// Tell the daemon to sync now.
+        #[qinvokable]
+        #[cxx_name = "syncNow"]
+        fn sync_now(self: Pin<&mut Self>);
 
         /// Reload the account details from Proton.
         #[qinvokable]
@@ -119,6 +133,10 @@ pub struct BackendRust {
     log_lines: QStringList,
     retention_days: i32,
     log_level: QString,
+    sync_status: QString,
+    sync_busy: bool,
+    daemon_running: bool,
+    sync_failed: bool,
     sync_folder: QString,
     ignore_file: QString,
     version: QString,
@@ -138,6 +156,10 @@ impl Default for BackendRust {
             log_lines: QStringList::default(),
             retention_days: 30,
             log_level: QString::from("WARN"),
+            sync_status: QString::default(),
+            sync_busy: false,
+            daemon_running: false,
+            sync_failed: false,
             sync_folder: QString::default(),
             ignore_file: QString::default(),
             version: QString::from(env!("CARGO_PKG_VERSION")),
@@ -177,12 +199,18 @@ impl cxx_qt::Initialize for qobject::Backend {
                             });
                         }));
                         match result {
-                            Ok(_) => load_account(&runtime, &qt),
+                            Ok(_) => {
+                                // The daemon is still holding the session this
+                                // sign-in replaced; it reloads when poked.
+                                kpdrive::daemon::poke();
+                                load_account(&runtime, &qt);
+                            }
                             Err(e) => report(&qt, format!("Sign-in failed: {e:#}")),
                         }
                     }
                     Task::Logout => match runtime.block_on(kpdrive::account::logout()) {
                         Ok(()) => {
+                            kpdrive::daemon::poke();
                             let _ = qt.queue(|mut b| {
                                 b.as_mut().set_logged_in(false);
                                 b.as_mut().set_username(QString::default());
@@ -202,6 +230,7 @@ impl cxx_qt::Initialize for qobject::Backend {
         self.as_mut().set_retention_days(config.log_retention_days as i32);
         self.as_mut().set_log_level(QString::from(config.log_level.name()));
         self.as_mut().show_folder();
+        self.as_mut().refresh_sync_status();
         self.as_mut().reload_logs("");
         self.refresh();
     }
@@ -266,6 +295,20 @@ impl qobject::Backend {
         }
         let url = format!("file://{}", root.join(kpdrive::sync::IGNORE_FILE).display());
         self.as_mut().open_url_requested(QString::from(&url));
+    }
+
+    /// The daemon's own account of itself, in the words `kpdrive status` uses.
+    pub fn refresh_sync_status(mut self: Pin<&mut Self>) {
+        let report = kpdrive::daemon::ask();
+        self.as_mut().set_daemon_running(report.running);
+        self.as_mut().set_sync_busy(report.syncing);
+        self.as_mut().set_sync_failed(report.error.is_some() || report.signed_out);
+        self.as_mut().set_sync_status(QString::from(&report.sentence()));
+    }
+
+    pub fn sync_now(self: Pin<&mut Self>) {
+        kpdrive::daemon::poke();
+        self.refresh_sync_status();
     }
 
     pub fn refresh(mut self: Pin<&mut Self>) {

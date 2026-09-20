@@ -15,7 +15,7 @@
 //!   If it changed remotely, the remote version is restored instead.
 //! - A file removed remotely is deleted locally only if untouched since we wrote it.
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use proton_crypto::crypto::PGPProviderSync;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,10 @@ const UPLOAD_IN_FLIGHT: usize = 4;
 pub struct State {
     pub root: PathBuf,
     pub event_id: Option<String>,
+    /// The Drive volume this folder was synced with. Recorded so that signing
+    /// in as somebody else cannot quietly merge two accounts into one folder.
+    #[serde(default)]
+    pub volume_id: Option<String>,
     /// link id → what we last wrote locally for it.
     pub nodes: BTreeMap<String, Entry>,
 }
@@ -124,6 +128,17 @@ impl Occupied {
 /// ask: the folder is empty, absent, or already the one being synced. kpdrive's
 /// own files do not count as content, or setting the same folder twice would
 /// keep asking.
+impl State {
+    /// Forgets what was synced, so the next pass re-adopts the folder by
+    /// comparing contents. The account goes with it: an untracked folder has
+    /// not been claimed by anyone yet.
+    pub fn untrack(&mut self) {
+        self.nodes.clear();
+        self.event_id = None;
+        self.volume_id = None;
+    }
+}
+
 pub fn folder_question(state: &State, root: &Path) -> Option<String> {
     if state.root == root && !state.nodes.is_empty() {
         return None;
@@ -188,7 +203,7 @@ pub fn set_folder(state: &mut State, new_root: PathBuf, occupied: Occupied) -> R
 
     if old == new_root || old.as_os_str().is_empty() {
         if aside.is_some() {
-            state.nodes.clear();
+            state.untrack();
         }
         fs::create_dir_all(&new_root)?;
         save_state(state)?;
@@ -203,7 +218,7 @@ pub fn set_folder(state: &mut State, new_root: PathBuf, occupied: Occupied) -> R
         match fs::rename(&old, &new_root) {
             Ok(()) => format!("moved {} to {}", old.display(), new_root.display()),
             Err(_) => {
-                state.nodes.clear();
+                state.untrack();
                 format!(
                     "syncing to {} (could not move across filesystems, so it will be fetched again; {} was left alone)",
                     new_root.display(),
@@ -214,7 +229,7 @@ pub fn set_folder(state: &mut State, new_root: PathBuf, occupied: Occupied) -> R
     } else {
         // Somewhere that already exists: the next pass compares contents and
         // adopts anything identical rather than duplicating it.
-        state.nodes.clear();
+        state.untrack();
         format!("syncing to {}", new_root.display())
     };
 
@@ -268,6 +283,7 @@ pub async fn run_with<P: PGPProviderSync>(
     check_local: bool,
 ) -> Result<Option<Vec<String>>> {
     let mut notes: Vec<String> = Vec::new();
+    claim_for_account(drive, state).await?;
     fs::create_dir_all(&state.root).with_context(|| format!("create {}", state.root.display()))?;
     let ignores = Ignores::load(&state.root);
     let events = drive.events(state.event_id.as_deref()).await?;
@@ -737,6 +753,59 @@ async fn ensure_node<P: PGPProviderSync>(
     }
 }
 
+/// Makes sure this folder belongs to the account that is signed in.
+///
+/// Tracked entries name links inside one account's volume. Applying them to
+/// another account's Drive would upload one person's files to the other and
+/// delete the ones it could not find, so a folder recorded for a different
+/// volume is refused outright.
+///
+/// A record from before the volume was tracked is settled by asking: a sample
+/// of the links it names either exists in this Drive or it does not. Nothing
+/// existing is proof enough to stop, because that is what a folder belonging
+/// to somebody else looks like.
+async fn claim_for_account<P: PGPProviderSync>(drive: &Drive<P>, state: &mut State) -> Result<()> {
+    let current = drive.volume_id();
+    match &state.volume_id {
+        Some(recorded) if recorded == current => return Ok(()),
+        Some(_) => return Err(mismatch(state, drive)),
+        None => {}
+    }
+    if !state.nodes.is_empty() {
+        let sample: Vec<String> = state.nodes.keys().take(PROBE).cloned().collect();
+        let found = match drive.nodes_by_ids(&sample).await {
+            Ok(links) => links.iter().filter(|(_, node)| node.is_some()).count(),
+            // A volume that will not answer for these links is not one that
+            // can be shown to own them.
+            Err(e) => {
+                crate::log::warn(&format!("could not check who {} belongs to: {e:#}", state.root.display()));
+                0
+            }
+        };
+        if found == 0 {
+            return Err(mismatch(state, drive));
+        }
+        crate::log::write("INFO", &format!("{} belongs to {}", state.root.display(), drive.email()));
+    }
+    state.volume_id = Some(current.to_owned());
+    Ok(())
+}
+
+/// How many tracked links are checked against the volume. One call, and one
+/// survivor is all it takes to settle it.
+const PROBE: usize = 20;
+
+fn mismatch<P: PGPProviderSync>(state: &State, drive: &Drive<P>) -> anyhow::Error {
+    anyhow!(
+        "{} holds files synced with a different Proton account than {}. \
+         Sign in to the account it belongs to, or point kpdrive at another folder. \
+         If this folder is meant for {}, re-adopt it with: kpdrive sync --adopt",
+        state.root.display(),
+        drive.email(),
+        drive.email()
+    )
+}
+
 /// Cheap local scan: anything new, edited or deleted since the last pass?
 fn local_changed(state: &State, ignores: &Ignores) -> bool {
     let by_path: HashMap<&PathBuf, &Entry> = state.nodes.values().map(|e| (&e.path, e)).collect();
@@ -1042,7 +1111,7 @@ mod tests {
         drop(file);
         let entry = Entry { path: "f".into(), is_folder: false, revision: None, mtime: 1_700_000_000, size: 3 };
         assert!(local_matches(&fs::metadata(&f).unwrap(), &entry));
-        let state = State { root: dir.clone(), event_id: None, nodes: BTreeMap::from([("id".to_string(), entry.clone())]) };
+        let state = State { root: dir.clone(), nodes: BTreeMap::from([("id".to_string(), entry.clone())]), ..State::default() };
         let ignores = Ignores::load(&dir);
         assert!(!local_changed(&state, &ignores));
         fs::write(&f, b"abcd").unwrap();
