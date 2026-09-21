@@ -254,7 +254,7 @@ Kirigami.ApplicationWindow {
                         visible: backend.syncStatus.length > 0
                         position: Kirigami.InlineMessage.Position.Inline
                         type: backend.syncFailed ? Kirigami.MessageType.Error
-                            : !backend.daemonRunning ? Kirigami.MessageType.Warning
+                            : backend.syncOffline || !backend.daemonRunning ? Kirigami.MessageType.Warning
                             : Kirigami.MessageType.Information
                         text: backend.syncStatus
                         actions: [

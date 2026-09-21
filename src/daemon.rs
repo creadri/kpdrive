@@ -32,6 +32,8 @@ struct Snapshot {
     last_error: Option<String>,
     /// No usable session: waiting for a sign-in rather than failing every pass.
     signed_out: bool,
+    /// Proton unreachable: retrying, and saying so rather than logging it.
+    offline: bool,
     /// When the last pass finished, seconds since the epoch.
     last_sync: Option<i64>,
 }
@@ -45,6 +47,7 @@ impl Snapshot {
             "items": self.entries.len(),
             "syncing": self.syncing,
             "signedOut": self.signed_out,
+            "offline": self.offline,
             "lastSync": self.last_sync,
             "error": self.last_error,
         })
@@ -195,6 +198,64 @@ async fn serve_socket(snap: Shared, cmds: mpsc::UnboundedSender<Cmd>) -> Result<
     }
 }
 
+/// A connection that drops and comes back within this long is one episode,
+/// not two. Without it a flapping link reports every dip.
+const FLAP: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// Tracks an outage so that losing the network costs one log line when it
+/// goes and one when it returns, however many passes fail in between.
+///
+/// `now` is passed in rather than read, so the rules can be tested without
+/// waiting for the clock.
+#[derive(Default)]
+struct Outage {
+    since: Option<std::time::Instant>,
+    /// Whether the user was told about the outage in hand. A dip that was not
+    /// worth mentioning is not worth an all-clear either.
+    reported: bool,
+    last_report: Option<std::time::Instant>,
+}
+
+impl Outage {
+    /// A pass failed because Proton could not be reached. Gives the line to
+    /// log, the first time an outage is worth mentioning and never again.
+    fn failing(&mut self, now: std::time::Instant, reason: &str) -> Option<String> {
+        let since = *self.since.get_or_insert(now);
+        if self.reported {
+            return None;
+        }
+        // Straight after a report, a failure is the same flapping link. One
+        // that lasts is worth its own line, once it is clear it will.
+        let settling = self.last_report.map(|t| now.duration_since(t) < FLAP).unwrap_or(false);
+        if settling && now.duration_since(since) < FLAP {
+            return None;
+        }
+        self.reported = true;
+        self.last_report = Some(now);
+        Some(format!("{reason}; retrying"))
+    }
+
+    /// A pass succeeded. Gives the all-clear, if the outage was mentioned.
+    fn ended(&mut self, now: std::time::Instant) -> Option<String> {
+        let since = self.since.take()?;
+        if !std::mem::take(&mut self.reported) {
+            return None;
+        }
+        self.last_report = Some(now);
+        Some(format!("Proton Drive is reachable again, after {}", spell(now.duration_since(since))))
+    }
+}
+
+/// A rough duration, in the largest unit that still says something.
+fn spell(d: std::time::Duration) -> String {
+    let secs = d.as_secs();
+    match secs {
+        0..=90 => format!("{secs} seconds"),
+        91..=5400 => format!("{} minutes", secs / 60),
+        _ => format!("{} hours", secs / 3600),
+    }
+}
+
 /// What a daemon is doing, as anything outside it sees it. `running: false`
 /// is the answer when there is no daemon to ask.
 #[derive(Default, Debug, Clone)]
@@ -205,6 +266,8 @@ pub struct Report {
     pub answered: bool,
     pub syncing: bool,
     pub signed_out: bool,
+    /// Proton cannot be reached. Still trying, and nothing is wrong as such.
+    pub offline: bool,
     pub items: usize,
     pub last_sync: Option<i64>,
     pub error: Option<String>,
@@ -224,7 +287,10 @@ impl Report {
             return "Signed out. Syncing resumes once you sign in.".into();
         }
         if let Some(e) = &self.error {
-            return format!("Last sync failed: {e}");
+            return match self.offline {
+                true => format!("{e}. Still trying."),
+                false => format!("Last sync failed: {e}"),
+            };
         }
         if self.syncing {
             return "Syncing…".into();
@@ -263,6 +329,7 @@ pub fn ask() -> Report {
         report.answered = true;
         report.syncing = v["syncing"].as_bool().unwrap_or(false);
         report.signed_out = v["signedOut"].as_bool().unwrap_or(false);
+        report.offline = v["offline"].as_bool().unwrap_or(false);
         report.items = v["items"].as_u64().unwrap_or(0) as usize;
         report.last_sync = v["lastSync"].as_i64();
         report.error = v["error"].as_str().map(str::to_owned);
@@ -286,13 +353,25 @@ pub fn notify(body: &str) {
         .spawn();
 }
 
-fn refresh(snap: &Shared, state: &State, syncing: bool, error: Option<String>, signed_out: bool) {
+/// What the daemon is able to do at all, as distinct from how the last pass
+/// went. Both of these are waiting on something rather than failing.
+#[derive(Clone, Copy, PartialEq)]
+enum Health {
+    Ok,
+    /// No session to work with.
+    SignedOut,
+    /// Proton cannot be reached.
+    Offline,
+}
+
+fn refresh(snap: &Shared, state: &State, syncing: bool, error: Option<String>, health: Health) {
     let mut s = snap.write().expect("snapshot lock");
     s.root = state.root.clone();
     s.entries = state.nodes.values().map(|e| (e.path.clone(), e.clone())).collect();
     s.syncing = syncing;
     s.last_error = error;
-    s.signed_out = signed_out;
+    s.signed_out = health == Health::SignedOut;
+    s.offline = health == Health::Offline;
 }
 
 fn now() -> i64 {
@@ -383,7 +462,7 @@ where
     Fut: std::future::Future<Output = Result<Drive<P>>>,
 {
     let snap: Shared = Arc::default();
-    refresh(&snap, &state, false, None, false);
+    refresh(&snap, &state, false, None, Health::Ok);
     let (tx, mut rx) = mpsc::unbounded_channel();
 
     {
@@ -419,8 +498,10 @@ where
     // Set when the keyring has no session to work with. Passes stop until one
     // appears rather than failing every thirty seconds.
     let mut signed_out = false;
+    let mut outage = Outage::default();
     loop {
         let mut retry_now = false;
+        let mut health = Health::Ok;
         if signed_out {
             match reopen().await {
                 Ok(fresh) => {
@@ -433,7 +514,7 @@ where
                 Err(_) => {
                     // Still nothing. Wait for a sign-in, quietly, but stay as
                     // ready to quit as any other wait is.
-                    refresh(&snap, &state, false, None, true);
+                    refresh(&snap, &state, false, None, Health::SignedOut);
                     if let Some(t) = &tray {
                         t.update(|_| {}).await;
                     }
@@ -455,7 +536,7 @@ where
         if let Err(e) = crate::log::prune(crate::config::load().log_retention_days) {
             crate::log::error(&format!("log retention: {e:#}"));
         }
-        refresh(&snap, &state, true, None, false);
+        refresh(&snap, &state, true, None, Health::Ok);
         if let Some(t) = &tray {
             t.update(|_| {}).await;
         }
@@ -486,6 +567,19 @@ where
                     continue;
                 }
             },
+            // Nothing reached Proton: a state to show, not a failure to
+            // record every thirty seconds. The tray and the window carry it
+            // for as long as it lasts; the log gets the two ends of it.
+            Err(e) if crate::api::offline(&e) => {
+                let reason = crate::api::offline_reason(&e);
+                if let Some(line) = outage.failing(std::time::Instant::now(), &reason) {
+                    crate::log::warn(&line);
+                    notify(&line);
+                }
+                failures += 1;
+                health = Health::Offline;
+                Some(reason)
+            }
             Err(e) => {
                 let msg = format!("{e:#}");
                 crate::log::error(&format!("sync error: {msg}"));
@@ -496,13 +590,20 @@ where
                 Some(msg)
             }
         };
-        if error.is_none() && failures > 0 {
-            notify("Sync resumed");
+        if error.is_none() {
+            match outage.ended(std::time::Instant::now()) {
+                Some(line) => {
+                    crate::log::warn(&line);
+                    notify(&line);
+                }
+                None if failures > 0 => notify("Sync resumed"),
+                None => {}
+            }
             failures = 0;
         }
         force = false;
         persist(&drive);
-        refresh(&snap, &state, false, error, false);
+        refresh(&snap, &state, false, error, health);
         // A pass happened, whatever it found: that is what "checked" means.
         snap.write().expect("snapshot lock").last_sync = Some(now());
         if let Some(t) = &tray {
@@ -515,8 +616,15 @@ where
         }
 
         // A fixed 30 s poll of the event stream while healthy (nothing pushes
-        // from Proton), doubling per failed pass up to 16 minutes.
-        let wait = POLL * 2u32.pow(failures.min(5));
+        // from Proton), doubling per failed pass up to 16 minutes. An outage
+        // stops sooner at four: asking whether the network is back costs a
+        // failed DNS lookup, and waiting a quarter of an hour to find out it
+        // returned is worse than the lookup.
+        let ceiling = match health {
+            Health::Offline => 3,
+            _ => 5,
+        };
+        let wait = POLL * 2u32.pow(failures.min(ceiling));
         if !wait_for_work(&mut rx, &mut fs_rx, wait, &mut force, &mut fs_dirty).await? {
             break;
         }
@@ -530,6 +638,38 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_outage_is_two_lines_however_long_it_lasts() {
+        let t0 = std::time::Instant::now();
+        let at = |secs: u64| t0 + std::time::Duration::from_secs(secs);
+        let mut o = Outage::default();
+
+        // One line when it goes, nothing for the passes that keep failing.
+        assert!(o.failing(at(0), "cannot reach Proton Drive: no route").is_some());
+        assert_eq!(o.failing(at(30), "cannot reach Proton Drive: no route"), None);
+        assert_eq!(o.failing(at(900), "cannot reach Proton Drive: no route"), None);
+        // One when it comes back, saying how long it was gone.
+        let back = o.ended(at(960)).expect("the all-clear");
+        assert!(back.contains("16 minutes"), "{back}");
+        assert_eq!(o.ended(at(990)), None, "a pass that succeeds while online says nothing");
+
+        // A link that dips straight after is the same episode: no second pair.
+        assert_eq!(o.failing(at(1000), "cannot reach Proton Drive: no route"), None);
+        assert_eq!(o.ended(at(1010)), None);
+        assert_eq!(o.failing(at(1020), "cannot reach Proton Drive: no route"), None);
+
+        // Unless it stays down: then it is a real outage and gets its line,
+        // and its own all-clear.
+        assert!(o.failing(at(1020 + 301), "cannot reach Proton Drive: no route").is_some());
+        assert!(o.ended(at(1020 + 400)).is_some());
+
+        // Long after the last report, a fresh outage reports at once again.
+        let mut o = Outage::default();
+        assert!(o.failing(at(0), "x").is_some());
+        assert!(o.ended(at(60)).is_some());
+        assert!(o.failing(at(60 + 301), "x").is_some(), "quiet for long enough is a new episode");
+    }
 
     #[test]
     fn the_sentence_says_what_matters_most_first() {
@@ -548,6 +688,10 @@ mod tests {
 
         let syncing = Report { syncing: true, ..failed.clone() };
         assert!(syncing.sentence().contains("boom"), "a failure outranks being busy");
+
+        let off = Report { offline: true, error: Some("cannot reach Proton Drive: no route".into()), ..running.clone() };
+        assert!(off.sentence().contains("Still trying"), "an outage is not a failed sync: {}", off.sentence());
+        assert!(!off.sentence().contains("Last sync failed"));
 
         let out = Report { signed_out: true, ..failed.clone() };
         assert!(out.sentence().contains("Signed out"), "being signed out outranks the error it caused");

@@ -32,6 +32,7 @@ pub mod qobject {
         #[qproperty(bool, sync_busy, cxx_name = "syncBusy")]
         #[qproperty(bool, daemon_running, cxx_name = "daemonRunning")]
         #[qproperty(bool, sync_failed, cxx_name = "syncFailed")]
+        #[qproperty(bool, sync_offline, cxx_name = "syncOffline")]
         #[qproperty(QString, sync_folder, cxx_name = "syncFolder")]
         #[qproperty(QString, ignore_file, cxx_name = "ignoreFile")]
         #[qproperty(QString, version)]
@@ -136,6 +137,7 @@ pub struct BackendRust {
     sync_busy: bool,
     daemon_running: bool,
     sync_failed: bool,
+    sync_offline: bool,
     sync_folder: QString,
     ignore_file: QString,
     version: QString,
@@ -159,6 +161,7 @@ impl Default for BackendRust {
             sync_busy: false,
             daemon_running: false,
             sync_failed: false,
+            sync_offline: false,
             sync_folder: QString::default(),
             ignore_file: QString::default(),
             version: QString::from(env!("CARGO_PKG_VERSION")),
@@ -301,7 +304,10 @@ impl qobject::Backend {
         let report = kpdrive::daemon::ask();
         self.as_mut().set_daemon_running(report.running);
         self.as_mut().set_sync_busy(report.syncing);
-        self.as_mut().set_sync_failed(report.error.is_some() || report.signed_out);
+        // An outage clears itself, so it reads as something to wait out
+        // rather than something that went wrong.
+        self.as_mut().set_sync_offline(report.offline);
+        self.as_mut().set_sync_failed(report.signed_out || (report.error.is_some() && !report.offline));
         self.as_mut().set_sync_status(QString::from(&report.sentence()));
     }
 

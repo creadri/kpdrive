@@ -397,6 +397,25 @@ pub const DOES_NOT_EXIST: i64 = 2501;
 /// signed out or signed in again while a daemon was holding the old session.
 pub const INVALID_REFRESH: i64 = 10013;
 
+/// Whether a failure means the request never reached Proton at all: no
+/// response came back, so nothing is known about the account or the file. It
+/// says the machine is offline, not that anything is wrong with the request.
+pub fn offline(error: &anyhow::Error) -> bool {
+    error.chain().any(|e| {
+        e.downcast_ref::<reqwest::Error>()
+            .map(|r| r.is_connect() || r.is_timeout() || r.is_request())
+            .unwrap_or(false)
+    })
+}
+
+/// A few words for an outage. The full chain restates the same failure at
+/// every layer and prints the URL twice, which is worth neither the log line
+/// nor the reading.
+pub fn offline_reason(error: &anyhow::Error) -> String {
+    let cause = error.chain().last().map(|c| c.to_string()).unwrap_or_else(|| error.to_string());
+    format!("cannot reach Proton Drive: {cause}")
+}
+
 /// Whether a failure means the session is dead rather than the call being bad.
 /// The cure is a session from the keyring, not a retry.
 pub fn session_expired(error: &anyhow::Error) -> bool {
@@ -527,6 +546,26 @@ mod tests {
         }
         assert_eq!(refreshes.load(Ordering::SeqCst), 1, "exactly one refresh for eight concurrent 401s");
         assert_eq!(api.session().unwrap().refresh_token, "fresh-r", "the rotated tokens are what is kept");
+    }
+
+    #[tokio::test]
+    async fn a_connection_that_never_lands_reads_as_offline() {
+        // Port 1 has nobody listening, so the request cannot even connect.
+        let api = Api::with_base("http://127.0.0.1:1/", None);
+        let e = api.get::<Value>("anything").await.expect_err("nothing answers there");
+        assert!(offline(&e), "{e:#}");
+        let reason = offline_reason(&e);
+        assert!(reason.starts_with("cannot reach Proton Drive: "), "{reason}");
+        assert!(reason.len() < 120, "a short line, not the whole chain: {} chars", reason.len());
+
+        // Something Proton answered is a real failure, whatever it says.
+        let answered = anyhow::Error::from(ApiError {
+            code: 2501,
+            status: 422,
+            message: "does not exist".into(),
+            path: "drive/x".into(),
+        });
+        assert!(!offline(&answered));
     }
 
     #[test]
