@@ -146,12 +146,12 @@ to build if the crates disagree with it:
 
 ```
 # bump both crates first, then
-git commit -am "Release 0.2.0"
-git tag -a v0.2.0 -m "kpdrive 0.2.0"
-git push origin dev v0.2.0
+git commit -am "Release 0.x.0"
+git tag -a v0.x.0 -m "kpdrive 0.x.0"
+git push origin dev v0.x.0
 ```
 
-A tag containing a hyphen (`v0.2.0-rc1`) is published as a pre-release, and
+A tag containing a hyphen (`v0.x.0-rc1`) is published as a pre-release, and
 `.github/workflows/release.yml` can also be run by hand against an existing tag.
 
 | Target | Built in | Packages |

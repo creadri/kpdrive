@@ -1,6 +1,6 @@
 [package]
 name = "kpdrive-ui"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Account and log window for kpdrive"
 license = "GPL-3.0-or-later"
