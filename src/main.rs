@@ -91,6 +91,9 @@ enum Cmd {
     /// Move a remote file or folder to the trash.
     Rm {
         remote: String,
+        /// Do not ask first. Needed when there is no terminal to ask on.
+        #[arg(short, long)]
+        force: bool,
     },
     /// Create a remote folder.
     Mkdir {
@@ -118,7 +121,7 @@ async fn main() -> Result<()> {
         Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
         Cmd::Setup { root } => setup(root).await,
         Cmd::Mkdir { remote } => mkdir(&remote).await,
-        Cmd::Rm { remote } => rm(&remote).await,
+        Cmd::Rm { remote, force } => rm(&remote, force).await,
         Cmd::Share { remote, copy, password, expires_days } => share(&remote, copy, password.as_deref(), expires_days).await,
         Cmd::Unshare { remote } => unshare(&remote).await,
     }
@@ -274,10 +277,26 @@ fn copy_to_clipboard(text: &str) -> bool {
     false
 }
 
-async fn rm(remote: &str) -> Result<()> {
+async fn rm(remote: &str, force: bool) -> Result<()> {
     let remote = remote_path(remote)?;
     let (drive, before) = account::open_drive().await?;
     let (_, node) = drive.resolve_with_parent(&remote).await?;
+    if !force {
+        use std::io::IsTerminal;
+        // A folder takes everything under it, which is worth saying before
+        // rather than after.
+        let what = match node.is_folder {
+            true => format!("{remote} and everything in it"),
+            false => remote.clone(),
+        };
+        if !std::io::stdin().is_terminal() {
+            anyhow::bail!("{remote} was left alone: there is no terminal to confirm on, so pass --force");
+        }
+        if !confirm(&format!("Move {what} to the Proton Drive trash?"))? {
+            println!("left alone");
+            return Ok(());
+        }
+    }
     drive.trash(std::slice::from_ref(&node.id)).await?;
     log::info(&format!("trashed {remote}"));
     account::persist(drive.api, before).await
@@ -295,6 +314,17 @@ async fn mkdir(remote: &str) -> Result<()> {
 /// Where to sync: an explicit `--root` wins, then the configured folder, then
 /// `~/ProtonDrive`. A folder set by an older version lives in the sync state
 /// instead, so it is adopted into the config on first sight.
+/// A yes/no question, where anything but yes means no. Only call it with a
+/// terminal to ask on: the caller decides what no terminal means.
+fn confirm(question: &str) -> Result<bool> {
+    use std::io::{BufRead, Write};
+    print!("{question} [y/N] ");
+    std::io::stdout().flush()?;
+    let mut line = String::new();
+    std::io::stdin().lock().read_line(&mut line)?;
+    Ok(matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes"))
+}
+
 /// Puts the occupied-folder choice to the user, in the same words the window
 /// uses. Anything that is not a terminal (the autostarted daemon, a script)
 /// takes the answer that changes nothing.
