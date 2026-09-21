@@ -46,7 +46,18 @@ fn stamp(secs: i64) -> String {
 /// level this build does not know is always kept: dropping something that
 /// cannot be ranked would hide it for good.
 fn stores(level: &str, min: crate::config::LogLevel) -> bool {
+    // [`SESSION`] is one of the levels that cannot be ranked, so it is kept.
     crate::config::LogLevel::parse(level).is_none_or(|l| l >= min)
+}
+
+/// The level carried by the line that opens a run. It is deliberately not one
+/// of the levels the user can filter out: the window reads back to it to know
+/// where this run began, so it has to be there whatever the threshold says.
+pub const SESSION: &str = "SESSION";
+
+/// Records the start of a run.
+pub fn mark(message: &str) {
+    write(SESSION, message);
 }
 
 /// Appends one line. Never fails the caller: losing a log line must not take
@@ -107,14 +118,8 @@ pub fn prune(retention_days: u64) -> Result<usize> {
     Ok(removed)
 }
 
-/// The most recent `limit` lines, newest last, optionally only those containing
-/// `term` (case-insensitive).
-pub fn search(term: &str, limit: usize) -> Result<Vec<String>> {
-    search_in(&dir(), term, limit)
-}
-
-/// The body of [`search`], against any log directory, so it can be tested.
-pub fn search_in(dir: &std::path::Path, term: &str, limit: usize) -> Result<Vec<String>> {
+/// Day-files oldest first. Names sort like dates, so this is chronological.
+fn day_files(dir: &std::path::Path) -> Vec<PathBuf> {
     let mut days: Vec<_> = fs::read_dir(dir)
         .into_iter()
         .flatten()
@@ -123,7 +128,57 @@ pub fn search_in(dir: &std::path::Path, term: &str, limit: usize) -> Result<Vec<
         .map(|e| e.path())
         .collect();
     days.sort();
+    days
+}
 
+/// This run's lines, **newest first**, at most `limit`, optionally only those
+/// containing `term` (case-insensitive).
+///
+/// A run starts at the last [`SESSION`] line, which the daemon writes when it
+/// starts, so this is what has happened since. It reads back across day-files,
+/// which is what a daemon still running from yesterday needs. With no such
+/// line anywhere, because no daemon has run, the newest lines are returned
+/// rather than an empty window.
+pub fn session(term: &str, limit: usize) -> Result<Vec<String>> {
+    session_in(&dir(), term, limit)
+}
+
+/// The body of [`session`], against any log directory, so it can be tested.
+pub fn session_in(dir: &std::path::Path, term: &str, limit: usize) -> Result<Vec<String>> {
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+    let needle = term.to_lowercase();
+    let mut lines: Vec<String> = Vec::new();
+    for path in day_files(dir).iter().rev() {
+        let Ok(text) = fs::read_to_string(path) else { continue };
+        for line in text.lines().rev() {
+            if line.is_empty() {
+                continue;
+            }
+            // Checked before the filter: a search term must not read past the
+            // start of the run just because the opening line does not match it.
+            let opens_the_run = line.split_whitespace().nth(1) == Some(SESSION);
+            if needle.is_empty() || line.to_lowercase().contains(&needle) {
+                lines.push(line.to_owned());
+            }
+            if opens_the_run || lines.len() >= limit {
+                return Ok(lines);
+            }
+        }
+    }
+    Ok(lines)
+}
+
+/// The most recent `limit` lines, newest last, optionally only those containing
+/// `term` (case-insensitive).
+pub fn search(term: &str, limit: usize) -> Result<Vec<String>> {
+    search_in(&dir(), term, limit)
+}
+
+/// The body of [`search`], against any log directory, so it can be tested.
+pub fn search_in(dir: &std::path::Path, term: &str, limit: usize) -> Result<Vec<String>> {
+    let days = day_files(dir);
     if limit == 0 {
         return Ok(Vec::new());
     }
@@ -171,6 +226,29 @@ mod tests {
         assert_eq!(day(1_700_000_000), "2023-11-14");
         assert!(day(1_700_000_000) < day(1_700_000_000 + 86_400));
         assert_eq!(stamp(1_700_000_000), "2023-11-14T22:13:20Z");
+    }
+
+    #[test]
+    fn a_session_is_what_happened_since_the_last_start() {
+        let dir = std::env::temp_dir().join(format!("kpdrive-session-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("2026-09-18.log"), "d1 INFO old one\nd2 SESSION daemon started\nd3 INFO yesterday\n").unwrap();
+        fs::write(dir.join("2026-09-19.log"), "d4 INFO today one\nd5 WARN today two\n").unwrap();
+
+        // Newest first, back to the start of the run, across the day boundary.
+        let all = session_in(&dir, "", 10).unwrap();
+        assert_eq!(all, ["d5 WARN today two", "d4 INFO today one", "d3 INFO yesterday", "d2 SESSION daemon started"]);
+        assert_eq!(session_in(&dir, "", 2).unwrap(), ["d5 WARN today two", "d4 INFO today one"], "the limit is the newest ones");
+        assert_eq!(session_in(&dir, "today", 10).unwrap(), ["d5 WARN today two", "d4 INFO today one"], "a search stops at the start too");
+
+        // A later start narrows it; no start at all falls back to the newest.
+        fs::write(dir.join("2026-09-19.log"), "d4 SESSION daemon started\nd5 WARN today two\n").unwrap();
+        assert_eq!(session_in(&dir, "", 10).unwrap(), ["d5 WARN today two", "d4 SESSION daemon started"]);
+        fs::write(dir.join("2026-09-18.log"), "d1 INFO old one\n").unwrap();
+        fs::write(dir.join("2026-09-19.log"), "d5 WARN today two\n").unwrap();
+        assert_eq!(session_in(&dir, "", 10).unwrap(), ["d5 WARN today two", "d1 INFO old one"], "no start recorded: show what there is");
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

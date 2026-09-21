@@ -378,10 +378,10 @@ Kirigami.ApplicationWindow {
                             clip: true
                             visible: backend.logLines.length > 0
 
-                            // A log reads like a terminal: newest at the bottom.
-                            function toEnd() {
-                                const flick = logScroll.contentItem;
-                                flick.contentY = Math.max(0, flick.contentHeight - flick.height);
+                            // Newest first, so what just happened is in view
+                            // without scrolling.
+                            function toTop() {
+                                logScroll.contentItem.contentY = 0;
                             }
 
                             // The whole log is one laid-out document rather than a
@@ -402,10 +402,9 @@ Kirigami.ApplicationWindow {
                                 selectedTextColor: Kirigami.Theme.highlightedTextColor
                                 text: root.renderLog(backend.logLines)
 
-                                // The text is laid out after it is set, so the
-                                // height to scroll to is only known next tick.
-                                onTextChanged: Qt.callLater(logScroll.toEnd)
-                                Component.onCompleted: Qt.callLater(logScroll.toEnd)
+                                // A new search replaces the text; the view has
+                                // to go back to the newest line with it.
+                                onTextChanged: Qt.callLater(logScroll.toTop)
 
                                 Controls.Menu {
                                     id: logMenu
@@ -434,8 +433,8 @@ Kirigami.ApplicationWindow {
                             icon.name: search.text.length > 0 ? "edit-none" : "view-history"
                             text: search.text.length > 0 ? "No lines match" : "Nothing logged yet"
                             explanation: search.text.length > 0
-                                         ? "No log line contains “" + search.text + "”."
-                                         : "Sync activity, sign-ins and errors show up here."
+                                         ? "No line since the sync daemon started contains “" + search.text + "”."
+                                         : "This shows what has happened since the sync daemon started."
                         }
                     }
 

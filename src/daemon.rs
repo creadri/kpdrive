@@ -403,7 +403,8 @@ where
         }
     };
 
-    crate::log::write("INFO", "daemon started");
+    // Opens this run in the log; the window shows everything after it.
+    crate::log::mark("daemon started");
     let (fs_tx, mut fs_rx) = mpsc::unbounded_channel::<()>();
     let watcher = watch(&state.root, fs_tx);
     if watcher.is_some() {
