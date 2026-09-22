@@ -57,7 +57,27 @@ pub fn save_state(state: &State) -> Result<()> {
     Ok(())
 }
 
-/// `~/Pictures/Proton Drive`, honouring a localized or relocated Pictures folder.
+/// Where photos go: the setting, what an earlier version recorded, or the
+/// default. Recording it in the photo state came first; the setting is where
+/// it belongs, and an existing folder is adopted rather than re-downloaded.
+pub fn dest() -> Result<PathBuf> {
+    if let Some(dir) = crate::config::load().photos_sync_folder.filter(|d| !d.as_os_str().is_empty()) {
+        return Ok(dir);
+    }
+    if let Some(old) = load_state()?.map(|s| s.dest).filter(|d| !d.as_os_str().is_empty()) {
+        return Ok(old);
+    }
+    default_dest()
+}
+
+/// Points the photo download at `dir` from now on.
+pub fn set_dest(dir: PathBuf) -> Result<()> {
+    let mut config = crate::config::load();
+    config.photos_sync_folder = Some(dir);
+    crate::config::save(&config)
+}
+
+/// `~/Pictures/ProtonDrive`, honouring a localized or relocated Pictures folder.
 pub fn default_dest() -> Result<PathBuf> {
     let home = PathBuf::from(std::env::var_os("HOME").context("HOME not set")?);
     let pictures = std::process::Command::new("xdg-user-dir")
@@ -69,7 +89,7 @@ pub fn default_dest() -> Result<PathBuf> {
         .map(|s| PathBuf::from(s.trim()))
         .filter(|p| p.is_absolute() && p != &home)
         .unwrap_or_else(|| home.join("Pictures"));
-    Ok(pictures.join("Proton Drive"))
+    Ok(pictures.join("ProtonDrive"))
 }
 
 /// Downloads every timeline photo not already on disk. Returns how many arrived.
@@ -80,9 +100,7 @@ pub fn default_dest() -> Result<PathBuf> {
 /// in the account, so the copy on disk is a copy and nothing more.
 pub async fn pass<P: PGPProviderSync>(drive: &Drive<P>, sync_root: Option<&Path>) -> Result<Option<(usize, PathBuf)>> {
     let mut state = load_state()?.unwrap_or_default();
-    if state.dest.as_os_str().is_empty() {
-        state.dest = default_dest()?;
-    }
+    state.dest = dest()?;
     check_dest(&state.dest, sync_root)?;
     let fetched = run(drive, &mut state).await?;
     save_state(&state)?;

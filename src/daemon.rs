@@ -519,6 +519,11 @@ where
 
     // Opens this run in the log; the window shows everything after it.
     crate::log::mark("daemon started");
+    // A setting that is written but not obeyed is worse than one that is
+    // missing, so say it out loud, once, rather than ignoring it quietly.
+    if crate::config::load().photos_ingestion_folder.is_some() {
+        crate::log::warn("photos_ingestion_folder is set, but uploading to Proton Photos is not built yet (docs/photos-plan.md)");
+    }
     let (fs_tx, mut fs_rx) = mpsc::unbounded_channel::<()>();
     let watcher = watch(&state.root, fs_tx);
     if watcher.is_some() {
@@ -641,7 +646,7 @@ where
         }
         // Photos ride along with a pass that worked: the timeline is a second
         // library on a volume of its own, and download only.
-        if error.is_none() && (always_photos || crate::config::load().sync_photos) {
+        if error.is_none() && (always_photos || crate::config::load().photos_sync) {
             let due = last_photos.map(|t| t.elapsed() >= PHOTOS_EVERY).unwrap_or(true);
             if due {
                 last_photos = Some(std::time::Instant::now());

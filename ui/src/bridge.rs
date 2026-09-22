@@ -243,15 +243,8 @@ impl cxx_qt::Initialize for qobject::Backend {
         let config = kpdrive::config::load();
         self.as_mut().set_retention_days(config.log_retention_days as i32);
         self.as_mut().set_log_level(QString::from(config.log_level.name()));
-        self.as_mut().set_sync_photos(config.sync_photos);
-        let photos = kpdrive::photos::load_state()
-            .ok()
-            .flatten()
-            .map(|s| s.dest)
-            .filter(|d| !d.as_os_str().is_empty())
-            .or_else(|| kpdrive::photos::default_dest().ok())
-            .map(|d| d.display().to_string())
-            .unwrap_or_default();
+        self.as_mut().set_sync_photos(config.photos_sync);
+        let photos = kpdrive::photos::dest().map(|d| d.display().to_string()).unwrap_or_default();
         self.as_mut().set_photos_folder(QString::from(&photos));
         self.as_mut().show_folder();
         self.as_mut().refresh_sync_status();
@@ -386,7 +379,7 @@ impl qobject::Backend {
     pub fn change_sync_photos(mut self: Pin<&mut Self>, on: bool) {
         // Load and amend: building a fresh Config would drop the other settings.
         let mut config = kpdrive::config::load();
-        config.sync_photos = on;
+        config.photos_sync = on;
         if let Err(e) = kpdrive::config::save(&config) {
             self.as_mut().set_status(QString::from(&format!("cannot save the setting: {e:#}")));
             return;

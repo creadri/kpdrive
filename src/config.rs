@@ -45,7 +45,18 @@ pub struct Config {
     /// Whether the daemon also brings down the Proton Photos timeline. Off by
     /// default: it is a second library, and a large one on most accounts.
     #[serde(default)]
-    pub sync_photos: bool,
+    pub photos_sync: bool,
+    /// Where the timeline is copied to. Unset means `<Pictures>/ProtonDrive`.
+    #[serde(default)]
+    pub photos_sync_folder: Option<PathBuf>,
+    /// A folder to upload into Proton Photos. Not acted on yet: see
+    /// docs/photos-plan.md, which is what has to be settled first.
+    #[serde(default)]
+    pub photos_ingestion_folder: Option<PathBuf>,
+    /// After a photo is uploaded from the ingestion folder, delete it outright
+    /// rather than moving it to the desktop trash.
+    #[serde(default)]
+    pub photos_ingestion_perm_rm: bool,
     /// The least severe line worth storing. Ordinary activity is still printed
     /// by the CLI, it just does not reach the log file below this.
     #[serde(default = "default_level")]
@@ -62,7 +73,15 @@ fn default_retention() -> u64 {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { log_retention_days: default_retention(), sync_folder: None, sync_photos: false, log_level: default_level() }
+        Self {
+            log_retention_days: default_retention(),
+            sync_folder: None,
+            photos_sync: false,
+            photos_sync_folder: None,
+            photos_ingestion_folder: None,
+            photos_ingestion_perm_rm: false,
+            log_level: default_level(),
+        }
     }
 }
 

@@ -412,9 +412,7 @@ async fn setup(root: Option<std::path::PathBuf>) -> Result<()> {
 async fn photos(dest: Option<std::path::PathBuf>) -> Result<()> {
     // A destination given on the command line is remembered for next time.
     if let Some(dest) = dest {
-        let mut state = photos::load_state()?.unwrap_or_default();
-        state.dest = dest;
-        photos::save_state(&state)?;
+        photos::set_dest(dest)?;
     }
     let (drive, before) = account::open_drive().await?;
     let root = sync::load_state()?.map(|s| s.root);
