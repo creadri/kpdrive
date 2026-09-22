@@ -71,6 +71,12 @@ impl ksni::Tray for Tray {
     fn id(&self) -> String {
         "kpdrive".into()
     }
+    /// Clicking the icon opens the account window, which is what a tray icon
+    /// for a sync client is expected to do. The protocol has no notion of a
+    /// double click: the desktop decides what counts, and sends this.
+    fn activate(&mut self, _x: i32, _y: i32) {
+        open_window();
+    }
     fn title(&self) -> String {
         "Proton Drive".into()
     }
@@ -107,16 +113,7 @@ impl ksni::Tray for Tray {
             StandardItem {
                 label: "Account and logs…".into(),
                 icon_name: "user-identity".into(),
-                activate: Box::new(|_: &mut Self| {
-                    match crate::setup::ui_binary() {
-                        Ok(exe) => {
-                            if let Err(e) = std::process::Command::new(&exe).spawn() {
-                                crate::log::error(&format!("cannot start {}: {e}", exe.display()));
-                            }
-                        }
-                        Err(e) => crate::log::error(&format!("cannot locate the window: {e:#}")),
-                    }
-                }),
+                activate: Box::new(|_: &mut Self| open_window()),
                 ..Default::default()
             }
             .into(),
@@ -141,6 +138,38 @@ impl ksni::Tray for Tray {
             .into(),
         ]
     }
+}
+
+/// Starts the account window, unless one is already open. Clicking the icon
+/// half a dozen times should not leave half a dozen windows behind; a window
+/// that is open but buried stays where it is, because raising another
+/// process's window is not something Wayland allows.
+fn open_window() {
+    let exe = match crate::setup::ui_binary() {
+        Ok(exe) => exe,
+        Err(e) => return crate::log::error(&format!("cannot locate the window: {e:#}")),
+    };
+    if running(&exe) {
+        return;
+    }
+    if let Err(e) = std::process::Command::new(&exe).spawn() {
+        crate::log::error(&format!("cannot start {}: {e}", exe.display()));
+    }
+}
+
+/// Whether a process of this program is already running. /proc says so
+/// outright, where a lock file would have to be cleaned up after a crash.
+fn running(exe: &Path) -> bool {
+    let Some(name) = exe.file_name().map(|n| n.to_string_lossy().into_owned()) else {
+        return false;
+    };
+    // The kernel keeps only the first 15 bytes of a name in comm.
+    let short = &name[..name.len().min(15)];
+    let Ok(entries) = std::fs::read_dir("/proc") else { return false };
+    entries.flatten().any(|e| {
+        e.file_name().to_string_lossy().bytes().all(|b| b.is_ascii_digit())
+            && std::fs::read_to_string(e.path().join("comm")).map(|c| c.trim() == short).unwrap_or(false)
+    })
 }
 
 pub fn socket_path() -> PathBuf {
@@ -698,6 +727,13 @@ mod tests {
 
         let gone = Report { running: false, ..out.clone() };
         assert!(gone.sentence().contains("not running"), "nothing else matters if it is not there");
+    }
+
+    #[test]
+    fn spots_a_process_that_is_already_running() {
+        let me = std::env::current_exe().expect("this test is a process");
+        assert!(running(&me), "the test binary is running, being the one asking");
+        assert!(!running(Path::new("/usr/bin/kpdrive-no-such-window")));
     }
 
     #[test]
