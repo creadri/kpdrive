@@ -55,6 +55,11 @@ enum Cmd {
         /// Keep running and re-sync whenever the volume changes.
         #[arg(long)]
         watch: bool,
+        /// Also bring down the Proton Photos timeline, every half hour while
+        /// watching. Photos are download only: nothing is ever uploaded to
+        /// them or removed from them.
+        #[arg(long)]
+        photos: bool,
         /// Forget what was synced and re-adopt this folder for the account
         /// signed in. Files are compared by content, so nothing is lost.
         #[arg(long)]
@@ -116,7 +121,7 @@ async fn main() -> Result<()> {
         Cmd::Logout => do_logout().await,
         Cmd::Ls { path } => ls(&path).await,
         Cmd::Get { remote, local } => get(&remote, local).await,
-        Cmd::Sync { root, watch, force, adopt } => sync(root, watch, force, adopt).await,
+        Cmd::Sync { root, watch, force, adopt, photos } => sync(root, watch, force, adopt, photos).await,
         Cmd::Photos { dest } => photos(dest).await,
         Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
         Cmd::Setup { root } => setup(root).await,
@@ -405,26 +410,23 @@ async fn setup(root: Option<std::path::PathBuf>) -> Result<()> {
 }
 
 async fn photos(dest: Option<std::path::PathBuf>) -> Result<()> {
-    let mut state = photos::load_state()?.unwrap_or_default();
+    // A destination given on the command line is remembered for next time.
     if let Some(dest) = dest {
+        let mut state = photos::load_state()?.unwrap_or_default();
         state.dest = dest;
+        photos::save_state(&state)?;
     }
-    if state.dest.as_os_str().is_empty() {
-        state.dest = photos::default_dest()?;
-    }
-    photos::check_dest(&state.dest, sync::load_state()?.map(|s| s.root).as_deref())?;
-
-    let (mut drive, before) = account::open_drive().await?;
-    match photos::run(&mut drive, &mut state).await? {
+    let (drive, before) = account::open_drive().await?;
+    let root = sync::load_state()?.map(|s| s.root);
+    match photos::pass(&drive, root.as_deref()).await? {
         None => println!("this account has no Proton Photos library"),
-        Some(0) => println!("photos up to date in {}", state.dest.display()),
-        Some(n) => println!("{n} photo(s) into {}", state.dest.display()),
+        Some((0, dest)) => println!("photos up to date in {}", dest.display()),
+        Some((n, dest)) => println!("{n} photo(s) into {}", dest.display()),
     }
-    photos::save_state(&state)?;
     account::persist(drive.api, before).await
 }
 
-async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool, adopt: bool) -> Result<()> {
+async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool, adopt: bool, photos: bool) -> Result<()> {
     let mut state = sync::load_state()?.unwrap_or_default();
     resolve_root(&mut state, root)?;
     if adopt {
@@ -452,6 +454,7 @@ async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool, adopt:
         // Signing out and back in through the window replaces the stored
         // session; this is how the daemon gets hold of the new one.
         || async { account::open_drive().await.map(|(drive, _)| drive) },
+        photos,
         )
         .await;
     }

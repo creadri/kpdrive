@@ -28,6 +28,8 @@ pub mod qobject {
         #[qproperty(QStringList, log_lines, cxx_name = "logLines")]
         #[qproperty(i32, retention_days, cxx_name = "retentionDays")]
         #[qproperty(QString, log_level, cxx_name = "logLevel")]
+        #[qproperty(bool, sync_photos, cxx_name = "syncPhotos")]
+        #[qproperty(QString, photos_folder, cxx_name = "photosFolder")]
         #[qproperty(QString, sync_status, cxx_name = "syncStatus")]
         #[qproperty(bool, sync_busy, cxx_name = "syncBusy")]
         #[qproperty(bool, daemon_running, cxx_name = "daemonRunning")]
@@ -66,6 +68,12 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "openIgnoreFile"]
         fn open_ignore_file(self: Pin<&mut Self>);
+
+        /// Turn the Proton Photos download on or off. Named apart from the
+        /// property's own generated setter, which would otherwise clash.
+        #[qinvokable]
+        #[cxx_name = "changeSyncPhotos"]
+        fn change_sync_photos(self: Pin<&mut Self>, on: bool);
 
         /// Ask the sync daemon what it is doing. Cheap: a local socket.
         #[qinvokable]
@@ -133,6 +141,8 @@ pub struct BackendRust {
     log_lines: QStringList,
     retention_days: i32,
     log_level: QString,
+    sync_photos: bool,
+    photos_folder: QString,
     sync_status: QString,
     sync_busy: bool,
     daemon_running: bool,
@@ -157,6 +167,8 @@ impl Default for BackendRust {
             log_lines: QStringList::default(),
             retention_days: 30,
             log_level: QString::from("WARN"),
+            sync_photos: false,
+            photos_folder: QString::default(),
             sync_status: QString::default(),
             sync_busy: false,
             daemon_running: false,
@@ -231,6 +243,16 @@ impl cxx_qt::Initialize for qobject::Backend {
         let config = kpdrive::config::load();
         self.as_mut().set_retention_days(config.log_retention_days as i32);
         self.as_mut().set_log_level(QString::from(config.log_level.name()));
+        self.as_mut().set_sync_photos(config.sync_photos);
+        let photos = kpdrive::photos::load_state()
+            .ok()
+            .flatten()
+            .map(|s| s.dest)
+            .filter(|d| !d.as_os_str().is_empty())
+            .or_else(|| kpdrive::photos::default_dest().ok())
+            .map(|d| d.display().to_string())
+            .unwrap_or_default();
+        self.as_mut().set_photos_folder(QString::from(&photos));
         self.as_mut().show_folder();
         self.as_mut().refresh_sync_status();
         self.as_mut().reload_logs("");
@@ -359,6 +381,25 @@ impl qobject::Backend {
             Err(e) => list.append(QString::from(&format!("cannot read the log: {e:#}"))),
         }
         self.as_mut().set_log_lines(list);
+    }
+
+    pub fn change_sync_photos(mut self: Pin<&mut Self>, on: bool) {
+        // Load and amend: building a fresh Config would drop the other settings.
+        let mut config = kpdrive::config::load();
+        config.sync_photos = on;
+        if let Err(e) = kpdrive::config::save(&config) {
+            self.as_mut().set_status(QString::from(&format!("cannot save the setting: {e:#}")));
+            return;
+        }
+        self.as_mut().set_sync_photos(on);
+        // The daemon reads the setting each pass, so it needs no restart, but
+        // a nudge starts the first download now rather than at the next poll.
+        kpdrive::daemon::poke();
+        let told = match on {
+            true => "Proton Photos will be downloaded with the next sync",
+            false => "Proton Photos will be left alone",
+        };
+        self.as_mut().set_status(QString::from(told));
     }
 
     pub fn change_log_level(mut self: Pin<&mut Self>, level: &QString) {

@@ -19,6 +19,11 @@ const POLL: std::time::Duration = std::time::Duration::from_secs(30);
 const DEBOUNCE: std::time::Duration = std::time::Duration::from_secs(2);
 /// A burst that never goes quiet still gets a pass this often.
 const DEBOUNCE_CAP: std::time::Duration = std::time::Duration::from_secs(30);
+/// How often the photos timeline is looked at, when that is switched on.
+/// Photos arrive from a phone at their own pace, and the listing is a couple
+/// of calls, so this is slower than the folder poll rather than faster.
+const PHOTOS_EVERY: std::time::Duration = std::time::Duration::from_secs(1800);
+
 /// Even with inotify, sweep the folder now and then: network mounts and watch
 /// limits can lose events.
 const SWEEP_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
@@ -484,6 +489,7 @@ pub async fn run<P, F, Fut>(
     mut state: State,
     mut persist: impl FnMut(&Drive<P>),
     reopen: F,
+    always_photos: bool,
 ) -> Result<()>
 where
     P: PGPProviderSync,
@@ -528,6 +534,9 @@ where
     // appears rather than failing every thirty seconds.
     let mut signed_out = false;
     let mut outage = Outage::default();
+    // None until the first look, so switching photos on in the window starts
+    // fetching them at the next pass rather than half an hour later.
+    let mut last_photos: Option<std::time::Instant> = None;
     loop {
         let mut retry_now = false;
         let mut health = Health::Ok;
@@ -629,6 +638,25 @@ where
                 None => {}
             }
             failures = 0;
+        }
+        // Photos ride along with a pass that worked: the timeline is a second
+        // library on a volume of its own, and download only.
+        if error.is_none() && (always_photos || crate::config::load().sync_photos) {
+            let due = last_photos.map(|t| t.elapsed() >= PHOTOS_EVERY).unwrap_or(true);
+            if due {
+                last_photos = Some(std::time::Instant::now());
+                match crate::photos::pass(&drive, Some(&state.root)).await {
+                    Ok(None) => crate::log::write("INFO", "this account has no Proton Photos library"),
+                    Ok(Some((0, _))) => {}
+                    Ok(Some((n, dest))) => {
+                        crate::log::write("INFO", &format!("{n} photo(s) into {}", dest.display()));
+                        notify(&format!("{n} photo(s) downloaded"));
+                    }
+                    // Photos are a side errand: a failure there says nothing
+                    // about the folder, which has already synced.
+                    Err(e) => crate::log::error(&format!("photos: {e:#}")),
+                }
+            }
         }
         force = false;
         persist(&drive);

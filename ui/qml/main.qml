@@ -60,6 +60,7 @@ Kirigami.ApplicationWindow {
     Backend {
         id: backend
 
+
         // Sign-in needs the browser in front more than anything else does.
         onOpenUrlRequested: url => Qt.openUrlExternally(url)
     }
@@ -244,6 +245,27 @@ Kirigami.ApplicationWindow {
                                 icon.name: "document-edit"
                                 onClicked: backend.openIgnoreFile()
                             }
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+
+                        Controls.CheckBox {
+                            text: "Also download Proton Photos"
+                            checked: backend.syncPhotos
+                            onToggled: backend.changeSyncPhotos(checked)
+                        }
+
+                        Controls.Label {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 2
+                            text: "Read-only: your timeline is copied into " + (backend.photosFolder.length > 0 ? backend.photosFolder : "your Pictures folder")
+                                  + ". Photos are never uploaded, changed or deleted in Proton Photos, and the copy is checked every half hour."
+                            wrapMode: Text.WordWrap
+                            opacity: 0.7
+                            font: Kirigami.Theme.smallFont
                         }
                     }
 

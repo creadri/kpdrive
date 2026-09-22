@@ -73,7 +73,23 @@ pub fn default_dest() -> Result<PathBuf> {
 }
 
 /// Downloads every timeline photo not already on disk. Returns how many arrived.
-pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State) -> Result<Option<usize>> {
+/// Brings the timeline down to where it belongs, loading and saving the
+/// photo state around it. `None` when the account has no photos library.
+///
+/// Photos are download only: this never uploads, renames or deletes anything
+/// in the account, so the copy on disk is a copy and nothing more.
+pub async fn pass<P: PGPProviderSync>(drive: &Drive<P>, sync_root: Option<&Path>) -> Result<Option<(usize, PathBuf)>> {
+    let mut state = load_state()?.unwrap_or_default();
+    if state.dest.as_os_str().is_empty() {
+        state.dest = default_dest()?;
+    }
+    check_dest(&state.dest, sync_root)?;
+    let fetched = run(drive, &mut state).await?;
+    save_state(&state)?;
+    Ok(fetched.map(|n| (n, state.dest)))
+}
+
+pub async fn run<P: PGPProviderSync>(drive: &Drive<P>, state: &mut State) -> Result<Option<usize>> {
     let Some(root) = drive.photos_root().await? else {
         return Ok(None);
     };
@@ -136,7 +152,7 @@ pub async fn run<P: PGPProviderSync>(drive: &mut Drive<P>, state: &mut State) ->
 }
 
 async fn fetch<P: PGPProviderSync>(
-    drive: &mut Drive<P>,
+    drive: &Drive<P>,
     node: &crate::drive::Node<P::PrivateKey>,
     local: &Path,
     taken: i64,

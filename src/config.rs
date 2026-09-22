@@ -42,6 +42,10 @@ pub struct Config {
     /// Where Drive is mirrored. Unset until the first `setup` or `--root`.
     #[serde(default)]
     pub sync_folder: Option<PathBuf>,
+    /// Whether the daemon also brings down the Proton Photos timeline. Off by
+    /// default: it is a second library, and a large one on most accounts.
+    #[serde(default)]
+    pub sync_photos: bool,
     /// The least severe line worth storing. Ordinary activity is still printed
     /// by the CLI, it just does not reach the log file below this.
     #[serde(default = "default_level")]
@@ -58,7 +62,7 @@ fn default_retention() -> u64 {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { log_retention_days: default_retention(), sync_folder: None, log_level: default_level() }
+        Self { log_retention_days: default_retention(), sync_folder: None, sync_photos: false, log_level: default_level() }
     }
 }
 
