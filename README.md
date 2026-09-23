@@ -4,47 +4,52 @@ Simple KDE Proton Drive sync Client designed to have a simple solution.
 
 ![Main Window](docs/screenshots/kpdrive-main-ui-0.2.0.png)
 
-## Decisions
+## Features
 
-- **Not a FUSE mount**: only synching folders, no 
-- **API client:** our own thin client over the Drive REST API. Crypto comes from
-  Proton's official [proton-crypto-rs](https://github.com/ProtonMail/proton-crypto-rs)
-  (MIT, pure-Rust `rustpgp` backend, pinned commit). No third-party SDK ports.
-- **One binary:** `kpdrive` runs as the daemon or as a CLI talking to it over a Unix socket.
-- **KDE integration without C++:** tray via StatusNotifierItem, notifications and
-  KWallet via D-Bus, prompts via `kdialog`, browser via `xdg-open`, Places entry via `user-places.xbel`,
-  context menu via `kio/servicemenus`.
-- **Sharing:** a public link hangs off a share on the node. The share's session
-  key is re-wrapped under a bcrypt-derived key from the link password, and the
-  visitor proves the password by SRP. The generated password is also stored
-  encrypted to our own address key, which is how the link can be shown again.
-- **Window:** `ui/` is a separate crate so the CLI and daemon never need Qt.
-  It is Rust plus QML (Kirigami) through cxx-qt; network work runs on a worker
-  thread and results are posted back to the Qt thread.
-- **The one C++ piece:** Dolphin overlay icons (`KOverlayIconPlugin`). Lives in its own
-  directory, talks to the daemon socket, optional package.
-- **Packaging:** 
-  - Manual install: `cargo install`
-  - RPM targetting Fedora
-  - deb
-  - AUR depending on demand
-- **Terms:** Proton permits personal, non-commercial third-party use of its SDK/API today.
+- **Sync** ProtonDrive main folder
+- **Photos Sync** with some caviats
+- **KDE** and **Dolphin** integration
+- **.protonignore** with same syntax as .gitignore to ignore files to upload. .protonignore is still pushed though.
 
-## Milestones
+## Design decisions
 
-1. Login via browser sign-in (Proton session fork: the browser handles password, 2FA, captcha), session stored in KWallet.
-2. List root, download one file.
-3. Remote → local one-way sync driven by the event stream.
-4. Local → remote uploads (`put`, `mkdir`); `sync` pushes new/edited local files and trashes locally deleted ones.
-5. Tray, Places entry, notifications, autostart, Dolphin overlay plugin.
-6. Conflicts: both versions kept.
-7. Public links (`share`/`unshare`) and a "Copy Proton Drive link" Dolphin menu entry.
-8. Photos: timeline download.
-9. Account window and activity log with search and retention (`kpdrive-ui`).
+- Should be simple to use
+- **Sync only**, no FUSE mount
+- Using official [proton-crypto-rs](https://github.com/ProtonMail/proton-crypto-rs)
+- kpdrive rus as daemon or as a CLI so it can be used separetely if wanted.
 
-Conflicts, trash, sharing and photos wait until two-way sync is stable.
+### Photos handling
+
+Messing with the timeline is harder than you might think.
+
+- Read-only timeline
+- Ingestion Folder, by default ~/Pictures/ProtonDriveIngestion
+
+What works today is the read-only half: ``kpdrive photos`` fetches once, and
+*photos_sync* has the daemon do it every half hour. Photos land in
+``<photos_sync_folder>/YYYY/MM/``, each file's modified time set to when the
+photo was taken. That folder may not be inside the sync folder, or the file
+sync would upload the whole library back into Drive as ordinary files. The
+first run downloads the whole timeline, which on most accounts is the largest
+thing kpdrive will ever do.
+
+Ingestion is not built yet. What it has to produce for each photo, what happens
+to the local file afterwards, and the things the download half gets wrong
+today, are in [docs/photos-plan.md](docs/photos-plan.md). For now: a photo
+deleted in Proton stays on disk, a photo edited in Proton keeps its old copy,
+and deleting a local copy brings it back on the next pass.
+
+#### Photos Timeline Edge Cases
+
+> These are edge cases explaining why edit or pushing directly into the timeline isn't done yet
+
+- It's Proton Photos that will determine where in your timeline the photo is. As such, it's hard to make accurate predictions as it might evolve over time.
+- Editing a photo in a timeline might change the metadata and thus it might change the way Proton Photos puts your photo in the timeline.
+
 
 ## Usage
+
+### kpdrive CLI / daemon
 
 ```
 kpdrive login                 # browser sign-in, session stored in KWallet
@@ -62,29 +67,29 @@ kpdrive logs [--search TERM] [--lines N] [--retention DAYS]
 kpdrive logout
 ```
 
-`kpdrive-ui` opens the account window: who is signed in, storage used, links to
-Proton Drive and the account page on the web, sign in / sign out, and a second
-tab holding the activity log with a live search box and the retention setting.
-It is also in the application launcher and in the tray menu after `kpdrive setup`.
+### Configuration
 
-Activity goes to `~/.local/share/kpdrive/logs/YYYY-MM-DD.log` as plain text,
-one file per day, pruned to `log_retention_days` from
-`~/.config/kpdrive/config.json` (30 by default).
+Stored in `~/.config/kpdrive/config.json`. The window writes it, and the daemon
+re-reads it every pass, so a change takes effect without a restart (the sync
+folder is the exception: a running daemon keeps the one it started with).
+Missing keys take the default, so the file only needs what you change.
 
-The sync folder is `~/ProtonDrive` until you change it, with `--root` on
-`setup` or `sync`, or the **Change…** button in the window. Changing it moves
-what is already synced when the two paths are on one filesystem, which keeps
-every recorded path valid; across filesystems the old folder is left alone and
-the files are fetched again into the new one. The choice lives in
-`~/.config/kpdrive/config.json`. A running daemon keeps the old path until it
-restarts.
+- *sync_folder* : path of the folder to sync ProtonDrive, by default `~/ProtonDrive`
+- *log_level* : least severe line kept in the log, `INFO`, `WARN` or `ERROR`. `WARN` by default; the CLI prints its activity whatever this says
+- *log_retention_days* : Days of logs, `30` by default
+- *photos_sync* : boolean, true if the daemon downloads photos as well, every half hour. `false` by default
+- *photos_sync_folder* : path of the folder photos are copied into, by default `~/Pictures/ProtonDrive`. May not be inside *sync_folder*
+- *photos_ingestion_folder* : path of the folder to ingest Photos from, `~/Pictures/ProtonDriveIngestion` when it lands. **Not acted on yet**, see [docs/photos-plan.md](docs/photos-plan.md)
+- *photos_ingestion_perm_rm* : boolean, true if an ingested photo is deleted outright on successful upload, otherwise moved to trash. `false` by default. **Not acted on yet**
 
-`.protonignore` in the root of the sync folder lists paths to leave alone, with
-the same syntax as `.gitignore` (`*`, `**`, a trailing slash for folders only, a
-leading slash to anchor, `!` to make an exception); it is matched by the same
-library ripgrep uses. Ignored paths are neither uploaded nor downloaded nor
-deleted, and they do not wake the daemon. The file itself syncs, as `.gitignore`
-does, and `setup` writes a commented starter.
+`<sync_folder>/.protonignore` lists paths sync leaves alone, in `.gitignore`
+syntax; the window's **Ignore file…** opens it.
+
+### Logs
+
+`~/.local/share/kpdrive/logs/YYYY-MM-DD.log` as plain text
+
+### Sync State
 
 Sync state lives in `~/.local/share/kpdrive/state.json`. Rules:
 
@@ -100,9 +105,12 @@ Sync state lives in `~/.local/share/kpdrive/state.json`. Rules:
 - Removed remotely: deleted locally only if untouched since we wrote it.
 Set `KPDRIVE_DEBUG=1` for event-page diagnostics.
 
+#### Photos Sync State
+
 Photos are a separate volume with a flat, capture-time-ordered timeline, so
-`photos` is its own command and writes to `~/Pictures/Proton Drive/YYYY/MM/`
-(state in `photos.json`). It only downloads. The destination must be outside the
+`photos` is its own command and writes to `<photos_sync_folder>/YYYY/MM/`,
+`~/Pictures/ProtonDrive` by default (what has been downloaded is recorded in
+`photos.json`). It only downloads. The destination must be outside the
 file sync folder, or the file sync would upload the whole library back into
 Drive; kpdrive refuses that rather than letting it happen.
 
@@ -116,7 +124,8 @@ local path inside the sync folder as well as a remote one.
 
 The daemon (`sync --watch`) shows a Plasma tray icon, sends desktop
 notifications for conflicts and errors, and serves `$XDG_RUNTIME_DIR/kpdrive.sock`
-(line protocol: `STATUS <path>` → `OK|SYNC|NONE`, `ROOT`, `SYNC`, `QUIT`).
+(line protocol: `STATUS <path>` → `OK|SYNC|NONE`, `ROOT`, `STATE` → one line of
+JSON for the window, `SYNC`, `QUIT`).
 The Dolphin overlay plugin in `dolphin-overlay/` uses that socket; see its README.
 
 ## Build
@@ -131,12 +140,42 @@ cargo build -p kpdrive-ui   # the window; needs qt6-qtdeclarative-devel and kf6-
 ### RPM
 
 1. Download rpm files from release that matches your distribution, ex: fc43 or fc44 for Fedora 43 & 44
-2. ``sudo rpm -i kpdrive*fc44*.rpm`` install packages
-3. ``kpdrive-ui`` to set-up your account in GUI (or see usage for CLI)
-3. ``kpdrive sync --watch`` to have daemon with tray
+1. ``sudo rpm -i kpdrive<xxx>.rpm`` installs base daemon/cli
+1. ``sudo rpm -i kpdrive-dolphin<xxx>.rpm`` installs dolphin integration (icon overlay and right click menu)
+1. ``sudo rpm -i kpdrive-ui<xxx>.rpm`` installs KDE ui
+
+### DEB
+
+Built on Debian 13 (trixie). ``apt`` is used rather than ``dpkg`` so the
+dependencies come with it; the ``./`` in front of the file name is what tells
+apt it is a file and not a package name.
+
+1. Download the deb files from the release, ignoring the ``-dbgsym`` ones (debug symbols, not needed to run)
+1. ``sudo apt install ./kpdrive_<xxx>_amd64.deb`` installs base daemon/cli
+1. ``sudo apt install ./kpdrive-dolphin_<xxx>_amd64.deb`` installs dolphin integration (icon overlay and right click menu)
+1. ``sudo apt install ./kpdrive-ui_<xxx>_amd64.deb`` installs KDE ui
+
+### Initial Setup
+
+1. ``kpdrive-ui`` to set-up your account in GUI (or see usage for CLI)
+1. ``kpdrive sync --watch`` to have daemon with tray
 
 > Don't forget to reload Dolphin to see icon overlay.
 > Check Autostart to add kpdrive.
+
+### Uninstall
+
+### RPM
+
+```bash
+sudo dnf remove kpdrive kpdrive-dolphin kpdrive-ui
+```
+
+### DEB
+
+```bash
+sudo apt remove kpdrive kpdrive-dolphin kpdrive-ui
+```
 
 ## Releases
 
