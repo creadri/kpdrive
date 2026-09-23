@@ -23,7 +23,7 @@ Kirigami.ApplicationWindow {
 
     FolderDialog {
         id: folderDialog
-        title: "Choose the Proton Drive folder"
+        title: backend.i18n("Choose the Proton Drive folder")
         currentFolder: backend.syncFolder.length > 0 ? "file://" + encodeURI(backend.syncFolder) : ""
         // The dialog hands back a URL; sync wants a plain path.
         onAccepted: root.chooseFolder(decodeURIComponent(selectedFolder.toString().replace(/^file:\/\//, "")))
@@ -35,7 +35,7 @@ Kirigami.ApplicationWindow {
 
         property string folder: ""
 
-        title: "The folder is not empty"
+        title: backend.i18n("The folder is not empty")
         standardButtons: Controls.Dialog.NoButton
         customFooterActions: [
             Kirigami.Action {
@@ -70,9 +70,9 @@ Kirigami.ApplicationWindow {
     // xdg-open directly cannot, so the tab opens behind this window.
     function open(url, what) {
         if (Qt.openUrlExternally(url))
-            backend.status = "Opened " + what;
+            backend.status = backend.i18n("Opened {what}").replace("{what}", what);
         else
-            backend.status = "Could not open " + what + " (" + url + ")";
+            backend.status = backend.i18n("Could not open {what} ({url})").replace("{what}", what).replace("{url}", url);
     }
 
     // The log is shown as one text block so a selection can run across lines,
@@ -112,8 +112,8 @@ Kirigami.ApplicationWindow {
             return "0 GiB";
         const gib = bytes / (1024 * 1024 * 1024);
         if (gib >= 1)
-            return gib.toFixed(1) + " GiB";
-        return (bytes / (1024 * 1024)).toFixed(1) + " MiB";
+            return gib.toLocaleString(Qt.locale(), "f", 1) + " GiB";
+        return (bytes / (1024 * 1024)).toLocaleString(Qt.locale(), "f", 1) + " MiB";
     }
 
     pageStack.initialPage: Kirigami.Page {
@@ -127,8 +127,8 @@ Kirigami.ApplicationWindow {
                 id: tabs
                 Layout.fillWidth: true
 
-                Controls.TabButton { text: "Account" }
-                Controls.TabButton { text: "Logs" }
+                Controls.TabButton { text: backend.i18n("Account") }
+                Controls.TabButton { text: backend.i18n("Logs") }
             }
 
             StackLayout {
@@ -159,15 +159,15 @@ Kirigami.ApplicationWindow {
 
                             Kirigami.Heading {
                                 level: 2
-                                text: backend.loggedIn ? backend.username : "Not signed in"
+                                text: backend.loggedIn ? backend.username : backend.i18n("Not signed in")
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }
 
                             Controls.Label {
                                 text: backend.loggedIn
-                                      ? "Signed in to Proton Drive"
-                                      : "Sign in to sync this computer with Proton Drive."
+                                      ? backend.i18n("Signed in to Proton Drive")
+                                      : backend.i18n("Sign in to sync this computer with Proton Drive.")
                                 opacity: 0.7
                                 wrapMode: Text.WordWrap
                                 Layout.fillWidth: true
@@ -187,7 +187,7 @@ Kirigami.ApplicationWindow {
                         spacing: Kirigami.Units.smallSpacing
 
                         Controls.Label {
-                            text: "Storage"
+                            text: backend.i18n("Storage")
                             font.bold: true
                         }
 
@@ -215,8 +215,9 @@ Kirigami.ApplicationWindow {
                         }
 
                         Controls.Label {
-                            text: root.formatSize(backend.usedBytes) + " of "
-                                  + root.formatSize(backend.totalBytes) + " used"
+                            text: backend.i18n("{used} of {total} used")
+                                  .replace("{used}", root.formatSize(backend.usedBytes))
+                                  .replace("{total}", root.formatSize(backend.totalBytes))
                             opacity: 0.7
                         }
 
@@ -225,23 +226,23 @@ Kirigami.ApplicationWindow {
                             Layout.topMargin: Kirigami.Units.largeSpacing
                             spacing: Kirigami.Units.smallSpacing
 
-                            Controls.Label { text: "Syncing to"; opacity: 0.7 }
+                            Controls.Label { text: backend.i18n("Syncing to"); opacity: 0.7 }
 
                             Controls.Label {
                                 Layout.fillWidth: true
-                                text: backend.syncFolder.length > 0 ? backend.syncFolder : "nowhere yet"
+                                text: backend.syncFolder.length > 0 ? backend.syncFolder : backend.i18n("nowhere yet")
                                 elide: Text.ElideMiddle
                                 font.family: "monospace"
                             }
 
                             Controls.Button {
-                                text: "Change…"
+                                text: backend.i18n("Change…")
                                 icon.name: "folder-sync"
                                 onClicked: folderDialog.open()
                             }
 
                             Controls.Button {
-                                text: "Ignore file…"
+                                text: backend.i18n("Ignore file…")
                                 icon.name: "document-edit"
                                 onClicked: backend.openIgnoreFile()
                             }
@@ -253,7 +254,7 @@ Kirigami.ApplicationWindow {
                         spacing: 0
 
                         Controls.CheckBox {
-                            text: "Also download Proton Photos"
+                            text: backend.i18n("Also download Proton Photos")
                             checked: backend.syncPhotos
                             onToggled: backend.changeSyncPhotos(checked)
                         }
@@ -261,8 +262,8 @@ Kirigami.ApplicationWindow {
                         Controls.Label {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 2
-                            text: "Read-only: your timeline is copied into " + (backend.photosFolder.length > 0 ? backend.photosFolder : "your Pictures folder")
-                                  + ". Photos are never uploaded, changed or deleted in Proton Photos, and the copy is checked every half hour."
+                            text: backend.i18n("Read-only: your timeline is copied into {folder}. Photos are never uploaded, changed or deleted in Proton Photos, and the copy is checked every half hour.")
+                                  .replace("{folder}", backend.photosFolder.length > 0 ? backend.photosFolder : backend.i18n("your Pictures folder"))
                             wrapMode: Text.WordWrap
                             opacity: 0.7
                             font: Kirigami.Theme.smallFont
@@ -281,7 +282,7 @@ Kirigami.ApplicationWindow {
                         text: backend.syncStatus
                         actions: [
                             Kirigami.Action {
-                                text: "Sync now"
+                                text: backend.i18n("Sync now")
                                 icon.name: "view-refresh"
                                 visible: backend.daemonRunning && !backend.syncBusy
                                 onTriggered: backend.syncNow()
@@ -303,29 +304,29 @@ Kirigami.ApplicationWindow {
                         spacing: Kirigami.Units.smallSpacing
 
                         Controls.Button {
-                            text: "Open folder"
+                            text: backend.i18n("Open folder")
                             icon.name: "folder-open"
                             enabled: backend.syncFolder.length > 0
                             onClicked: root.open("file://" + encodeURI(backend.syncFolder), "the sync folder")
                         }
                         Controls.Button {
-                            text: "Drive on the web"
+                            text: backend.i18n("Drive on the web")
                             icon.name: "internet-services"
                             onClicked: root.open("https://drive.proton.me/", "Proton Drive in your browser")
                         }
                         Controls.Button {
-                            text: "Proton account"
+                            text: backend.i18n("Proton account")
                             icon.name: "system-users"
                             onClicked: root.open("https://account.proton.me/", "your Proton account in your browser")
                         }
                         Controls.Button {
-                            text: "Refresh"
+                            text: backend.i18n("Refresh")
                             icon.name: "view-refresh"
                             enabled: backend.loggedIn && !backend.busy
                             onClicked: backend.refresh()
                         }
                         Controls.Button {
-                            text: backend.loggedIn ? "Sign out" : "Sign in"
+                            text: backend.loggedIn ? backend.i18n("Sign out") : backend.i18n("Sign in")
                             icon.name: backend.loggedIn ? "system-log-out" : "key-enter"
                             enabled: !backend.busy
                             onClicked: backend.loggedIn ? backend.logout() : backend.login()
@@ -368,7 +369,7 @@ Kirigami.ApplicationWindow {
                         }
 
                         Controls.Button {
-                            text: "Read the licence"
+                            text: backend.i18n("Read the licence")
                             flat: true
                             onClicked: root.open("https://www.gnu.org/licenses/gpl-3.0.html", "the licence")
                         }
@@ -386,7 +387,7 @@ Kirigami.ApplicationWindow {
                     Kirigami.SearchField {
                         id: search
                         Layout.fillWidth: true
-                        placeholderText: "Search the log"
+                        placeholderText: backend.i18n("Search the log")
                         onTextChanged: backend.searchLogs(text)
                     }
 
@@ -431,12 +432,12 @@ Kirigami.ApplicationWindow {
                                 Controls.Menu {
                                     id: logMenu
                                     Controls.MenuItem {
-                                        text: "Copy"
+                                        text: backend.i18n("Copy")
                                         enabled: logView.selectedText.length > 0
                                         onTriggered: logView.copy()
                                     }
                                     Controls.MenuItem {
-                                        text: "Select all"
+                                        text: backend.i18n("Select all")
                                         onTriggered: logView.selectAll()
                                     }
                                 }
@@ -453,10 +454,10 @@ Kirigami.ApplicationWindow {
                             width: parent.width - Kirigami.Units.gridUnit * 4
                             visible: backend.logLines.length === 0
                             icon.name: search.text.length > 0 ? "edit-none" : "view-history"
-                            text: search.text.length > 0 ? "No lines match" : "Nothing logged yet"
+                            text: search.text.length > 0 ? backend.i18n("No lines match") : backend.i18n("Nothing logged yet")
                             explanation: search.text.length > 0
-                                         ? "No line since the sync daemon started contains “" + search.text + "”."
-                                         : "This shows what has happened since the sync daemon started."
+                                         ? backend.i18n("No line since the sync daemon started contains “{term}”.").replace("{term}", search.text)
+                                         : backend.i18n("This shows what has happened since the sync daemon started.")
                         }
                     }
 
@@ -464,7 +465,7 @@ Kirigami.ApplicationWindow {
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
 
-                        Controls.Label { text: "Keep logs for" }
+                        Controls.Label { text: backend.i18n("Keep logs for") }
 
                         Controls.SpinBox {
                             from: 1
@@ -473,20 +474,20 @@ Kirigami.ApplicationWindow {
                             onValueModified: backend.setRetention(value)
                         }
 
-                        Controls.Label { text: "days" }
+                        Controls.Label { text: backend.i18n("days") }
 
                         Item { width: Kirigami.Units.largeSpacing }
 
-                        Controls.Label { text: "Store" }
+                        Controls.Label { text: backend.i18n("Store") }
 
                         Controls.ComboBox {
                             id: levelBox
                             textRole: "text"
                             valueRole: "value"
                             model: [
-                                { text: "Warnings and errors", value: "WARN" },
-                                { text: "Everything", value: "INFO" },
-                                { text: "Errors only", value: "ERROR" },
+                                { text: backend.i18n("Warnings and errors"), value: "WARN" },
+                                { text: backend.i18n("Everything"), value: "INFO" },
+                                { text: backend.i18n("Errors only"), value: "ERROR" },
                             ]
                             currentIndex: Math.max(0, indexOfValue(backend.logLevel))
                             onActivated: backend.changeLogLevel(currentValue)
@@ -495,7 +496,7 @@ Kirigami.ApplicationWindow {
                         Item { Layout.fillWidth: true }
 
                         Controls.Label {
-                            text: backend.logLines.length + " line" + (backend.logLines.length === 1 ? "" : "s")
+                            text: backend.i18np("{n} line", "{n} lines", backend.logLines.length).replace("{n}", backend.logLines.length)
                             opacity: 0.7
                         }
                     }

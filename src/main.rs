@@ -1,5 +1,5 @@
 
-use kpdrive::{account, config, daemon, log, photos, setup, sync};
+use kpdrive::{account, config, daemon, i18n, log, photos, setup, sync};
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
 
@@ -114,6 +114,7 @@ enum Cmd {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    i18n::init();
     match Cli::parse().cmd {
         Cmd::Login => login().await,
         Cmd::Status => status().await,

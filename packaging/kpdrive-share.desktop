@@ -7,5 +7,6 @@ X-KDE-MaxNumberOfUrls=1
 
 [Desktop Action kpdriveShare]
 Name=Copy Proton Drive link
+Name[fr]=Copier le lien Proton Drive
 Icon=emblem-shared
 Exec=kpdrive share --copy %f

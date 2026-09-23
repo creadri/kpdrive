@@ -135,6 +135,25 @@ cargo build                 # CLI and daemon
 cargo build -p kpdrive-ui   # the window; needs qt6-qtdeclarative-devel and kf6-kirigami
 ```
 
+### Translations
+
+Catalogs live in `po/` and are compiled into the binaries at build time, so
+there is nothing to install and `gettext` is a build dependency. The language
+comes from `LC_ALL`, `LC_MESSAGES` or `LANG`; anything without a catalog falls
+back to English.
+
+```bash
+./po/make-pot.sh                        # rebuild the template from Rust and QML,
+                                        # and merge it into every existing .po
+msginit --no-translator -l nl -i po/kpdrive.pot -o po/nl.po   # start a language
+LC_ALL=fr_BE.UTF-8 kpdrive-ui           # see it
+```
+
+The window, the notifications and the wording the terminal shares with the
+window are translated. Log lines are not: they are a support tool, and a report
+nobody can grep is worth less than one in the wrong language. The rest of the
+terminal output is not translated yet.
+
 ## Install
 
 ### RPM

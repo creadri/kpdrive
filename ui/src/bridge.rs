@@ -75,6 +75,15 @@ pub mod qobject {
         #[cxx_name = "changeSyncPhotos"]
         fn change_sync_photos(self: Pin<&mut Self>, on: bool);
 
+        /// One translated string, for QML to put in a label. Named `i18n`
+        /// rather than `tr`, which already exists on every QObject.
+        #[qinvokable]
+        fn i18n(self: Pin<&mut Self>, text: &QString) -> QString;
+
+        /// The singular or plural form for `n`, chosen by the catalog's rules.
+        #[qinvokable]
+        fn i18np(self: Pin<&mut Self>, singular: &QString, plural: &QString, n: i32) -> QString;
+
         /// Ask the sync daemon what it is doing. Cheap: a local socket.
         #[qinvokable]
         #[cxx_name = "refreshSyncStatus"]
@@ -163,7 +172,7 @@ impl Default for BackendRust {
             total_bytes: 0.0,
             logged_in: false,
             busy: false,
-            status: QString::from("Starting…"),
+            status: QString::from(kpdrive::i18n::t("Starting…")),
             log_lines: QStringList::default(),
             retention_days: 30,
             log_level: QString::from("WARN"),
@@ -205,7 +214,7 @@ impl cxx_qt::Initialize for qobject::Backend {
                     Task::Login => {
                         let signal = qt.clone();
                         let result = runtime.block_on(kpdrive::account::login(|url, code| {
-                            let message = format!("Confirm the code {code} in your browser");
+                            let message = kpdrive::i18n::fill(kpdrive::i18n::t("Confirm the code {code} in your browser"), &[("code", code)]);
                             let url = url.to_owned();
                             let _ = signal.queue(move |mut b| {
                                 b.as_mut().set_status(QString::from(&message));
@@ -219,7 +228,7 @@ impl cxx_qt::Initialize for qobject::Backend {
                                 kpdrive::daemon::poke();
                                 load_account(&runtime, &qt);
                             }
-                            Err(e) => report(&qt, format!("Sign-in failed: {e:#}")),
+                            Err(e) => report(&qt, kpdrive::i18n::fill(kpdrive::i18n::t("Sign-in failed: {reason}"), &[("reason", &format!("{e:#}"))])),
                         }
                     }
                     Task::Logout => match runtime.block_on(kpdrive::account::logout()) {
@@ -231,10 +240,10 @@ impl cxx_qt::Initialize for qobject::Backend {
                                 b.as_mut().set_used_bytes(0.0);
                                 b.as_mut().set_total_bytes(0.0);
                                 b.as_mut().set_busy(false);
-                                b.as_mut().set_status(QString::from("Signed out"));
+                                b.as_mut().set_status(QString::from(kpdrive::i18n::t("Signed out")));
                             });
                         }
-                        Err(e) => report(&qt, format!("Sign-out failed: {e:#}")),
+                        Err(e) => report(&qt, kpdrive::i18n::fill(kpdrive::i18n::t("Sign-out failed: {reason}"), &[("reason", &format!("{e:#}"))])),
                     },
                 }
             }
@@ -293,25 +302,36 @@ impl qobject::Backend {
             Ok(note) => {
                 // A running daemon holds the old path in memory.
                 let running = kpdrive::daemon::socket_path().exists();
-                let note = if running { format!("{note}. Restart the sync daemon to use it.") } else { note };
+                let note = if running { kpdrive::i18n::fill(kpdrive::i18n::t("{note}. Restart the sync daemon to use it."), &[("note", &note)]) } else { note };
                 self.as_mut().set_status(QString::from(&note));
             }
-            Err(e) => self.as_mut().set_status(QString::from(&format!("cannot change the folder: {e:#}"))),
+            Err(e) => self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot change the folder: {reason}"), &[("reason", &format!("{e:#}"))]))),
         }
         self.show_folder();
     }
 
     pub fn open_ignore_file(mut self: Pin<&mut Self>) {
         let Some(root) = current_root() else {
-            self.as_mut().set_status(QString::from("No sync folder yet. Run: kpdrive setup"));
+            self.as_mut().set_status(QString::from(kpdrive::i18n::t("No sync folder yet. Run: kpdrive setup")));
             return;
         };
         if let Err(e) = kpdrive::setup::ignore_template(&root) {
-            self.as_mut().set_status(QString::from(&format!("cannot create the ignore file: {e:#}")));
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot create the ignore file: {reason}"), &[("reason", &format!("{e:#}"))])));
             return;
         }
         let url = format!("file://{}", root.join(kpdrive::sync::IGNORE_FILE).display());
         self.as_mut().open_url_requested(QString::from(&url));
+    }
+
+    /// QML asks for its strings here, because the catalog lives in the library
+    /// with the wording the terminal shares. The runtime looks strings up by
+    /// content, so the literal in the QML is both the key and the fallback.
+    pub fn i18n(self: Pin<&mut Self>, text: &QString) -> QString {
+        QString::from(&kpdrive::i18n::lookup(&text.to_string()))
+    }
+
+    pub fn i18np(self: Pin<&mut Self>, singular: &QString, plural: &QString, n: i32) -> QString {
+        QString::from(&kpdrive::i18n::lookup_plural(&singular.to_string(), &plural.to_string(), n.max(0) as u64))
     }
 
     /// The daemon's own account of itself, in the words `kpdrive status` uses.
@@ -333,19 +353,19 @@ impl qobject::Backend {
 
     pub fn refresh(mut self: Pin<&mut Self>) {
         self.as_mut().set_busy(true);
-        self.as_mut().set_status(QString::from("Checking the account…"));
+        self.as_mut().set_status(QString::from(kpdrive::i18n::t("Checking the account…")));
         self.send(Task::Refresh);
     }
 
     pub fn login(mut self: Pin<&mut Self>) {
         self.as_mut().set_busy(true);
-        self.as_mut().set_status(QString::from("Opening the browser…"));
+        self.as_mut().set_status(QString::from(kpdrive::i18n::t("Opening the browser…")));
         self.send(Task::Login);
     }
 
     pub fn logout(mut self: Pin<&mut Self>) {
         self.as_mut().set_busy(true);
-        self.as_mut().set_status(QString::from("Signing out…"));
+        self.as_mut().set_status(QString::from(kpdrive::i18n::t("Signing out…")));
         self.send(Task::Logout);
     }
 
@@ -371,7 +391,7 @@ impl qobject::Backend {
                     list.append(QString::from(&line));
                 }
             }
-            Err(e) => list.append(QString::from(&format!("cannot read the log: {e:#}"))),
+            Err(e) => list.append(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot read the log: {reason}"), &[("reason", &format!("{e:#}"))]))),
         }
         self.as_mut().set_log_lines(list);
     }
@@ -381,7 +401,7 @@ impl qobject::Backend {
         let mut config = kpdrive::config::load();
         config.photos_sync = on;
         if let Err(e) = kpdrive::config::save(&config) {
-            self.as_mut().set_status(QString::from(&format!("cannot save the setting: {e:#}")));
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
             return;
         }
         self.as_mut().set_sync_photos(on);
@@ -389,8 +409,8 @@ impl qobject::Backend {
         // a nudge starts the first download now rather than at the next poll.
         kpdrive::daemon::poke();
         let told = match on {
-            true => "Proton Photos will be downloaded with the next sync",
-            false => "Proton Photos will be left alone",
+            true => kpdrive::i18n::t("Proton Photos will be downloaded with the next sync"),
+            false => kpdrive::i18n::t("Proton Photos will be left alone"),
         };
         self.as_mut().set_status(QString::from(told));
     }
@@ -402,14 +422,14 @@ impl qobject::Backend {
         let mut config = kpdrive::config::load();
         config.log_level = parsed;
         if let Err(e) = kpdrive::config::save(&config) {
-            self.as_mut().set_status(QString::from(&format!("cannot save the setting: {e:#}")));
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
             return;
         }
         self.as_mut().set_log_level(QString::from(parsed.name()));
         let told = match parsed {
-            kpdrive::config::LogLevel::Info => "Storing everything from now on",
-            kpdrive::config::LogLevel::Warn => "Storing warnings and errors from now on",
-            kpdrive::config::LogLevel::Error => "Storing errors from now on",
+            kpdrive::config::LogLevel::Info => kpdrive::i18n::t("Storing everything from now on"),
+            kpdrive::config::LogLevel::Warn => kpdrive::i18n::t("Storing warnings and errors from now on"),
+            kpdrive::config::LogLevel::Error => kpdrive::i18n::t("Storing errors from now on"),
         };
         self.as_mut().set_status(QString::from(told));
     }
@@ -420,13 +440,13 @@ impl qobject::Backend {
         let mut config = kpdrive::config::load();
         config.log_retention_days = days;
         if let Err(e) = kpdrive::config::save(&config) {
-            self.as_mut().set_status(QString::from(&format!("cannot save the setting: {e:#}")));
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
             return;
         }
         match kpdrive::log::prune(days) {
             Ok(0) => {}
-            Ok(n) => self.as_mut().set_status(QString::from(&format!("removed {n} log file(s) past {days} days"))),
-            Err(e) => self.as_mut().set_status(QString::from(&format!("cannot prune the log: {e:#}"))),
+            Ok(n) => self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::tn("removed {n} log file older than {days} days", "removed {n} log files older than {days} days", n as u64), &[("n", &n.to_string()), ("days", &days.to_string())]))),
+            Err(e) => self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot prune the log: {reason}"), &[("reason", &format!("{e:#}"))]))),
         }
         self.as_mut().set_retention_days(days as i32);
         self.reload_logs("");

@@ -2,7 +2,9 @@
 Type=Application
 Name=Proton Drive
 GenericName=Cloud storage
+GenericName[fr]=Stockage en ligne
 Comment=Account, storage and activity log for Proton Drive
+Comment[fr]=Compte, stockage et journal d’activité pour Proton Drive
 Exec=kpdrive-ui
 Icon=be.otterit.kpdrive
 Terminal=false

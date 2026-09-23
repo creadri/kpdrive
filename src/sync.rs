@@ -118,8 +118,8 @@ impl Occupied {
     /// the same choice to the user.
     pub fn label(self) -> &'static str {
         match self {
-            Self::Merge => "Sync into it and keep what is already there",
-            Self::Rename => "Move it aside and start from an empty folder",
+            Self::Merge => crate::i18n::t("Sync into it and keep what is already there"),
+            Self::Rename => crate::i18n::t("Move it aside and start from an empty folder"),
         }
     }
 }
@@ -156,11 +156,12 @@ pub fn folder_question(state: &State, root: &Path) -> Option<String> {
     if held == 0 {
         return None;
     }
-    Some(format!(
-        "{} already holds {held} item{}, which syncing will merge with Proton Drive.",
-        root.display(),
-        if held == 1 { "" } else { "s" }
-    ))
+    let template = crate::i18n::tn(
+        "{folder} already holds {n} item, which syncing will merge with Proton Drive.",
+        "{folder} already holds {n} items, which syncing will merge with Proton Drive.",
+        held as u64,
+    );
+    Some(crate::i18n::fill(template, &[("folder", &root.display().to_string()), ("n", &held.to_string())]))
 }
 
 /// Renames `root` out of the way so syncing can start from an empty folder.

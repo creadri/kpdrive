@@ -1,0 +1,398 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-23 15:51+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: src/daemon.rs:98
+msgid "Signed out. Sign in from the account window."
+msgstr ""
+
+#: src/daemon.rs:100 src/daemon.rs:340
+msgid "Syncing…"
+msgstr ""
+
+#: src/daemon.rs:102 src/daemon.rs:343
+msgid "{n} item in sync"
+msgid_plural "{n} items in sync"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/daemon.rs:112 ui/qml/main.qml:307
+msgid "Open folder"
+msgstr ""
+
+#: src/daemon.rs:122
+msgid "Account and logs…"
+msgstr ""
+
+#: src/daemon.rs:129 ui/qml/main.qml:285
+msgid "Sync now"
+msgstr ""
+
+#: src/daemon.rs:139
+msgid "Quit"
+msgstr ""
+
+#: src/daemon.rs:272
+msgid "{reason}; retrying"
+msgstr ""
+
+#: src/daemon.rs:283
+msgid "Proton Drive is reachable again, after {duration}"
+msgstr ""
+
+#: src/daemon.rs:294
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/daemon.rs:295
+msgid "{n} minute"
+msgid_plural "{n} minutes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/daemon.rs:296
+msgid "{n} hour"
+msgid_plural "{n} hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/daemon.rs:324
+msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
+msgstr ""
+
+#: src/daemon.rs:327
+msgid ""
+"A sync daemon is running but is too old to say what it is doing. Restart it."
+msgstr ""
+
+#: src/daemon.rs:330
+msgid "Signed out. Syncing resumes once you sign in."
+msgstr ""
+
+#: src/daemon.rs:334
+msgid "{reason}. Still trying."
+msgstr ""
+
+#: src/daemon.rs:335
+msgid "Last sync failed: {reason}"
+msgstr ""
+
+#: src/daemon.rs:348
+msgid "just now"
+msgstr ""
+
+#: src/daemon.rs:350
+msgid "{n} minute ago"
+msgid_plural "{n} minutes ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/daemon.rs:353
+msgid "{n} hour ago"
+msgid_plural "{n} hours ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/daemon.rs:356
+msgid "{items}, checked {ago}"
+msgstr ""
+
+#: src/daemon.rs:573
+msgid "Signed in again. Syncing resumed."
+msgstr ""
+
+#: src/daemon.rs:627
+msgid "Signed out. Sign in from the account window to resume syncing."
+msgstr ""
+
+#: src/daemon.rs:660
+msgid "Sync resumed"
+msgstr ""
+
+#: src/daemon.rs:677
+msgid "{n} photo downloaded"
+msgid_plural "{n} photos downloaded"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/i18n.rs:111 ui/qml/main.qml:329
+msgid "Sign out"
+msgstr ""
+
+#: src/i18n.rs:112 src/i18n.rs:113
+msgid "{n} photo"
+msgid_plural "{n} photos"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/sync.rs:121
+msgid "Sync into it and keep what is already there"
+msgstr ""
+
+#: src/sync.rs:122
+msgid "Move it aside and start from an empty folder"
+msgstr ""
+
+#: src/sync.rs:160
+msgid ""
+"{folder} already holds {n} item, which syncing will merge with Proton Drive."
+msgid_plural ""
+"{folder} already holds {n} items, which syncing will merge with Proton Drive."
+msgstr[0] ""
+msgstr[1] ""
+
+#: ui/src/bridge.rs:175
+msgid "Starting…"
+msgstr ""
+
+#: ui/src/bridge.rs:217
+msgid "Confirm the code {code} in your browser"
+msgstr ""
+
+#: ui/src/bridge.rs:231
+msgid "Sign-in failed: {reason}"
+msgstr ""
+
+#: ui/src/bridge.rs:243
+msgid "Signed out"
+msgstr ""
+
+#: ui/src/bridge.rs:246
+msgid "Sign-out failed: {reason}"
+msgstr ""
+
+#: ui/src/bridge.rs:305
+msgid "{note}. Restart the sync daemon to use it."
+msgstr ""
+
+#: ui/src/bridge.rs:308
+msgid "Cannot change the folder: {reason}"
+msgstr ""
+
+#: ui/src/bridge.rs:315
+msgid "No sync folder yet. Run: kpdrive setup"
+msgstr ""
+
+#: ui/src/bridge.rs:319
+msgid "Cannot create the ignore file: {reason}"
+msgstr ""
+
+#: ui/src/bridge.rs:356
+msgid "Checking the account…"
+msgstr ""
+
+#: ui/src/bridge.rs:362
+msgid "Opening the browser…"
+msgstr ""
+
+#: ui/src/bridge.rs:368
+msgid "Signing out…"
+msgstr ""
+
+#: ui/src/bridge.rs:394
+msgid "Cannot read the log: {reason}"
+msgstr ""
+
+#: ui/src/bridge.rs:404 ui/src/bridge.rs:425 ui/src/bridge.rs:443
+msgid "Cannot save the setting: {reason}"
+msgstr ""
+
+#: ui/src/bridge.rs:412
+msgid "Proton Photos will be downloaded with the next sync"
+msgstr ""
+
+#: ui/src/bridge.rs:413
+msgid "Proton Photos will be left alone"
+msgstr ""
+
+#: ui/src/bridge.rs:430
+msgid "Storing everything from now on"
+msgstr ""
+
+#: ui/src/bridge.rs:431
+msgid "Storing warnings and errors from now on"
+msgstr ""
+
+#: ui/src/bridge.rs:432
+msgid "Storing errors from now on"
+msgstr ""
+
+#: ui/src/bridge.rs:448
+msgid "removed {n} log file older than {days} days"
+msgid_plural "removed {n} log files older than {days} days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: ui/src/bridge.rs:449
+msgid "Cannot prune the log: {reason}"
+msgstr ""
+
+#: ui/qml/main.qml:26
+msgid "Choose the Proton Drive folder"
+msgstr ""
+
+#: ui/qml/main.qml:38
+msgid "The folder is not empty"
+msgstr ""
+
+#: ui/qml/main.qml:73
+msgid "Opened {what}"
+msgstr ""
+
+#: ui/qml/main.qml:75
+msgid "Could not open {what} ({url})"
+msgstr ""
+
+#: ui/qml/main.qml:130
+msgid "Account"
+msgstr ""
+
+#: ui/qml/main.qml:131
+msgid "Logs"
+msgstr ""
+
+#: ui/qml/main.qml:162
+msgid "Not signed in"
+msgstr ""
+
+#: ui/qml/main.qml:169
+msgid "Signed in to Proton Drive"
+msgstr ""
+
+#: ui/qml/main.qml:170
+msgid "Sign in to sync this computer with Proton Drive."
+msgstr ""
+
+#: ui/qml/main.qml:190
+msgid "Storage"
+msgstr ""
+
+#: ui/qml/main.qml:218
+msgid "{used} of {total} used"
+msgstr ""
+
+#: ui/qml/main.qml:229
+msgid "Syncing to"
+msgstr ""
+
+#: ui/qml/main.qml:233
+msgid "nowhere yet"
+msgstr ""
+
+#: ui/qml/main.qml:239
+msgid "Change…"
+msgstr ""
+
+#: ui/qml/main.qml:245
+msgid "Ignore file…"
+msgstr ""
+
+#: ui/qml/main.qml:257
+msgid "Also download Proton Photos"
+msgstr ""
+
+#: ui/qml/main.qml:265
+msgid ""
+"Read-only: your timeline is copied into {folder}. Photos are never uploaded, "
+"changed or deleted in Proton Photos, and the copy is checked every half hour."
+msgstr ""
+
+#: ui/qml/main.qml:266
+msgid "your Pictures folder"
+msgstr ""
+
+#: ui/qml/main.qml:313
+msgid "Drive on the web"
+msgstr ""
+
+#: ui/qml/main.qml:318
+msgid "Proton account"
+msgstr ""
+
+#: ui/qml/main.qml:323
+msgid "Refresh"
+msgstr ""
+
+#: ui/qml/main.qml:329
+msgid "Sign in"
+msgstr ""
+
+#: ui/qml/main.qml:372
+msgid "Read the licence"
+msgstr ""
+
+#: ui/qml/main.qml:390
+msgid "Search the log"
+msgstr ""
+
+#: ui/qml/main.qml:435
+msgid "Copy"
+msgstr ""
+
+#: ui/qml/main.qml:440
+msgid "Select all"
+msgstr ""
+
+#: ui/qml/main.qml:457
+msgid "No lines match"
+msgstr ""
+
+#: ui/qml/main.qml:457
+msgid "Nothing logged yet"
+msgstr ""
+
+#: ui/qml/main.qml:459
+msgid "No line since the sync daemon started contains “{term}”."
+msgstr ""
+
+#: ui/qml/main.qml:460
+msgid "This shows what has happened since the sync daemon started."
+msgstr ""
+
+#: ui/qml/main.qml:468
+msgid "Keep logs for"
+msgstr ""
+
+#: ui/qml/main.qml:477
+msgid "days"
+msgstr ""
+
+#: ui/qml/main.qml:481
+msgid "Store"
+msgstr ""
+
+#: ui/qml/main.qml:488
+msgid "Warnings and errors"
+msgstr ""
+
+#: ui/qml/main.qml:489
+msgid "Everything"
+msgstr ""
+
+#: ui/qml/main.qml:490
+msgid "Errors only"
+msgstr ""
+
+#: ui/qml/main.qml:499
+msgid "{n} line"
+msgid_plural "{n} lines"
+msgstr[0] ""
+msgstr[1] ""

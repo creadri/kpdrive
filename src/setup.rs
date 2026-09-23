@@ -65,7 +65,7 @@ pub fn autostart() -> Result<PathBuf> {
     std::fs::write(
         &file,
         format!(
-            "[Desktop Entry]\nType=Application\nName=Proton Drive (kpdrive)\nComment=Sync Proton Drive with ~/ProtonDrive\nExec={} sync --watch\nIcon=folder-cloud\nTerminal=false\nX-KDE-autostart-after=panel\n",
+            "[Desktop Entry]\nType=Application\nName=Proton Drive (kpdrive)\nComment=Sync Proton Drive with ~/ProtonDrive\nComment[fr]=Synchroniser Proton Drive avec ~/ProtonDrive\nExec={} sync --watch\nIcon=folder-cloud\nTerminal=false\nX-KDE-autostart-after=panel\n",
             exe.display()
         ),
     )?;
@@ -129,7 +129,7 @@ pub fn launcher() -> Result<PathBuf> {
     std::fs::write(
         &file,
         format!(
-            "[Desktop Entry]\nType=Application\nName=Proton Drive\nGenericName=Cloud storage\nComment=Account, storage and activity log for Proton Drive\nExec={} %u\nIcon={}\nTerminal=false\nCategories=Utility;FileTools;\nStartupNotify=true\n",
+            "[Desktop Entry]\nType=Application\nName=Proton Drive\nGenericName=Cloud storage\nGenericName[fr]=Stockage en ligne\nComment=Account, storage and activity log for Proton Drive\nComment[fr]=Compte, stockage et journal d’activité pour Proton Drive\nExec={} %u\nIcon={}\nTerminal=false\nCategories=Utility;FileTools;\nStartupNotify=true\n",
             exe.display(),
             icon
         ),
@@ -158,7 +158,7 @@ pub fn servicemenu() -> Result<PathBuf> {
     std::fs::write(
         &file,
         format!(
-            "[Desktop Entry]\nType=Service\n# all files inherit from application/octet-stream\nMimeType=application/octet-stream;inode/directory;\nActions=kpdriveShare;\nX-KDE-MaxNumberOfUrls=1\n\n[Desktop Action kpdriveShare]\nName=Copy Proton Drive link\nIcon=emblem-shared\nExec={} share --copy %f\n",
+            "[Desktop Entry]\nType=Service\n# all files inherit from application/octet-stream\nMimeType=application/octet-stream;inode/directory;\nActions=kpdriveShare;\nX-KDE-MaxNumberOfUrls=1\n\n[Desktop Action kpdriveShare]\nName=Copy Proton Drive link\nName[fr]=Copier le lien Proton Drive\nIcon=emblem-shared\nExec={} share --copy %f\n",
             exe.display()
         ),
     )?;

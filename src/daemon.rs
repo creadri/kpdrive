@@ -95,10 +95,13 @@ impl ksni::Tray for Tray {
     fn tool_tip(&self) -> ksni::ToolTip {
         let s = self.snap.read().expect("snapshot lock");
         let description = match (s.signed_out, &s.last_error, s.syncing) {
-            (true, ..) => "Signed out. Sign in from the account window.".into(),
+            (true, ..) => crate::i18n::t("Signed out. Sign in from the account window.").into(),
             (_, Some(e), _) => e.clone(),
-            (_, None, true) => "Syncing…".into(),
-            (_, None, false) => format!("{} items in sync", s.entries.len()),
+            (_, None, true) => crate::i18n::t("Syncing…").into(),
+            (_, None, false) => crate::i18n::fill(
+                crate::i18n::tn("{n} item in sync", "{n} items in sync", s.entries.len() as u64),
+                &[("n", &s.entries.len().to_string())],
+            ),
         };
         ksni::ToolTip { title: "Proton Drive".into(), description, ..Default::default() }
     }
@@ -106,7 +109,7 @@ impl ksni::Tray for Tray {
         use ksni::menu::*;
         vec![
             StandardItem {
-                label: "Open folder".into(),
+                label: crate::i18n::t("Open folder").into(),
                 icon_name: "folder-open".into(),
                 activate: Box::new(|t: &mut Self| {
                     let root = t.snap.read().expect("snapshot lock").root.clone();
@@ -116,14 +119,14 @@ impl ksni::Tray for Tray {
             }
             .into(),
             StandardItem {
-                label: "Account and logs…".into(),
+                label: crate::i18n::t("Account and logs…").into(),
                 icon_name: "user-identity".into(),
                 activate: Box::new(|_: &mut Self| open_window()),
                 ..Default::default()
             }
             .into(),
             StandardItem {
-                label: "Sync now".into(),
+                label: crate::i18n::t("Sync now").into(),
                 icon_name: "view-refresh".into(),
                 activate: Box::new(|t: &mut Self| {
                     let _ = t.cmds.send(Cmd::Sync);
@@ -133,7 +136,7 @@ impl ksni::Tray for Tray {
             .into(),
             MenuItem::Separator,
             StandardItem {
-                label: "Quit".into(),
+                label: crate::i18n::t("Quit").into(),
                 icon_name: "application-exit".into(),
                 activate: Box::new(|t: &mut Self| {
                     let _ = t.cmds.send(Cmd::Quit);
@@ -266,7 +269,7 @@ impl Outage {
         }
         self.reported = true;
         self.last_report = Some(now);
-        Some(format!("{reason}; retrying"))
+        Some(crate::i18n::fill(crate::i18n::t("{reason}; retrying"), &[("reason", reason)]))
     }
 
     /// A pass succeeded. Gives the all-clear, if the outage was mentioned.
@@ -276,18 +279,23 @@ impl Outage {
             return None;
         }
         self.last_report = Some(now);
-        Some(format!("Proton Drive is reachable again, after {}", spell(now.duration_since(since))))
+        Some(crate::i18n::fill(
+            crate::i18n::t("Proton Drive is reachable again, after {duration}"),
+            &[("duration", &spell(now.duration_since(since)))],
+        ))
     }
 }
 
 /// A rough duration, in the largest unit that still says something.
 fn spell(d: std::time::Duration) -> String {
+    use crate::i18n::{fill, tn};
     let secs = d.as_secs();
-    match secs {
-        0..=90 => format!("{secs} seconds"),
-        91..=5400 => format!("{} minutes", secs / 60),
-        _ => format!("{} hours", secs / 3600),
-    }
+    let (template, n) = match secs {
+        0..=90 => (tn("{n} second", "{n} seconds", secs), secs),
+        91..=5400 => (tn("{n} minute", "{n} minutes", secs / 60), secs / 60),
+        _ => (tn("{n} hour", "{n} hours", secs / 3600), secs / 3600),
+    };
+    fill(template, &[("n", &n.to_string())])
 }
 
 /// What a daemon is doing, as anything outside it sees it. `running: false`
@@ -311,31 +319,41 @@ impl Report {
     /// One sentence, worded once, so the window and `kpdrive status` say the
     /// same thing about the same daemon.
     pub fn sentence(&self) -> String {
+        use crate::i18n::{fill, t, tn};
         if !self.running {
-            return "The sync daemon is not running. Start it with: kpdrive sync --watch".into();
+            return t("The sync daemon is not running. Start it with: kpdrive sync --watch").into();
         }
         if !self.answered {
-            return "A sync daemon is running but is too old to say what it is doing. Restart it.".into();
+            return t("A sync daemon is running but is too old to say what it is doing. Restart it.").into();
         }
         if self.signed_out {
-            return "Signed out. Syncing resumes once you sign in.".into();
+            return t("Signed out. Syncing resumes once you sign in.").into();
         }
         if let Some(e) = &self.error {
-            return match self.offline {
-                true => format!("{e}. Still trying."),
-                false => format!("Last sync failed: {e}"),
+            let line = match self.offline {
+                true => t("{reason}. Still trying."),
+                false => t("Last sync failed: {reason}"),
             };
+            return fill(line, &[("reason", e)]);
         }
         if self.syncing {
-            return "Syncing…".into();
+            return t("Syncing…").into();
         }
-        let items = format!("{} item{} in sync", self.items, if self.items == 1 { "" } else { "s" });
-        match self.last_sync.map(|t| now() - t) {
-            Some(secs) if secs < 90 => format!("{items}, checked just now"),
-            Some(secs) if secs < 5400 => format!("{items}, checked {} minutes ago", secs / 60),
-            Some(secs) => format!("{items}, checked {} hours ago", secs / 3600),
-            None => items,
-        }
+        let items = fill(
+            tn("{n} item in sync", "{n} items in sync", self.items as u64),
+            &[("n", &self.items.to_string())],
+        );
+        let ago = match self.last_sync.map(|t| now() - t) {
+            None => return items,
+            Some(secs) if secs < 90 => t("just now").into(),
+            Some(secs) if secs < 5400 => {
+                fill(tn("{n} minute ago", "{n} minutes ago", (secs / 60) as u64), &[("n", &(secs / 60).to_string())])
+            }
+            Some(secs) => {
+                fill(tn("{n} hour ago", "{n} hours ago", (secs / 3600) as u64), &[("n", &(secs / 3600).to_string())])
+            }
+        };
+        fill(t("{items}, checked {ago}"), &[("items", &items), ("ago", &ago)])
     }
 }
 
@@ -552,7 +570,7 @@ where
                     signed_out = false;
                     failures = 0;
                     crate::log::write("INFO", "signed in again; syncing resumed");
-                    notify("Signed in again. Syncing resumed.");
+                    notify(crate::i18n::t("Signed in again. Syncing resumed."));
                 }
                 Err(_) => {
                     // Still nothing. Wait for a sign-in, quietly, but stay as
@@ -606,7 +624,7 @@ where
                 Err(_) => {
                     signed_out = true;
                     crate::log::warn("signed out elsewhere; waiting for a sign-in");
-                    notify("Signed out. Sign in from the account window to resume syncing.");
+                    notify(crate::i18n::t("Signed out. Sign in from the account window to resume syncing."));
                     continue;
                 }
             },
@@ -639,7 +657,7 @@ where
                     crate::log::warn(&line);
                     notify(&line);
                 }
-                None if failures > 0 => notify("Sync resumed"),
+                None if failures > 0 => notify(crate::i18n::t("Sync resumed")),
                 None => {}
             }
             failures = 0;
@@ -655,7 +673,10 @@ where
                     Ok(Some((0, _))) => {}
                     Ok(Some((n, dest))) => {
                         crate::log::write("INFO", &format!("{n} photo(s) into {}", dest.display()));
-                        notify(&format!("{n} photo(s) downloaded"));
+                        notify(&crate::i18n::fill(
+                            crate::i18n::tn("{n} photo downloaded", "{n} photos downloaded", n as u64),
+                            &[("n", &n.to_string())],
+                        ));
                     }
                     // Photos are a side errand: a failure there says nothing
                     // about the folder, which has already synced.

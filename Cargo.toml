@@ -9,6 +9,7 @@ description = "Proton Drive sync client for KDE Plasma"
 license = "GPL-3.0-or-later"
 
 [dependencies]
+gettext = "0.4"
 aes-gcm = "0.11"
 anyhow = "1.0.104"
 base64 = "0.23.1"

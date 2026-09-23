@@ -22,6 +22,8 @@ BuildRequires:  cmake
 BuildRequires:  extra-cmake-modules
 # rustls builds AWS-LC, which is C and drives its own cmake/perl steps.
 BuildRequires:  perl-interpreter
+# msgfmt, which compiles the translation catalogs into the binaries
+BuildRequires:  gettext
 BuildRequires:  qt6-qtbase-devel
 BuildRequires:  qt6-qtdeclarative-devel
 BuildRequires:  kf6-kcoreaddons-devel
