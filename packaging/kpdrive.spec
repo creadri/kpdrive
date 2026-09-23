@@ -124,27 +124,24 @@ cargo test --release --workspace --offline --locked
 %{_datadir}/kio/servicemenus/kpdrive-share.desktop
 
 %changelog
+* Wed Sep 23 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.4.1-1
+- No changes, changes are limited to dev build and package info
+
 * Wed Sep 23 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.4.0-1
-- adding script to increase version release due to lazyness
-- Twenty-four languages, and count them correctly
-- Tell translators what the ambiguous fragments mean
-- Speak French, and whatever else anyone writes a catalog for
-- rewrite readme
-- Rewrite the photos plan after review
-- Name the photo settings as the README specifies, and plan ingestion
-- Let the sync daemon bring down Proton Photos too
-- Open the account window from the tray icon
+- Localizations with AI translated text
+- Integrate photos in UI and main daemon
+- Photos timeline in read-only, Photos ingestion Folder
+- Open account window from double clicking on tray icon
+- Readme rewritten
 
 * Mon Sep 21 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.3.0-1
-- updating version
 - Ask before rm trashes something, unless told not to
 - Report losing the network once, not every thirty seconds
 - Show only this run's log, newest first
 - Keep the daemon and the window in step about the session
-- install instruction & screenshot
+- Better install instructionss
 
 * Sun Sep 20 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.2.0-1
-- changing to verison 0.2.0
 - Ask what to do about a sync folder that already has files
 - Let the window choose which log levels are stored
 - Show the newest hundred log lines

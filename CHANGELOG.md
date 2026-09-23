@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 - 2026-09-23
+
+- No changes, changes are limited to dev build and package info
+
 ## 0.4.0 - 2026-09-23
 
 - Localizations with AI translated text
