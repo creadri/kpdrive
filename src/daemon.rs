@@ -269,6 +269,7 @@ impl Outage {
         }
         self.reported = true;
         self.last_report = Some(now);
+        // TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no route"
         Some(crate::i18n::fill(crate::i18n::t("{reason}; retrying"), &[("reason", reason)]))
     }
 
@@ -345,6 +346,7 @@ impl Report {
         );
         let ago = match self.last_sync.map(|t| now() - t) {
             None => return items,
+            // TRANSLATORS: how long ago the last sync ran; fills {ago} below
             Some(secs) if secs < 90 => t("just now").into(),
             Some(secs) if secs < 5400 => {
                 fill(tn("{n} minute ago", "{n} minutes ago", (secs / 60) as u64), &[("n", &(secs / 60).to_string())])
@@ -353,6 +355,7 @@ impl Report {
                 fill(tn("{n} hour ago", "{n} hours ago", (secs / 3600) as u64), &[("n", &(secs / 3600).to_string())])
             }
         };
+        // TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes ago"
         fill(t("{items}, checked {ago}"), &[("items", &items), ("ago", &ago)])
     }
 }

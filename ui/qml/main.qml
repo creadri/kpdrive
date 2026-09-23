@@ -127,7 +127,9 @@ Kirigami.ApplicationWindow {
                 id: tabs
                 Layout.fillWidth: true
 
+                // TRANSLATORS: tab label, the page showing the signed-in account
                 Controls.TabButton { text: backend.i18n("Account") }
+                // TRANSLATORS: tab label, the page showing the activity log
                 Controls.TabButton { text: backend.i18n("Logs") }
             }
 
@@ -187,6 +189,7 @@ Kirigami.ApplicationWindow {
                         spacing: Kirigami.Units.smallSpacing
 
                         Controls.Label {
+                            // TRANSLATORS: heading above the bar showing how much of the account is used
                             text: backend.i18n("Storage")
                             font.bold: true
                         }
@@ -226,6 +229,7 @@ Kirigami.ApplicationWindow {
                             Layout.topMargin: Kirigami.Units.largeSpacing
                             spacing: Kirigami.Units.smallSpacing
 
+                            // TRANSLATORS: label before the path of the sync folder, as in "Syncing to /home/you/ProtonDrive"
                             Controls.Label { text: backend.i18n("Syncing to"); opacity: 0.7 }
 
                             Controls.Label {
@@ -236,12 +240,14 @@ Kirigami.ApplicationWindow {
                             }
 
                             Controls.Button {
+                                // TRANSLATORS: button that opens a folder picker to sync somewhere else
                                 text: backend.i18n("Change…")
                                 icon.name: "folder-sync"
                                 onClicked: folderDialog.open()
                             }
 
                             Controls.Button {
+                                // TRANSLATORS: button that opens .protonignore, the list of paths sync leaves alone
                                 text: backend.i18n("Ignore file…")
                                 icon.name: "document-edit"
                                 onClicked: backend.openIgnoreFile()
@@ -320,6 +326,7 @@ Kirigami.ApplicationWindow {
                             onClicked: root.open("https://account.proton.me/", "your Proton account in your browser")
                         }
                         Controls.Button {
+                            // TRANSLATORS: button that reloads the account details from Proton
                             text: backend.i18n("Refresh")
                             icon.name: "view-refresh"
                             enabled: backend.loggedIn && !backend.busy
@@ -432,11 +439,13 @@ Kirigami.ApplicationWindow {
                                 Controls.Menu {
                                     id: logMenu
                                     Controls.MenuItem {
+                                        // TRANSLATORS: right-click menu item, copies the selected log text
                                         text: backend.i18n("Copy")
                                         enabled: logView.selectedText.length > 0
                                         onTriggered: logView.copy()
                                     }
                                     Controls.MenuItem {
+                                        // TRANSLATORS: right-click menu item, selects the whole log view
                                         text: backend.i18n("Select all")
                                         onTriggered: logView.selectAll()
                                     }
@@ -465,6 +474,7 @@ Kirigami.ApplicationWindow {
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
 
+                        // TRANSLATORS: start of "Keep logs for [30] days"; the number and "days" follow
                         Controls.Label { text: backend.i18n("Keep logs for") }
 
                         Controls.SpinBox {
@@ -474,10 +484,12 @@ Kirigami.ApplicationWindow {
                             onValueModified: backend.setRetention(value)
                         }
 
+                        // TRANSLATORS: end of "Keep logs for [30] days"
                         Controls.Label { text: backend.i18n("days") }
 
                         Item { width: Kirigami.Units.largeSpacing }
 
+                        // TRANSLATORS: verb, label before a dropdown choosing which log levels are written to disk
                         Controls.Label { text: backend.i18n("Store") }
 
                         Controls.ComboBox {
@@ -485,8 +497,11 @@ Kirigami.ApplicationWindow {
                             textRole: "text"
                             valueRole: "value"
                             model: [
+                                // TRANSLATORS: dropdown choice, store warnings and errors only
                                 { text: backend.i18n("Warnings and errors"), value: "WARN" },
+                                // TRANSLATORS: dropdown choice, store every log line
                                 { text: backend.i18n("Everything"), value: "INFO" },
+                                // TRANSLATORS: dropdown choice, store errors only
                                 { text: backend.i18n("Errors only"), value: "ERROR" },
                             ]
                             currentIndex: Math.max(0, indexOfValue(backend.logLevel))
