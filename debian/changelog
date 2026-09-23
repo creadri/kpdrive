@@ -1,6 +1,62 @@
+kpdrive (0.4.0) unstable; urgency=medium
+
+  * adding script to increase version release due to lazyness
+  * Twenty-four languages, and count them correctly
+  * Tell translators what the ambiguous fragments mean
+  * Speak French, and whatever else anyone writes a catalog for
+  * rewrite readme
+  * Rewrite the photos plan after review
+  * Name the photo settings as the README specifies, and plan ingestion
+  * Let the sync daemon bring down Proton Photos too
+  * Open the account window from the tray icon
+
+ -- Adrien Nelis <github.com.daybed777@passmail.net>  Wed, 23 Sep 2026 14:00:00 +0200
+
+kpdrive (0.3.0) unstable; urgency=medium
+
+  * updating version
+  * Ask before rm trashes something, unless told not to
+  * Report losing the network once, not every thirty seconds
+  * Show only this run's log, newest first
+  * Keep the daemon and the window in step about the session
+  * install instruction & screenshot
+
+ -- Adrien Nelis <github.com.daybed777@passmail.net>  Mon, 21 Sep 2026 14:00:00 +0200
+
+kpdrive (0.2.0) unstable; urgency=medium
+
+  * changing to verison 0.2.0
+  * Ask what to do about a sync folder that already has files
+  * Let the window choose which log levels are stored
+  * Show the newest hundred log lines
+  * Make the log text selectable
+  * Stop logging a warning when there is no .protonignore
+  * Push a folder's changed files concurrently
+  * Sync from the event stream instead of walking the tree
+  * Speed: parallel transfers, shareable API client, parallel walk, inotify
+  * Performance plan, with the measurements behind it
+  * changing icon
+  * added fedora update ca fix compiling issues
+
+ -- Adrien Nelis <github.com.daybed777@passmail.net>  Sun, 20 Sep 2026 14:00:00 +0200
+
 kpdrive (0.1.0) unstable; urgency=medium
 
-  * Initial packaging. The release workflow rewrites this version from the
-    git tag, so editing it by hand is not needed.
+  * Fix the Debian CI job and make it catch bad package names
+  * readme & icon change
+  * Replace the icon with a pure-vector one
+  * changing readme
+  * Build RPMs for two Fedoras and DEBs for Debian
+  * Package as RPMs and release from version tags
+  * Configurable sync folder and .protonignore
+  * Account window, activity log, and GPL-3.0-or-later
+  * Photos: download the timeline
+  * Public links: share/unshare plus a Dolphin menu entry
+  * Conflicts: keep both versions instead of stalling
+  * KDE integration: daemon with tray and status socket, setup, Dolphin
+    overlay plugin
+  * Uploads and two-way sync
+  * Proton Drive client skeleton: browser login, session in KWallet, ls and
+    get
 
- -- Adrien Nelis <adrien.nelis@otterit.be>  Sun, 20 Sep 2026 00:00:00 +0000
+ -- Adrien Nelis <github.com.daybed777@passmail.net>  Sun, 20 Sep 2026 14:00:00 +0200

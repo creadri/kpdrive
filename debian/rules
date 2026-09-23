@@ -21,6 +21,8 @@ override_dh_auto_install:
 	install -Dpm0755 target/release/kpdrive-ui debian/tmp/usr/bin/kpdrive-ui
 	install -Dpm0644 packaging/be.otterit.kpdrive.desktop \
 	        debian/tmp/usr/share/applications/be.otterit.kpdrive.desktop
+	install -Dpm0644 packaging/be.otterit.kpdrive.metainfo.xml \
+	        debian/tmp/usr/share/metainfo/be.otterit.kpdrive.metainfo.xml
 	install -Dpm0644 packaging/kpdrive-share.desktop \
 	        debian/tmp/usr/share/kio/servicemenus/kpdrive-share.desktop
 	install -Dpm0644 assets/icon.svg \

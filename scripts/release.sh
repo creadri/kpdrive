@@ -20,6 +20,13 @@ git rev-parse -q --verify "refs/tags/v$version" >/dev/null && {
 sed -i "0,/^version = \".*\"/s//version = \"$version\"/" Cargo.toml ui/Cargo.toml
 cargo update --workspace --offline --quiet
 
+# The draft comes from commit subjects; say what changed for users instead.
+scripts/changelog-update.sh "$version"
+echo "Review the $version section of CHANGELOG.md, then press Enter."
+echo "Ctrl-C aborts; git checkout . undoes the version bump."
+read -r
+scripts/changelog.sh
+
 git commit -qam "Release v$version"
 git tag -a "v$version" -m "kpdrive $version"
 echo "committed and tagged v$version. Push it: git push origin $(git branch --show-current) v$version"

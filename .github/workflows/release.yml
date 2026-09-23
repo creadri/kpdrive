@@ -62,7 +62,8 @@ jobs:
             git ca-certificates rust cargo gcc-c++ cmake extra-cmake-modules lld perl-interpreter gettext \
             qt6-qtbase-devel qt6-qtdeclarative-devel \
             kf6-kcoreaddons-devel kf6-kio-devel kf6-kirigami-devel \
-            rpm-build tar gzip
+            cargo-rpm-macros desktop-file-utils libappstream-glib \
+            rpm-build tar gzip xz
 
           # The base image ships no trust bundle, so git over https fails.
           update-ca-trust
@@ -89,14 +90,25 @@ jobs:
           git config --global --add safe.directory "$PWD"
           git archive --format=tar.gz --prefix="kpdrive-$VERSION/" \
             -o ~/rpmbuild/SOURCES/"kpdrive-$VERSION.tar.gz" HEAD
+          # The spec builds offline from this, as Koji and COPR would. It is
+          # attached to the release, where the spec's Source1 URL points.
+          vendor=$(mktemp -d)
+          git archive HEAD | tar -x -C "$vendor"
+          (cd "$vendor" && cargo vendor --locked vendor > cargo-vendor-config.toml \
+             && tar -cJf ~/rpmbuild/SOURCES/"kpdrive-$VERSION-vendor.tar.xz" \
+                  vendor cargo-vendor-config.toml)
           rpmbuild -ba --define "kpdrive_version $VERSION" packaging/kpdrive.spec
           find ~/rpmbuild/RPMS ~/rpmbuild/SRPMS -name '*.rpm' -exec cp {} dist/ \;
+          cp ~/rpmbuild/SOURCES/"kpdrive-$VERSION-vendor.tar.xz" dist/
           ls -la dist/
 
       - uses: actions/upload-artifact@v7
         with:
           name: rpm-fc${{ matrix.fedora }}
-          path: dist/*.rpm
+          # Both Fedora jobs make the vendor tarball; the release keeps one.
+          path: |
+            dist/*.rpm
+            dist/*-vendor.tar.xz
 
   deb:
     name: DEB (Debian ${{ matrix.debian }})

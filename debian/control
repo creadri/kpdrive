@@ -1,7 +1,7 @@
 Source: kpdrive
 Section: utils
 Priority: optional
-Maintainer: Adrien Nelis <adrien.nelis@otterit.be>
+Maintainer: Adrien Nelis <github.com.daybed777@passmail.net>
 # rustc and cargo are deliberately absent: Debian stable ships Rust 1.85 while
 # some dependencies need 1.92, so the workflow installs a toolchain instead.
 Build-Depends: debhelper-compat (= 13),
