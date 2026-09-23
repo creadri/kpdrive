@@ -10,6 +10,7 @@ Simple KDE Proton Drive sync Client designed to have a simple solution.
 - **Photos Sync** with some caviats
 - **KDE** and **Dolphin** integration
 - **.protonignore** with same syntax as .gitignore to ignore files to upload. .protonignore is still pushed though.
+- **Localization** support
 
 ## Design decisions
 

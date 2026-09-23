@@ -1,434 +1,406 @@
-# French translation for kpdrive.
+# Korean translation for kpdrive.
 # Copyright (C) kpdrive contributors
 # This file is distributed under the same licence as kpdrive, GPL-3.0-or-later.
 #
 # Machine translation. It is complete and the plural forms are right, but no
-# speaker of French has read it. Corrections are welcome and expected.
+# speaker of Korean has read it. Corrections are welcome and expected.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: kpdrive 0.3.0\n"
 "Report-Msgid-Bugs-To: https://github.com/creadri/kpdrive/issues\n"
 "POT-Creation-Date: 2026-09-23 16:05+0200\n"
-"PO-Revision-Date: 2026-09-23 15:51+0200\n"
+"PO-Revision-Date: 2026-09-23 16:05+0200\n"
 "Last-Translator: machine translation, needs review by a speaker\n"
-"Language-Team: fr\n"
-"Language: fr\n"
+"Language-Team: ko\n"
+"Language: ko\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
 
 #: src/daemon.rs:98
 msgid "Signed out. Sign in from the account window."
-msgstr "Déconnecté. Connectez-vous depuis la fenêtre du compte."
+msgstr "로그아웃되었습니다. 계정 창에서 로그인하십시오."
 
 #: src/daemon.rs:100 src/daemon.rs:341
 msgid "Syncing…"
-msgstr "Synchronisation…"
+msgstr "동기화 중…"
 
 #: src/daemon.rs:102 src/daemon.rs:344
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
-msgstr[0] "{n} élément synchronisé"
-msgstr[1] "{n} éléments synchronisés"
+msgstr[0] "동기화 중인 항목 {n}개"
 
 #: src/daemon.rs:112 ui/qml/main.qml:313
 msgid "Open folder"
-msgstr "Ouvrir le dossier"
+msgstr "폴더 열기"
 
 #: src/daemon.rs:122
 msgid "Account and logs…"
-msgstr "Compte et journaux…"
+msgstr "계정 및 로그…"
 
 #: src/daemon.rs:129 ui/qml/main.qml:291
 msgid "Sync now"
-msgstr "Synchroniser maintenant"
+msgstr "지금 동기화"
 
 #: src/daemon.rs:139
 msgid "Quit"
-msgstr "Quitter"
+msgstr "종료"
 
 #. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no route"
 #: src/daemon.rs:273
 msgid "{reason}; retrying"
-msgstr "{reason} ; nouvelle tentative en cours"
+msgstr "{reason}. 다시 시도합니다"
 
 #: src/daemon.rs:284
 msgid "Proton Drive is reachable again, after {duration}"
-msgstr "Proton Drive est de nouveau joignable, après {duration}"
+msgstr "{duration} 만에 Proton Drive에 다시 연결되었습니다"
 
 #: src/daemon.rs:295
 msgid "{n} second"
 msgid_plural "{n} seconds"
-msgstr[0] "{n} seconde"
-msgstr[1] "{n} secondes"
+msgstr[0] "{n}초"
 
 #: src/daemon.rs:296
 msgid "{n} minute"
 msgid_plural "{n} minutes"
-msgstr[0] "{n} minute"
-msgstr[1] "{n} minutes"
+msgstr[0] "{n}분"
 
 #: src/daemon.rs:297
 msgid "{n} hour"
 msgid_plural "{n} hours"
-msgstr[0] "{n} heure"
-msgstr[1] "{n} heures"
+msgstr[0] "{n}시간"
 
 #: src/daemon.rs:325
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
-msgstr ""
-"Le service de synchronisation n’est pas lancé. Démarrez-le avec : kpdrive "
-"sync --watch"
+msgstr "동기화 데몬이 실행 중이 아닙니다. 다음 명령으로 시작하십시오: kpdrive sync --watch"
 
 #: src/daemon.rs:328
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
-msgstr ""
-"Un service de synchronisation est lancé, mais il est trop ancien pour dire "
-"ce qu’il fait. Redémarrez-le."
+msgstr "동기화 데몬이 실행 중이지만 버전이 오래되어 진행 상태를 알릴 수 없습니다. 다시 시작하십시오."
 
 #: src/daemon.rs:331
 msgid "Signed out. Syncing resumes once you sign in."
-msgstr ""
-"Déconnecté. La synchronisation reprendra dès que vous vous reconnecterez."
+msgstr "로그아웃되었습니다. 로그인하면 동기화를 재개합니다."
 
 #: src/daemon.rs:335
 msgid "{reason}. Still trying."
-msgstr "{reason}. Nouvelle tentative en cours."
+msgstr "{reason}. 계속 시도합니다."
 
 #: src/daemon.rs:336
 msgid "Last sync failed: {reason}"
-msgstr "Échec de la dernière synchronisation : {reason}"
+msgstr "마지막 동기화 실패: {reason}"
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
 #: src/daemon.rs:350
 msgid "just now"
-msgstr "à l’instant"
+msgstr "방금 전"
 
 #: src/daemon.rs:352
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
-msgstr[0] "il y a {n} minute"
-msgstr[1] "il y a {n} minutes"
+msgstr[0] "{n}분 전"
 
 #: src/daemon.rs:355
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
-msgstr[0] "il y a {n} heure"
-msgstr[1] "il y a {n} heures"
+msgstr[0] "{n}시간 전"
 
 #. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes ago"
 #: src/daemon.rs:359
 msgid "{items}, checked {ago}"
-msgstr "{items}, vérifié {ago}"
+msgstr "{items}, {ago} 확인함"
 
 #: src/daemon.rs:576
 msgid "Signed in again. Syncing resumed."
-msgstr "Reconnecté. La synchronisation a repris."
+msgstr "다시 로그인했습니다. 동기화를 재개했습니다."
 
 #: src/daemon.rs:630
 msgid "Signed out. Sign in from the account window to resume syncing."
-msgstr ""
-"Déconnecté. Connectez-vous depuis la fenêtre du compte pour reprendre la "
-"synchronisation."
+msgstr "로그아웃되었습니다. 동기화를 재개하려면 계정 창에서 로그인하십시오."
 
 #: src/daemon.rs:663
 msgid "Sync resumed"
-msgstr "Synchronisation reprise"
+msgstr "동기화 재개됨"
 
 #: src/daemon.rs:680
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
-msgstr[0] "{n} photo téléchargée"
-msgstr[1] "{n} photos téléchargées"
+msgstr[0] "사진 {n}장을 다운로드했습니다"
 
 #: src/i18n.rs:111 ui/qml/main.qml:336
 msgid "Sign out"
-msgstr "Se déconnecter"
+msgstr "로그아웃"
 
 #: src/i18n.rs:112 src/i18n.rs:113
 msgid "{n} photo"
 msgid_plural "{n} photos"
-msgstr[0] "{n} photo"
-msgstr[1] "{n} photos"
+msgstr[0] "사진 {n}장"
 
 #: src/sync.rs:121
 msgid "Sync into it and keep what is already there"
-msgstr "Synchroniser dedans et conserver ce qui s’y trouve déjà"
+msgstr "이 폴더에 동기화하고 기존 내용 유지"
 
 #: src/sync.rs:122
 msgid "Move it aside and start from an empty folder"
-msgstr "Le déplacer et repartir d’un dossier vide"
+msgstr "폴더를 옮겨 두고 빈 폴더에서 시작"
 
 #: src/sync.rs:160
 msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
 "{folder} already holds {n} items, which syncing will merge with Proton Drive."
-msgstr[0] ""
-"{folder} contient déjà {n} élément, que la synchronisation fusionnera avec "
-"Proton Drive."
-msgstr[1] ""
-"{folder} contient déjà {n} éléments, que la synchronisation fusionnera avec "
-"Proton Drive."
+msgstr[0] "{folder} 폴더에 이미 항목 {n}개가 있으며, 동기화하면 Proton Drive와 병합됩니다."
 
 #: ui/src/bridge.rs:175
 msgid "Starting…"
-msgstr "Démarrage…"
+msgstr "시작하는 중…"
 
 #: ui/src/bridge.rs:217
 msgid "Confirm the code {code} in your browser"
-msgstr "Confirmez le code {code} dans votre navigateur"
+msgstr "브라우저에서 다음 코드를 확인하십시오: {code}"
 
 #: ui/src/bridge.rs:231
 msgid "Sign-in failed: {reason}"
-msgstr "Échec de la connexion : {reason}"
+msgstr "로그인 실패: {reason}"
 
 #: ui/src/bridge.rs:243
 msgid "Signed out"
-msgstr "Déconnecté"
+msgstr "로그아웃됨"
 
 #: ui/src/bridge.rs:246
 msgid "Sign-out failed: {reason}"
-msgstr "Échec de la déconnexion : {reason}"
+msgstr "로그아웃 실패: {reason}"
 
 #: ui/src/bridge.rs:305
 msgid "{note}. Restart the sync daemon to use it."
-msgstr "{note}. Redémarrez le service de synchronisation pour l’utiliser."
+msgstr "{note}. 사용하려면 동기화 데몬을 다시 시작하십시오."
 
 #: ui/src/bridge.rs:308
 msgid "Cannot change the folder: {reason}"
-msgstr "Impossible de changer de dossier : {reason}"
+msgstr "폴더를 변경할 수 없습니다: {reason}"
 
 #: ui/src/bridge.rs:315
 msgid "No sync folder yet. Run: kpdrive setup"
-msgstr ""
-"Aucun dossier de synchronisation pour l’instant. Lancez : kpdrive setup"
+msgstr "아직 동기화 폴더가 없습니다. 다음을 실행하십시오: kpdrive setup"
 
 #: ui/src/bridge.rs:319
 msgid "Cannot create the ignore file: {reason}"
-msgstr "Impossible de créer le fichier d’exclusion : {reason}"
+msgstr "무시 파일을 만들 수 없습니다: {reason}"
 
 #: ui/src/bridge.rs:356
 msgid "Checking the account…"
-msgstr "Vérification du compte…"
+msgstr "계정 확인 중…"
 
 #: ui/src/bridge.rs:362
 msgid "Opening the browser…"
-msgstr "Ouverture du navigateur…"
+msgstr "브라우저 여는 중…"
 
 #: ui/src/bridge.rs:368
 msgid "Signing out…"
-msgstr "Déconnexion…"
+msgstr "로그아웃하는 중…"
 
 #: ui/src/bridge.rs:394
 msgid "Cannot read the log: {reason}"
-msgstr "Impossible de lire le journal : {reason}"
+msgstr "로그를 읽을 수 없습니다: {reason}"
 
 #: ui/src/bridge.rs:404 ui/src/bridge.rs:425 ui/src/bridge.rs:443
 msgid "Cannot save the setting: {reason}"
-msgstr "Impossible d’enregistrer le réglage : {reason}"
+msgstr "설정을 저장할 수 없습니다: {reason}"
 
 #: ui/src/bridge.rs:412
 msgid "Proton Photos will be downloaded with the next sync"
-msgstr "Proton Photos sera téléchargé à la prochaine synchronisation"
+msgstr "다음 동기화에서 Proton Photos를 내려받습니다"
 
 #: ui/src/bridge.rs:413
 msgid "Proton Photos will be left alone"
-msgstr "Proton Photos ne sera pas téléchargé"
+msgstr "Proton Photos는 동기화하지 않습니다"
 
 #: ui/src/bridge.rs:430
 msgid "Storing everything from now on"
-msgstr "Tout sera désormais conservé"
+msgstr "이제부터 모든 항목을 기록합니다"
 
 #: ui/src/bridge.rs:431
 msgid "Storing warnings and errors from now on"
-msgstr "Les avertissements et les erreurs seront désormais conservés"
+msgstr "이제부터 경고와 오류를 기록합니다"
 
 #: ui/src/bridge.rs:432
 msgid "Storing errors from now on"
-msgstr "Seules les erreurs seront désormais conservées"
+msgstr "이제부터 오류만 기록합니다"
 
 #: ui/src/bridge.rs:448
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
-msgstr[0] "{n} fichier de journal de plus de {days} jours supprimé"
-msgstr[1] "{n} fichiers de journal de plus de {days} jours supprimés"
+msgstr[0] "{days}일이 지난 로그 파일 {n}개를 삭제했습니다"
 
 #: ui/src/bridge.rs:449
 msgid "Cannot prune the log: {reason}"
-msgstr "Impossible de purger le journal : {reason}"
+msgstr "로그를 정리할 수 없습니다: {reason}"
 
 #: ui/qml/main.qml:26
 msgid "Choose the Proton Drive folder"
-msgstr "Choisir le dossier Proton Drive"
+msgstr "Proton Drive 폴더 선택"
 
 #: ui/qml/main.qml:38
 msgid "The folder is not empty"
-msgstr "Le dossier n’est pas vide"
+msgstr "폴더가 비어 있지 않습니다"
 
 #: ui/qml/main.qml:73
 msgid "Opened {what}"
-msgstr "{what} ouvert"
+msgstr "다음을 열었습니다: {what}"
 
 #: ui/qml/main.qml:75
 msgid "Could not open {what} ({url})"
-msgstr "Impossible d’ouvrir {what} ({url})"
+msgstr "다음을 열 수 없습니다: {what} ({url})"
 
 #. TRANSLATORS: tab label, the page showing the signed-in account
 #: ui/qml/main.qml:131
 msgid "Account"
-msgstr "Compte"
+msgstr "계정"
 
 #. TRANSLATORS: tab label, the page showing the activity log
 #: ui/qml/main.qml:133
 msgid "Logs"
-msgstr "Journaux"
+msgstr "로그"
 
 #: ui/qml/main.qml:164
 msgid "Not signed in"
-msgstr "Non connecté"
+msgstr "로그인되지 않음"
 
 #: ui/qml/main.qml:171
 msgid "Signed in to Proton Drive"
-msgstr "Connecté à Proton Drive"
+msgstr "Proton Drive에 로그인됨"
 
 #: ui/qml/main.qml:172
 msgid "Sign in to sync this computer with Proton Drive."
-msgstr "Connectez-vous pour synchroniser cet ordinateur avec Proton Drive."
+msgstr "이 컴퓨터를 Proton Drive와 동기화하려면 로그인하십시오."
 
 #. TRANSLATORS: heading above the bar showing how much of the account is used
 #: ui/qml/main.qml:193
 msgid "Storage"
-msgstr "Stockage"
+msgstr "저장 공간"
 
 #: ui/qml/main.qml:221
 msgid "{used} of {total} used"
-msgstr "{used} utilisés sur {total}"
+msgstr "{total} 중 {used} 사용"
 
 #. TRANSLATORS: label before the path of the sync folder, as in "Syncing to /home/you/ProtonDrive"
 #: ui/qml/main.qml:233
 msgid "Syncing to"
-msgstr "Synchronisé vers"
+msgstr "동기화 위치"
 
 #: ui/qml/main.qml:237
 msgid "nowhere yet"
-msgstr "nulle part pour l’instant"
+msgstr "아직 없음"
 
 #. TRANSLATORS: button that opens a folder picker to sync somewhere else
 #: ui/qml/main.qml:244
 msgid "Change…"
-msgstr "Changer…"
+msgstr "변경…"
 
 #. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves alone
 #: ui/qml/main.qml:251
 msgid "Ignore file…"
-msgstr "Fichier d’exclusion…"
+msgstr "무시 파일…"
 
 #: ui/qml/main.qml:263
 msgid "Also download Proton Photos"
-msgstr "Télécharger également Proton Photos"
+msgstr "Proton Photos도 함께 내려받기"
 
 #: ui/qml/main.qml:271
 msgid ""
 "Read-only: your timeline is copied into {folder}. Photos are never uploaded, "
 "changed or deleted in Proton Photos, and the copy is checked every half hour."
-msgstr ""
-"Lecture seule : votre chronologie est copiée dans {folder}. Aucune photo "
-"n’est jamais envoyée, modifiée ou supprimée dans Proton Photos, et la copie "
-"est vérifiée toutes les demi-heures."
+msgstr "읽기 전용: 타임라인이 {folder} 위치로 복사됩니다. Proton Photos의 사진은 업로드, 변경, 삭제되지 않으며 복사본은 30분마다 확인됩니다."
 
 #: ui/qml/main.qml:272
 msgid "your Pictures folder"
-msgstr "votre dossier Images"
+msgstr "사진 폴더"
 
 #: ui/qml/main.qml:319
 msgid "Drive on the web"
-msgstr "Drive sur le web"
+msgstr "웹 Drive"
 
 #: ui/qml/main.qml:324
 msgid "Proton account"
-msgstr "Compte Proton"
+msgstr "Proton 계정"
 
 #. TRANSLATORS: button that reloads the account details from Proton
 #: ui/qml/main.qml:330
 msgid "Refresh"
-msgstr "Actualiser"
+msgstr "새로 고침"
 
 #: ui/qml/main.qml:336
 msgid "Sign in"
-msgstr "Se connecter"
+msgstr "로그인"
 
 #: ui/qml/main.qml:379
 msgid "Read the licence"
-msgstr "Lire la licence"
+msgstr "라이선스 보기"
 
 #: ui/qml/main.qml:397
 msgid "Search the log"
-msgstr "Rechercher dans le journal"
+msgstr "로그 검색"
 
 #. TRANSLATORS: right-click menu item, copies the selected log text
 #: ui/qml/main.qml:443
 msgid "Copy"
-msgstr "Copier"
+msgstr "복사"
 
 #. TRANSLATORS: right-click menu item, selects the whole log view
 #: ui/qml/main.qml:449
 msgid "Select all"
-msgstr "Tout sélectionner"
+msgstr "모두 선택"
 
 #: ui/qml/main.qml:466
 msgid "No lines match"
-msgstr "Aucune ligne ne correspond"
+msgstr "일치하는 줄 없음"
 
 #: ui/qml/main.qml:466
 msgid "Nothing logged yet"
-msgstr "Rien dans le journal pour l’instant"
+msgstr "아직 기록된 내용이 없습니다"
 
 #: ui/qml/main.qml:468
 msgid "No line since the sync daemon started contains “{term}”."
-msgstr "Aucune ligne depuis le démarrage du service ne contient « {term} »."
+msgstr "동기화 데몬이 시작된 이후 “{term}” 문자열이 포함된 줄이 없습니다."
 
 #: ui/qml/main.qml:469
 msgid "This shows what has happened since the sync daemon started."
-msgstr ""
-"Ceci montre ce qui s’est passé depuis le démarrage du service de "
-"synchronisation."
+msgstr "동기화 데몬이 시작된 이후에 일어난 일을 표시합니다."
 
 #. TRANSLATORS: start of "Keep logs for [30] days"; the number and "days" follow
 #: ui/qml/main.qml:478
 msgid "Keep logs for"
-msgstr "Conserver les journaux"
+msgstr "로그 보관 기간"
 
 #. TRANSLATORS: end of "Keep logs for [30] days"
 #: ui/qml/main.qml:488
 msgid "days"
-msgstr "jours"
+msgstr "일"
 
 #. TRANSLATORS: verb, label before a dropdown choosing which log levels are written to disk
 #: ui/qml/main.qml:493
 msgid "Store"
-msgstr "Conserver"
+msgstr "기록 대상"
 
 #. TRANSLATORS: dropdown choice, store warnings and errors only
 #: ui/qml/main.qml:501
 msgid "Warnings and errors"
-msgstr "Avertissements et erreurs"
+msgstr "경고와 오류"
 
 #. TRANSLATORS: dropdown choice, store every log line
 #: ui/qml/main.qml:503
 msgid "Everything"
-msgstr "Tout"
+msgstr "모든 항목"
 
 #. TRANSLATORS: dropdown choice, store errors only
 #: ui/qml/main.qml:505
 msgid "Errors only"
-msgstr "Erreurs uniquement"
+msgstr "오류만"
 
 #: ui/qml/main.qml:514
 msgid "{n} line"
 msgid_plural "{n} lines"
-msgstr[0] "{n} ligne"
-msgstr[1] "{n} lignes"
+msgstr[0] "{n}줄"

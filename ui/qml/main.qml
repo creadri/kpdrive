@@ -141,6 +141,12 @@ Kirigami.ApplicationWindow {
                 // ---- Account ------------------------------------------------
                 Item {
                 ColumnLayout {
+                    id: accountPage
+                    Timer {
+                        running: true; interval: 2500
+                        onTriggered: accountPage.grabToImage(function(r) { console.warn("PROBE saved=" + r.saveToFile("/tmp/claude-1000/-home-anelis-Projects-kpdrive/0909956e-d5a7-4976-96c5-469d585f9558/scratchpad/ar-account.png")); },
+                                                             Qt.size(accountPage.width * 2, accountPage.height * 2))
+                    }
                     anchors.fill: parent
                     anchors.margins: Kirigami.Units.gridUnit
                     spacing: Kirigami.Units.largeSpacing

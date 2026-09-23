@@ -8,5 +8,6 @@ pub mod drive;
 pub mod log;
 pub mod i18n;
 pub mod photos;
+pub mod plural;
 pub mod setup;
 pub mod sync;

@@ -1,0 +1,417 @@
+# Hindi translation for kpdrive.
+# Copyright (C) kpdrive contributors
+# This file is distributed under the same licence as kpdrive, GPL-3.0-or-later.
+#
+# Machine translation. It is complete and the plural forms are right, but no
+# speaker of Hindi has read it. Corrections are welcome and expected.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: kpdrive 0.3.0\n"
+"Report-Msgid-Bugs-To: https://github.com/creadri/kpdrive/issues\n"
+"POT-Creation-Date: 2026-09-23 16:05+0200\n"
+"PO-Revision-Date: 2026-09-23 16:05+0200\n"
+"Last-Translator: machine translation, needs review by a speaker\n"
+"Language-Team: hi\n"
+"Language: hi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/daemon.rs:98
+msgid "Signed out. Sign in from the account window."
+msgstr "साइन आउट हो गया। खाता विंडो से साइन इन करें।"
+
+#: src/daemon.rs:100 src/daemon.rs:341
+msgid "Syncing…"
+msgstr "सिंक हो रहा है…"
+
+#: src/daemon.rs:102 src/daemon.rs:344
+msgid "{n} item in sync"
+msgid_plural "{n} items in sync"
+msgstr[0] "{n} आइटम सिंक में है"
+msgstr[1] "{n} आइटम सिंक में हैं"
+
+#: src/daemon.rs:112 ui/qml/main.qml:313
+msgid "Open folder"
+msgstr "फ़ोल्डर खोलें"
+
+#: src/daemon.rs:122
+msgid "Account and logs…"
+msgstr "खाता और लॉग…"
+
+#: src/daemon.rs:129 ui/qml/main.qml:291
+msgid "Sync now"
+msgstr "अभी सिंक करें"
+
+#: src/daemon.rs:139
+msgid "Quit"
+msgstr "बाहर जाएँ"
+
+#. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no route"
+#: src/daemon.rs:273
+msgid "{reason}; retrying"
+msgstr "{reason}; पुनः प्रयास जारी"
+
+#: src/daemon.rs:284
+msgid "Proton Drive is reachable again, after {duration}"
+msgstr "{duration} के बाद Proton Drive फिर से उपलब्ध है"
+
+#: src/daemon.rs:295
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} सेकंड"
+msgstr[1] "{n} सेकंड"
+
+#: src/daemon.rs:296
+msgid "{n} minute"
+msgid_plural "{n} minutes"
+msgstr[0] "{n} मिनट"
+msgstr[1] "{n} मिनट"
+
+#: src/daemon.rs:297
+msgid "{n} hour"
+msgid_plural "{n} hours"
+msgstr[0] "{n} घंटा"
+msgstr[1] "{n} घंटे"
+
+#: src/daemon.rs:325
+msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
+msgstr "सिंक सेवा नहीं चल रही है। इसे इस तरह शुरू करें: kpdrive sync --watch"
+
+#: src/daemon.rs:328
+msgid ""
+"A sync daemon is running but is too old to say what it is doing. Restart it."
+msgstr "सिंक सेवा चल रही है, पर वह इतनी पुरानी है कि अपनी स्थिति नहीं बता सकती। इसे पुनः आरंभ करें।"
+
+#: src/daemon.rs:331
+msgid "Signed out. Syncing resumes once you sign in."
+msgstr "साइन आउट हो गया। साइन इन करते ही सिंक फिर से शुरू हो जाएगा।"
+
+#: src/daemon.rs:335
+msgid "{reason}. Still trying."
+msgstr "{reason}। प्रयास अब भी जारी है।"
+
+#: src/daemon.rs:336
+msgid "Last sync failed: {reason}"
+msgstr "पिछला सिंक विफल रहा: {reason}"
+
+#. TRANSLATORS: how long ago the last sync ran; fills {ago} below
+#: src/daemon.rs:350
+msgid "just now"
+msgstr "अभी-अभी"
+
+#: src/daemon.rs:352
+msgid "{n} minute ago"
+msgid_plural "{n} minutes ago"
+msgstr[0] "{n} मिनट पहले"
+msgstr[1] "{n} मिनट पहले"
+
+#: src/daemon.rs:355
+msgid "{n} hour ago"
+msgid_plural "{n} hours ago"
+msgstr[0] "{n} घंटा पहले"
+msgstr[1] "{n} घंटे पहले"
+
+#. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes ago"
+#: src/daemon.rs:359
+msgid "{items}, checked {ago}"
+msgstr "{items}, {ago} जाँचा गया"
+
+#: src/daemon.rs:576
+msgid "Signed in again. Syncing resumed."
+msgstr "फिर से साइन इन हो गया। सिंक फिर से शुरू हुआ।"
+
+#: src/daemon.rs:630
+msgid "Signed out. Sign in from the account window to resume syncing."
+msgstr "साइन आउट हो गया। सिंक फिर से शुरू करने के लिए खाता विंडो से साइन इन करें।"
+
+#: src/daemon.rs:663
+msgid "Sync resumed"
+msgstr "सिंक फिर से शुरू हुआ"
+
+#: src/daemon.rs:680
+msgid "{n} photo downloaded"
+msgid_plural "{n} photos downloaded"
+msgstr[0] "{n} फ़ोटो डाउनलोड हुई"
+msgstr[1] "{n} फ़ोटो डाउनलोड हुईं"
+
+#: src/i18n.rs:111 ui/qml/main.qml:336
+msgid "Sign out"
+msgstr "साइन आउट"
+
+#: src/i18n.rs:112 src/i18n.rs:113
+msgid "{n} photo"
+msgid_plural "{n} photos"
+msgstr[0] "{n} फ़ोटो"
+msgstr[1] "{n} फ़ोटो"
+
+#: src/sync.rs:121
+msgid "Sync into it and keep what is already there"
+msgstr "इसी में सिंक करें और जो पहले से है उसे रखें"
+
+#: src/sync.rs:122
+msgid "Move it aside and start from an empty folder"
+msgstr "इसे किनारे हटाकर खाली फ़ोल्डर से शुरू करें"
+
+#: src/sync.rs:160
+msgid ""
+"{folder} already holds {n} item, which syncing will merge with Proton Drive."
+msgid_plural ""
+"{folder} already holds {n} items, which syncing will merge with Proton Drive."
+msgstr[0] "{folder} में पहले से {n} आइटम है, जिसे सिंक Proton Drive के साथ मिला देगा।"
+msgstr[1] "{folder} में पहले से {n} आइटम हैं, जिन्हें सिंक Proton Drive के साथ मिला देगा।"
+
+#: ui/src/bridge.rs:175
+msgid "Starting…"
+msgstr "आरंभ हो रहा है…"
+
+#: ui/src/bridge.rs:217
+msgid "Confirm the code {code} in your browser"
+msgstr "अपने ब्राउज़र में कोड {code} की पुष्टि करें"
+
+#: ui/src/bridge.rs:231
+msgid "Sign-in failed: {reason}"
+msgstr "साइन इन विफल रहा: {reason}"
+
+#: ui/src/bridge.rs:243
+msgid "Signed out"
+msgstr "साइन आउट हो गया"
+
+#: ui/src/bridge.rs:246
+msgid "Sign-out failed: {reason}"
+msgstr "साइन आउट विफल रहा: {reason}"
+
+#: ui/src/bridge.rs:305
+msgid "{note}. Restart the sync daemon to use it."
+msgstr "{note}। इसका उपयोग करने के लिए सिंक सेवा पुनः आरंभ करें।"
+
+#: ui/src/bridge.rs:308
+msgid "Cannot change the folder: {reason}"
+msgstr "फ़ोल्डर नहीं बदला जा सका: {reason}"
+
+#: ui/src/bridge.rs:315
+msgid "No sync folder yet. Run: kpdrive setup"
+msgstr "अभी कोई सिंक फ़ोल्डर नहीं है। चलाएँ: kpdrive setup"
+
+#: ui/src/bridge.rs:319
+msgid "Cannot create the ignore file: {reason}"
+msgstr "अनदेखी फ़ाइल नहीं बनाई जा सकी: {reason}"
+
+#: ui/src/bridge.rs:356
+msgid "Checking the account…"
+msgstr "खाते की जाँच हो रही है…"
+
+#: ui/src/bridge.rs:362
+msgid "Opening the browser…"
+msgstr "ब्राउज़र खुल रहा है…"
+
+#: ui/src/bridge.rs:368
+msgid "Signing out…"
+msgstr "साइन आउट हो रहा है…"
+
+#: ui/src/bridge.rs:394
+msgid "Cannot read the log: {reason}"
+msgstr "लॉग नहीं पढ़ा जा सका: {reason}"
+
+#: ui/src/bridge.rs:404 ui/src/bridge.rs:425 ui/src/bridge.rs:443
+msgid "Cannot save the setting: {reason}"
+msgstr "सेटिंग सहेजी नहीं जा सकी: {reason}"
+
+#: ui/src/bridge.rs:412
+msgid "Proton Photos will be downloaded with the next sync"
+msgstr "अगले सिंक के साथ Proton Photos डाउनलोड होगा"
+
+#: ui/src/bridge.rs:413
+msgid "Proton Photos will be left alone"
+msgstr "Proton Photos को अछूता छोड़ा जाएगा"
+
+#: ui/src/bridge.rs:430
+msgid "Storing everything from now on"
+msgstr "अब से सब कुछ संग्रहीत होगा"
+
+#: ui/src/bridge.rs:431
+msgid "Storing warnings and errors from now on"
+msgstr "अब से चेतावनियाँ और त्रुटियाँ संग्रहीत होंगी"
+
+#: ui/src/bridge.rs:432
+msgid "Storing errors from now on"
+msgstr "अब से त्रुटियाँ संग्रहीत होंगी"
+
+#: ui/src/bridge.rs:448
+msgid "removed {n} log file older than {days} days"
+msgid_plural "removed {n} log files older than {days} days"
+msgstr[0] "{days} दिन से पुरानी {n} लॉग फ़ाइल हटाई गई"
+msgstr[1] "{days} दिन से पुरानी {n} लॉग फ़ाइलें हटाई गईं"
+
+#: ui/src/bridge.rs:449
+msgid "Cannot prune the log: {reason}"
+msgstr "लॉग साफ़ नहीं किया जा सका: {reason}"
+
+#: ui/qml/main.qml:26
+msgid "Choose the Proton Drive folder"
+msgstr "Proton Drive फ़ोल्डर चुनें"
+
+#: ui/qml/main.qml:38
+msgid "The folder is not empty"
+msgstr "फ़ोल्डर खाली नहीं है"
+
+#: ui/qml/main.qml:73
+msgid "Opened {what}"
+msgstr "{what} खोला गया"
+
+#: ui/qml/main.qml:75
+msgid "Could not open {what} ({url})"
+msgstr "{what} ({url}) नहीं खोला जा सका"
+
+#. TRANSLATORS: tab label, the page showing the signed-in account
+#: ui/qml/main.qml:131
+msgid "Account"
+msgstr "खाता"
+
+#. TRANSLATORS: tab label, the page showing the activity log
+#: ui/qml/main.qml:133
+msgid "Logs"
+msgstr "लॉग"
+
+#: ui/qml/main.qml:164
+msgid "Not signed in"
+msgstr "साइन इन नहीं है"
+
+#: ui/qml/main.qml:171
+msgid "Signed in to Proton Drive"
+msgstr "Proton Drive में साइन इन है"
+
+#: ui/qml/main.qml:172
+msgid "Sign in to sync this computer with Proton Drive."
+msgstr "इस कंप्यूटर को Proton Drive के साथ सिंक करने के लिए साइन इन करें।"
+
+#. TRANSLATORS: heading above the bar showing how much of the account is used
+#: ui/qml/main.qml:193
+msgid "Storage"
+msgstr "भंडारण"
+
+#: ui/qml/main.qml:221
+msgid "{used} of {total} used"
+msgstr "{total} में से {used} उपयोग में"
+
+#. TRANSLATORS: label before the path of the sync folder, as in "Syncing to /home/you/ProtonDrive"
+#: ui/qml/main.qml:233
+msgid "Syncing to"
+msgstr "यहाँ सिंक हो रहा है"
+
+#: ui/qml/main.qml:237
+msgid "nowhere yet"
+msgstr "अभी कहीं नहीं"
+
+#. TRANSLATORS: button that opens a folder picker to sync somewhere else
+#: ui/qml/main.qml:244
+msgid "Change…"
+msgstr "बदलें…"
+
+#. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves alone
+#: ui/qml/main.qml:251
+msgid "Ignore file…"
+msgstr "अनदेखी फ़ाइल…"
+
+#: ui/qml/main.qml:263
+msgid "Also download Proton Photos"
+msgstr "Proton Photos भी डाउनलोड करें"
+
+#: ui/qml/main.qml:271
+msgid ""
+"Read-only: your timeline is copied into {folder}. Photos are never uploaded, "
+"changed or deleted in Proton Photos, and the copy is checked every half hour."
+msgstr "केवल पढ़ने योग्य: आपकी टाइमलाइन {folder} में कॉपी की जाती है। Proton Photos में फ़ोटो कभी अपलोड, परिवर्तित या हटाई नहीं जातीं, और कॉपी की जाँच हर आधे घंटे में होती है।"
+
+#: ui/qml/main.qml:272
+msgid "your Pictures folder"
+msgstr "आपका चित्र फ़ोल्डर"
+
+#: ui/qml/main.qml:319
+msgid "Drive on the web"
+msgstr "वेब पर Drive"
+
+#: ui/qml/main.qml:324
+msgid "Proton account"
+msgstr "Proton खाता"
+
+#. TRANSLATORS: button that reloads the account details from Proton
+#: ui/qml/main.qml:330
+msgid "Refresh"
+msgstr "ताज़ा करें"
+
+#: ui/qml/main.qml:336
+msgid "Sign in"
+msgstr "साइन इन"
+
+#: ui/qml/main.qml:379
+msgid "Read the licence"
+msgstr "लाइसेंस पढ़ें"
+
+#: ui/qml/main.qml:397
+msgid "Search the log"
+msgstr "लॉग में खोजें"
+
+#. TRANSLATORS: right-click menu item, copies the selected log text
+#: ui/qml/main.qml:443
+msgid "Copy"
+msgstr "कॉपी करें"
+
+#. TRANSLATORS: right-click menu item, selects the whole log view
+#: ui/qml/main.qml:449
+msgid "Select all"
+msgstr "सभी चुनें"
+
+#: ui/qml/main.qml:466
+msgid "No lines match"
+msgstr "कोई पंक्ति मेल नहीं खाती"
+
+#: ui/qml/main.qml:466
+msgid "Nothing logged yet"
+msgstr "अभी तक कुछ भी लॉग नहीं हुआ"
+
+#: ui/qml/main.qml:468
+msgid "No line since the sync daemon started contains “{term}”."
+msgstr "सिंक सेवा शुरू होने के बाद की किसी भी पंक्ति में “{term}” नहीं है।"
+
+#: ui/qml/main.qml:469
+msgid "This shows what has happened since the sync daemon started."
+msgstr "यह दिखाता है कि सिंक सेवा शुरू होने के बाद क्या हुआ।"
+
+#. TRANSLATORS: start of "Keep logs for [30] days"; the number and "days" follow
+#: ui/qml/main.qml:478
+msgid "Keep logs for"
+msgstr "लॉग रखें"
+
+#. TRANSLATORS: end of "Keep logs for [30] days"
+#: ui/qml/main.qml:488
+msgid "days"
+msgstr "दिन"
+
+#. TRANSLATORS: verb, label before a dropdown choosing which log levels are written to disk
+#: ui/qml/main.qml:493
+msgid "Store"
+msgstr "संग्रहीत करें"
+
+#. TRANSLATORS: dropdown choice, store warnings and errors only
+#: ui/qml/main.qml:501
+msgid "Warnings and errors"
+msgstr "चेतावनियाँ और त्रुटियाँ"
+
+#. TRANSLATORS: dropdown choice, store every log line
+#: ui/qml/main.qml:503
+msgid "Everything"
+msgstr "सब कुछ"
+
+#. TRANSLATORS: dropdown choice, store errors only
+#: ui/qml/main.qml:505
+msgid "Errors only"
+msgstr "केवल त्रुटियाँ"
+
+#: ui/qml/main.qml:514
+msgid "{n} line"
+msgid_plural "{n} lines"
+msgstr[0] "{n} पंक्ति"
+msgstr[1] "{n} पंक्तियाँ"
