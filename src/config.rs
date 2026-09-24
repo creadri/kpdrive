@@ -49,8 +49,8 @@ pub struct Config {
     /// Where the timeline is copied to. Unset means `<Pictures>/ProtonDrive`.
     #[serde(default)]
     pub photos_sync_folder: Option<PathBuf>,
-    /// A folder to upload into Proton Photos. Not acted on yet: see
-    /// docs/photos-plan.md, which is what has to be settled first.
+    /// A folder whose photos are uploaded into Proton Photos and then removed
+    /// from it. Unset means no ingestion.
     #[serde(default)]
     pub photos_ingestion_folder: Option<PathBuf>,
     /// After a photo is uploaded from the ingestion folder, delete it outright

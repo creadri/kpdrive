@@ -30,6 +30,8 @@ pub mod qobject {
         #[qproperty(QString, log_level, cxx_name = "logLevel")]
         #[qproperty(bool, sync_photos, cxx_name = "syncPhotos")]
         #[qproperty(QString, photos_folder, cxx_name = "photosFolder")]
+        #[qproperty(QString, ingest_folder, cxx_name = "ingestFolder")]
+        #[qproperty(bool, ingest_perm_rm, cxx_name = "ingestPermRm")]
         #[qproperty(QString, sync_status, cxx_name = "syncStatus")]
         #[qproperty(bool, sync_busy, cxx_name = "syncBusy")]
         #[qproperty(bool, daemon_running, cxx_name = "daemonRunning")]
@@ -74,6 +76,16 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "changeSyncPhotos"]
         fn change_sync_photos(self: Pin<&mut Self>, on: bool);
+
+        /// Upload photos from `folder` into Proton Photos; empty stops it.
+        #[qinvokable]
+        #[cxx_name = "changeIngestFolder"]
+        fn change_ingest_folder(self: Pin<&mut Self>, folder: &QString);
+
+        /// Delete uploaded photos outright rather than trashing them.
+        #[qinvokable]
+        #[cxx_name = "changeIngestPermRm"]
+        fn change_ingest_perm_rm(self: Pin<&mut Self>, on: bool);
 
         /// One translated string, for QML to put in a label. Named `i18n`
         /// rather than `tr`, which already exists on every QObject.
@@ -152,6 +164,8 @@ pub struct BackendRust {
     log_level: QString,
     sync_photos: bool,
     photos_folder: QString,
+    ingest_folder: QString,
+    ingest_perm_rm: bool,
     sync_status: QString,
     sync_busy: bool,
     daemon_running: bool,
@@ -178,6 +192,8 @@ impl Default for BackendRust {
             log_level: QString::from("WARN"),
             sync_photos: false,
             photos_folder: QString::default(),
+            ingest_folder: QString::default(),
+            ingest_perm_rm: false,
             sync_status: QString::default(),
             sync_busy: false,
             daemon_running: false,
@@ -255,6 +271,9 @@ impl cxx_qt::Initialize for qobject::Backend {
         self.as_mut().set_sync_photos(config.photos_sync);
         let photos = kpdrive::photos::dest().map(|d| d.display().to_string()).unwrap_or_default();
         self.as_mut().set_photos_folder(QString::from(&photos));
+        let ingest = kpdrive::ingest::folder().map(|d| d.display().to_string()).unwrap_or_default();
+        self.as_mut().set_ingest_folder(QString::from(&ingest));
+        self.as_mut().set_ingest_perm_rm(config.photos_ingestion_perm_rm);
         self.as_mut().show_folder();
         self.as_mut().refresh_sync_status();
         self.as_mut().reload_logs("");
@@ -413,6 +432,42 @@ impl qobject::Backend {
             false => kpdrive::i18n::t("Proton Photos will be left alone"),
         };
         self.as_mut().set_status(QString::from(told));
+    }
+
+    pub fn change_ingest_folder(mut self: Pin<&mut Self>, folder: &QString) {
+        let folder = std::path::PathBuf::from(folder.to_string());
+        if !folder.as_os_str().is_empty() {
+            let (root, dest) = (current_root(), kpdrive::photos::dest().ok());
+            let others: Vec<&std::path::Path> = root.as_deref().into_iter().chain(dest.as_deref()).collect();
+            if let Err(e) = kpdrive::ingest::check_folder(&folder, &others) {
+                self.as_mut().set_status(QString::from(&format!("{e:#}")));
+                return;
+            }
+        }
+        // Load and amend: building a fresh Config would drop the other settings.
+        let mut config = kpdrive::config::load();
+        config.photos_ingestion_folder = Some(folder.clone()).filter(|f| !f.as_os_str().is_empty());
+        if let Err(e) = kpdrive::config::save(&config) {
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
+            return;
+        }
+        self.as_mut().set_ingest_folder(QString::from(&folder.display().to_string()));
+        kpdrive::daemon::poke();
+        let told = match config.photos_ingestion_folder {
+            Some(_) => kpdrive::i18n::t("Photos put in that folder will be uploaded to Proton Photos"),
+            None => kpdrive::i18n::t("No longer uploading photos"),
+        };
+        self.as_mut().set_status(QString::from(told));
+    }
+
+    pub fn change_ingest_perm_rm(mut self: Pin<&mut Self>, on: bool) {
+        let mut config = kpdrive::config::load();
+        config.photos_ingestion_perm_rm = on;
+        if let Err(e) = kpdrive::config::save(&config) {
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
+            return;
+        }
+        self.as_mut().set_ingest_perm_rm(on);
     }
 
     pub fn change_log_level(mut self: Pin<&mut Self>, level: &QString) {

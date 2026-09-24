@@ -7,6 +7,7 @@ pub mod daemon;
 pub mod drive;
 pub mod log;
 pub mod i18n;
+pub mod ingest;
 pub mod photos;
 pub mod plural;
 pub mod setup;

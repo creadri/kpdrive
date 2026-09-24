@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Dolphin overlay icons for the kpdrive sync folder. Asks the running daemon
+// Dolphin overlay icons for the kpdrive sync and photos folders. Asks the running daemon
 // over its Unix socket; see src/daemon.rs for the protocol.
 #include <KOverlayIconPlugin>
 #include <QElapsedTimer>
@@ -25,8 +25,13 @@ public:
         const QString path = url.toLocalFile();
         if (m_root.isEmpty()) {
             m_root = ask(QStringLiteral("ROOT"));
+            // An older daemon answers ERR: no photos folder then.
+            m_photos = ask(QStringLiteral("PHOTOS"));
+            if (m_photos == QLatin1String("ERR")) {
+                m_photos.clear();
+            }
         }
-        if (m_root.isEmpty() || !(path == m_root || path.startsWith(m_root + QLatin1Char('/')))) {
+        if (!under(path, m_root) && !under(path, m_photos)) {
             return {};
         }
         const QString reply = ask(QStringLiteral("STATUS ") + path);
@@ -40,6 +45,11 @@ public:
     }
 
 private:
+    static bool under(const QString &path, const QString &dir)
+    {
+        return !dir.isEmpty() && (path == dir || path.startsWith(dir + QLatin1Char('/')));
+    }
+
     // One line in, one line out. When the daemon is down, back off so a big
     // directory listing does not pay a connect timeout per file.
     QString ask(const QString &line)
@@ -68,6 +78,7 @@ private:
     QLocalSocket m_sock;
     QElapsedTimer m_backoff;
     QString m_root;
+    QString m_photos;
 };
 
 #include "kpdriveoverlay.moc"

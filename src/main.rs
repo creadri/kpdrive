@@ -47,6 +47,13 @@ enum Cmd {
         #[arg(long)]
         dest: Option<std::path::PathBuf>,
     },
+    /// Upload the photo ingestion folder into Proton Photos once, then trash
+    /// (or with photos_ingestion_perm_rm, delete) each file that went up.
+    Ingest {
+        /// The folder to ingest; remembered for the daemon.
+        #[arg(long)]
+        folder: Option<std::path::PathBuf>,
+    },
     /// Sync Drive with the local folder (two-way). --watch keeps running with a tray icon.
     Sync {
         /// Local folder; remembered after the first run. Default: ~/ProtonDrive
@@ -124,6 +131,7 @@ async fn main() -> Result<()> {
         Cmd::Get { remote, local } => get(&remote, local).await,
         Cmd::Sync { root, watch, force, adopt, photos } => sync(root, watch, force, adopt, photos).await,
         Cmd::Photos { dest } => photos(dest).await,
+        Cmd::Ingest { folder } => ingest(folder).await,
         Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
         Cmd::Setup { root } => setup(root).await,
         Cmd::Mkdir { remote } => mkdir(&remote).await,
@@ -422,6 +430,34 @@ async fn photos(dest: Option<std::path::PathBuf>) -> Result<()> {
         Some((0, dest)) => println!("photos up to date in {}", dest.display()),
         Some((n, dest)) => println!("{n} photo(s) into {}", dest.display()),
     }
+    account::persist(drive.api, before).await
+}
+
+async fn ingest(folder: Option<std::path::PathBuf>) -> Result<()> {
+    if let Some(folder) = folder {
+        let mut config = config::load();
+        config.photos_ingestion_folder = Some(folder);
+        config::save(&config)?;
+    }
+    let Some(folder) = kpdrive::ingest::folder() else {
+        anyhow::bail!("no ingestion folder: pass --folder, or set photos_ingestion_folder");
+    };
+    // Two passes over one folder would upload the same file twice.
+    if daemon::ask().running {
+        println!("the daemon is running and ingests {} on its own", folder.display());
+        return Ok(());
+    }
+    let (drive, before) = account::open_drive().await?;
+    let root = sync::load_state()?.map(|s| s.root);
+    let dest = photos::dest()?;
+    let others: Vec<&std::path::Path> = root.as_deref().into_iter().chain([dest.as_path()]).collect();
+    // A file goes up once two looks agree on it: the first look only notes
+    // what is there, so a copy still in progress is left alone.
+    let mut seen = kpdrive::ingest::Seen::default();
+    kpdrive::ingest::pass(&drive, &mut seen, &others).await?;
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    let n = kpdrive::ingest::pass(&drive, &mut seen, &others).await?;
+    println!("{n} photo(s) uploaded from {}", folder.display());
     account::persist(drive.api, before).await
 }
 

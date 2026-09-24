@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 use proton_crypto::crypto::PGPProviderSync;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -41,6 +41,10 @@ struct Snapshot {
     offline: bool,
     /// When the last pass finished, seconds since the epoch.
     last_sync: Option<i64>,
+    /// The photos folder, and every downloaded photo and folder in it,
+    /// relative to it.
+    photos_root: Option<PathBuf>,
+    photos: HashSet<PathBuf>,
 }
 
 impl Snapshot {
@@ -187,9 +191,28 @@ pub fn socket_path() -> PathBuf {
         .join("kpdrive.sock")
 }
 
+/// Reads what the photo download has written, for the overlays. Only at
+/// startup and after a photo pass: that is the only time it changes.
+fn refresh_photos(snap: &Shared) {
+    let Ok(Some(state)) = crate::photos::load_state() else { return };
+    let mut photos = HashSet::new();
+    for entry in state.photos.values() {
+        photos.extend(entry.path.ancestors().map(Path::to_path_buf));
+    }
+    let mut s = snap.write().expect("snapshot lock");
+    s.photos_root = Some(state.dest).filter(|d| !d.as_os_str().is_empty());
+    s.photos = photos;
+}
+
 /// Per-path status for overlays: OK, SYNC (pending), NONE (not ours).
 fn status(snap: &Snapshot, path: &Path) -> &'static str {
-    let Ok(rel) = path.strip_prefix(&snap.root) else { return "NONE" };
+    let Ok(rel) = path.strip_prefix(&snap.root) else {
+        // Photos are download only, so a photo is either here or not ours.
+        return match snap.photos_root.as_deref().map(|r| path.strip_prefix(r)) {
+            Some(Ok(rel)) if snap.photos.contains(rel) => "OK",
+            _ => "NONE",
+        };
+    };
     match snap.entries.get(rel) {
         Some(e) if e.is_folder => "OK",
         Some(e) => match std::fs::metadata(path) {
@@ -216,6 +239,13 @@ async fn serve_socket(snap: Shared, cmds: mpsc::UnboundedSender<Cmd>) -> Result<
                 let reply = match line.split_once(' ') {
                     Some(("STATUS", p)) => status(&snap.read().expect("snapshot lock"), Path::new(p)).to_string(),
                     _ if line == "ROOT" => snap.read().expect("snapshot lock").root.display().to_string(),
+                    _ if line == "PHOTOS" => snap
+                        .read()
+                        .expect("snapshot lock")
+                        .photos_root
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default(),
                     _ if line == "STATE" => snap.read().expect("snapshot lock").report(),
                     _ if line == "SYNC" => {
                         let _ = cmds.send(Cmd::Sync);
@@ -519,6 +549,7 @@ where
 {
     let snap: Shared = Arc::default();
     refresh(&snap, &state, false, None, Health::Ok);
+    refresh_photos(&snap);
     let (tx, mut rx) = mpsc::unbounded_channel();
 
     {
@@ -540,11 +571,6 @@ where
 
     // Opens this run in the log; the window shows everything after it.
     crate::log::mark("daemon started");
-    // A setting that is written but not obeyed is worse than one that is
-    // missing, so say it out loud, once, rather than ignoring it quietly.
-    if crate::config::load().photos_ingestion_folder.is_some() {
-        crate::log::warn("photos_ingestion_folder is set, but uploading to Proton Photos is not built yet (docs/photos-plan.md)");
-    }
     let (fs_tx, mut fs_rx) = mpsc::unbounded_channel::<()>();
     let watcher = watch(&state.root, fs_tx);
     if watcher.is_some() {
@@ -563,6 +589,10 @@ where
     // None until the first look, so switching photos on in the window starts
     // fetching them at the next pass rather than half an hour later.
     let mut last_photos: Option<std::time::Instant> = None;
+    let mut ingest_seen = crate::ingest::Seen::default();
+    // The last ingestion failure, so a standing one is logged once rather
+    // than every thirty seconds.
+    let mut ingest_error: Option<String> = None;
     loop {
         let mut retry_now = false;
         let mut health = Health::Ok;
@@ -684,6 +714,31 @@ where
                     // Photos are a side errand: a failure there says nothing
                     // about the folder, which has already synced.
                     Err(e) => crate::log::error(&format!("photos: {e:#}")),
+                }
+                refresh_photos(&snap);
+            }
+        }
+        // Ingestion every pass, not half-hourly: a photo dropped in should go
+        // up within a minute, and listing one folder is cheap.
+        if error.is_none() && crate::ingest::folder().is_some() {
+            let dest = crate::photos::dest().ok();
+            let others: Vec<&Path> = std::iter::once(state.root.as_path()).chain(dest.as_deref()).collect();
+            match crate::ingest::pass(&drive, &mut ingest_seen, &others).await {
+                Ok(n) => {
+                    ingest_error = None;
+                    if n > 0 {
+                        notify(&crate::i18n::fill(
+                            crate::i18n::tn("{n} photo uploaded to Proton Photos", "{n} photos uploaded to Proton Photos", n as u64),
+                            &[("n", &n.to_string())],
+                        ));
+                    }
+                }
+                Err(e) => {
+                    let e = format!("photo ingestion: {e:#}");
+                    if ingest_error.as_ref() != Some(&e) {
+                        crate::log::error(&e);
+                        ingest_error = Some(e);
+                    }
                 }
             }
         }
@@ -811,5 +866,13 @@ mod tests {
         std::fs::write(dir.join("a"), b"abcd").unwrap();
         assert_eq!(status(&snap, &dir.join("a")), "SYNC");
         std::fs::remove_dir_all(&dir).unwrap();
+
+        snap.photos_root = Some("/pics".into());
+        snap.photos = Path::new("2024/03/a.jpg").ancestors().map(Path::to_path_buf).collect();
+        for ok in ["/pics", "/pics/2024", "/pics/2024/03", "/pics/2024/03/a.jpg"] {
+            assert_eq!(status(&snap, Path::new(ok)), "OK", "{ok}");
+        }
+        assert_eq!(status(&snap, Path::new("/pics/2024/03/mine.jpg")), "NONE");
+        assert_eq!(status(&snap, Path::new("/pictures")), "NONE");
     }
 }

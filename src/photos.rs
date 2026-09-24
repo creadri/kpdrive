@@ -158,13 +158,14 @@ pub async fn run<P: PGPProviderSync>(drive: &Drive<P>, state: &mut State) -> Res
                 Ok(size) => {
                     crate::log::info(&format!("fetched photo {} ({size} bytes)", rel.display()));
                     state.photos.insert(node.id.clone(), Entry { path: rel, revision: node.revision.clone() });
+                    // Per photo: one recorded late would come back as `name (2)`
+                    // after an interrupted run, next to the copy already here.
+                    save_state(state)?;
                     fetched += 1;
                 }
-                Err(e) => eprintln!("error: {}: {e:#}", rel.display()),
+                Err(e) => crate::log::error(&format!("error: {}: {e:#}", rel.display())),
             }
         }
-        // Per chunk, so an interrupted run does not re-download what it already has.
-        save_state(state)?;
     }
     Ok(Some(fetched))
 }
@@ -177,7 +178,14 @@ async fn fetch<P: PGPProviderSync>(
 ) -> Result<u64> {
     let tmp = local.with_extension("kpdrive-part");
     let mut out = std::io::BufWriter::new(fs::File::create(&tmp)?);
-    let size = drive.download(node, &mut out).await?;
+    let size = match drive.download(node, &mut out).await {
+        Ok(size) => size,
+        Err(e) => {
+            drop(out);
+            let _ = fs::remove_file(&tmp);
+            return Err(e);
+        }
+    };
     std::io::Write::flush(&mut out)?;
     let file = out.into_inner().map_err(|e| e.into_error())?;
     // Capture time, not upload time: that is what photo tools sort by.

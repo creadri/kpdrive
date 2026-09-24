@@ -8,8 +8,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: kpdrive 0.3.0\n"
-"Report-Msgid-Bugs-To: https://github.com/creadri/kpdrive/issues\n"
-"POT-Creation-Date: 2026-09-23 16:05+0200\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-24 11:58+0200\n"
 "PO-Revision-Date: 2026-09-23 16:05+0200\n"
 "Last-Translator: machine translation, needs review by a speaker\n"
 "Language-Team: sv\n"
@@ -19,129 +19,140 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: src/daemon.rs:98
+#: src/daemon.rs:102
 msgid "Signed out. Sign in from the account window."
 msgstr "Utloggad. Logga in från kontofönstret."
 
-#: src/daemon.rs:100 src/daemon.rs:341
+#: src/daemon.rs:104 src/daemon.rs:371
 msgid "Syncing…"
 msgstr "Synkroniserar…"
 
-#: src/daemon.rs:102 src/daemon.rs:344
+#: src/daemon.rs:106 src/daemon.rs:374
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] "{n} objekt synkroniserat"
 msgstr[1] "{n} objekt synkroniserade"
 
-#: src/daemon.rs:112 ui/qml/main.qml:313
+#: src/daemon.rs:116 ui/qml/main.qml:382
 msgid "Open folder"
 msgstr "Öppna mapp"
 
-#: src/daemon.rs:122
+#: src/daemon.rs:126
 msgid "Account and logs…"
 msgstr "Konto och logg…"
 
-#: src/daemon.rs:129 ui/qml/main.qml:291
+#: src/daemon.rs:133 ui/qml/main.qml:360
 msgid "Sync now"
 msgstr "Synkronisera nu"
 
-#: src/daemon.rs:139
+#: src/daemon.rs:143
 msgid "Quit"
 msgstr "Avsluta"
 
 #. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no route"
-#: src/daemon.rs:273
+#: src/daemon.rs:303
 msgid "{reason}; retrying"
 msgstr "{reason}; försöker igen"
 
-#: src/daemon.rs:284
+#: src/daemon.rs:314
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr "Proton Drive går att nå igen, efter {duration}"
 
-#: src/daemon.rs:295
+#: src/daemon.rs:325
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] "{n} sekund"
 msgstr[1] "{n} sekunder"
 
-#: src/daemon.rs:296
+#: src/daemon.rs:326
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "{n} minut"
 msgstr[1] "{n} minuter"
 
-#: src/daemon.rs:297
+#: src/daemon.rs:327
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] "{n} timme"
 msgstr[1] "{n} timmar"
 
-#: src/daemon.rs:325
+#: src/daemon.rs:355
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
-msgstr "Synkroniseringstjänsten körs inte. Starta den med: kpdrive sync --watch"
+msgstr ""
+"Synkroniseringstjänsten körs inte. Starta den med: kpdrive sync --watch"
 
-#: src/daemon.rs:328
+#: src/daemon.rs:358
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
-msgstr "En synkroniseringstjänst körs, men den är för gammal för att kunna berätta vad den gör. Starta om den."
+msgstr ""
+"En synkroniseringstjänst körs, men den är för gammal för att kunna berätta "
+"vad den gör. Starta om den."
 
-#: src/daemon.rs:331
+#: src/daemon.rs:361
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr "Utloggad. Synkroniseringen återupptas när du loggar in."
 
-#: src/daemon.rs:335
+#: src/daemon.rs:365
 msgid "{reason}. Still trying."
 msgstr "{reason}. Försöker fortfarande."
 
-#: src/daemon.rs:336
+#: src/daemon.rs:366
 msgid "Last sync failed: {reason}"
 msgstr "Senaste synkroniseringen misslyckades: {reason}"
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:350
+#: src/daemon.rs:380
 msgid "just now"
 msgstr "just nu"
 
-#: src/daemon.rs:352
+#: src/daemon.rs:382
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "för {n} minut sedan"
 msgstr[1] "för {n} minuter sedan"
 
-#: src/daemon.rs:355
+#: src/daemon.rs:385
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "för {n} timme sedan"
 msgstr[1] "för {n} timmar sedan"
 
 #. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes ago"
-#: src/daemon.rs:359
+#: src/daemon.rs:389
 msgid "{items}, checked {ago}"
 msgstr "{items}, kontrollerat {ago}"
 
-#: src/daemon.rs:576
+#: src/daemon.rs:606
 msgid "Signed in again. Syncing resumed."
 msgstr "Inloggad igen. Synkroniseringen har återupptagits."
 
-#: src/daemon.rs:630
+#: src/daemon.rs:660
 msgid "Signed out. Sign in from the account window to resume syncing."
-msgstr "Utloggad. Logga in från kontofönstret för att återuppta synkroniseringen."
+msgstr ""
+"Utloggad. Logga in från kontofönstret för att återuppta synkroniseringen."
 
-#: src/daemon.rs:663
+#: src/daemon.rs:693
 msgid "Sync resumed"
 msgstr "Synkroniseringen återupptagen"
 
-#: src/daemon.rs:680
+#: src/daemon.rs:710
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] "{n} foto hämtat"
 msgstr[1] "{n} foton hämtade"
 
-#: src/i18n.rs:111 ui/qml/main.qml:336
+#: src/daemon.rs:731
+#, fuzzy
+msgid "{n} photo uploaded to Proton Photos"
+msgid_plural "{n} photos uploaded to Proton Photos"
+msgstr[0] "Hämta även Proton Photos"
+msgstr[1] "Hämta även Proton Photos"
+
+#: src/i18n.rs:155 ui/qml/main.qml:405
 msgid "Sign out"
 msgstr "Logga ut"
 
-#: src/i18n.rs:112 src/i18n.rs:113
+#: src/i18n.rs:156 src/i18n.rs:157
 msgid "{n} photo"
 msgid_plural "{n} photos"
 msgstr[0] "{n} foto"
@@ -160,92 +171,106 @@ msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
 "{folder} already holds {n} items, which syncing will merge with Proton Drive."
-msgstr[0] "{folder} innehåller redan {n} objekt, som synkroniseringen slår samman med Proton Drive."
-msgstr[1] "{folder} innehåller redan {n} objekt, som synkroniseringen slår samman med Proton Drive."
+msgstr[0] ""
+"{folder} innehåller redan {n} objekt, som synkroniseringen slår samman med "
+"Proton Drive."
+msgstr[1] ""
+"{folder} innehåller redan {n} objekt, som synkroniseringen slår samman med "
+"Proton Drive."
 
-#: ui/src/bridge.rs:175
+#: ui/src/bridge.rs:189
 msgid "Starting…"
 msgstr "Startar…"
 
-#: ui/src/bridge.rs:217
+#: ui/src/bridge.rs:233
 msgid "Confirm the code {code} in your browser"
 msgstr "Bekräfta koden {code} i webbläsaren"
 
-#: ui/src/bridge.rs:231
+#: ui/src/bridge.rs:247
 msgid "Sign-in failed: {reason}"
 msgstr "Inloggningen misslyckades: {reason}"
 
-#: ui/src/bridge.rs:243
+#: ui/src/bridge.rs:259
 msgid "Signed out"
 msgstr "Utloggad"
 
-#: ui/src/bridge.rs:246
+#: ui/src/bridge.rs:262
 msgid "Sign-out failed: {reason}"
 msgstr "Utloggningen misslyckades: {reason}"
 
-#: ui/src/bridge.rs:305
+#: ui/src/bridge.rs:324
 msgid "{note}. Restart the sync daemon to use it."
-msgstr "{note}. Starta om synkroniseringstjänsten så att ändringen börjar gälla."
+msgstr ""
+"{note}. Starta om synkroniseringstjänsten så att ändringen börjar gälla."
 
-#: ui/src/bridge.rs:308
+#: ui/src/bridge.rs:327
 msgid "Cannot change the folder: {reason}"
 msgstr "Det går inte att byta mapp: {reason}"
 
-#: ui/src/bridge.rs:315
+#: ui/src/bridge.rs:334
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr "Ingen synkroniseringsmapp än. Kör: kpdrive setup"
 
-#: ui/src/bridge.rs:319
+#: ui/src/bridge.rs:338
 msgid "Cannot create the ignore file: {reason}"
 msgstr "Det går inte att skapa ignoreringsfilen: {reason}"
 
-#: ui/src/bridge.rs:356
+#: ui/src/bridge.rs:375
 msgid "Checking the account…"
 msgstr "Kontrollerar kontot…"
 
-#: ui/src/bridge.rs:362
+#: ui/src/bridge.rs:381
 msgid "Opening the browser…"
 msgstr "Öppnar webbläsaren…"
 
-#: ui/src/bridge.rs:368
+#: ui/src/bridge.rs:387
 msgid "Signing out…"
 msgstr "Loggar ut…"
 
-#: ui/src/bridge.rs:394
+#: ui/src/bridge.rs:413
 msgid "Cannot read the log: {reason}"
 msgstr "Det går inte att läsa loggen: {reason}"
 
-#: ui/src/bridge.rs:404 ui/src/bridge.rs:425 ui/src/bridge.rs:443
+#: ui/src/bridge.rs:423 ui/src/bridge.rs:451 ui/src/bridge.rs:467
+#: ui/src/bridge.rs:480 ui/src/bridge.rs:498
 msgid "Cannot save the setting: {reason}"
 msgstr "Det går inte att spara inställningen: {reason}"
 
-#: ui/src/bridge.rs:412
+#: ui/src/bridge.rs:431
 msgid "Proton Photos will be downloaded with the next sync"
 msgstr "Proton Photos hämtas vid nästa synkronisering"
 
-#: ui/src/bridge.rs:413
+#: ui/src/bridge.rs:432
 msgid "Proton Photos will be left alone"
 msgstr "Proton Photos lämnas orört"
 
-#: ui/src/bridge.rs:430
+#: ui/src/bridge.rs:457
+msgid "Photos put in that folder will be uploaded to Proton Photos"
+msgstr ""
+
+#: ui/src/bridge.rs:458
+msgid "No longer uploading photos"
+msgstr ""
+
+#: ui/src/bridge.rs:485
 msgid "Storing everything from now on"
 msgstr "Lagrar allt från och med nu"
 
-#: ui/src/bridge.rs:431
+#: ui/src/bridge.rs:486
 msgid "Storing warnings and errors from now on"
 msgstr "Lagrar varningar och fel från och med nu"
 
-#: ui/src/bridge.rs:432
+#: ui/src/bridge.rs:487
 msgid "Storing errors from now on"
 msgstr "Lagrar fel från och med nu"
 
-#: ui/src/bridge.rs:448
+#: ui/src/bridge.rs:503
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] "tog bort {n} loggfil som är äldre än {days} dagar"
 msgstr[1] "tog bort {n} loggfiler som är äldre än {days} dagar"
 
-#: ui/src/bridge.rs:449
+#: ui/src/bridge.rs:504
 msgid "Cannot prune the log: {reason}"
 msgstr "Det går inte att rensa loggen: {reason}"
 
@@ -253,164 +278,186 @@ msgstr "Det går inte att rensa loggen: {reason}"
 msgid "Choose the Proton Drive folder"
 msgstr "Välj Proton Drive-mappen"
 
-#: ui/qml/main.qml:38
+#: ui/qml/main.qml:34
+msgid "Choose the folder to upload photos from"
+msgstr ""
+
+#: ui/qml/main.qml:45
 msgid "The folder is not empty"
 msgstr "Mappen är inte tom"
 
-#: ui/qml/main.qml:73
+#: ui/qml/main.qml:80
 msgid "Opened {what}"
 msgstr "Öppnade {what}"
 
-#: ui/qml/main.qml:75
+#: ui/qml/main.qml:82
 msgid "Could not open {what} ({url})"
 msgstr "Det gick inte att öppna {what} ({url})"
 
 #. TRANSLATORS: tab label, the page showing the signed-in account
-#: ui/qml/main.qml:131
+#: ui/qml/main.qml:138
 msgid "Account"
 msgstr "Konto"
 
 #. TRANSLATORS: tab label, the page showing the activity log
-#: ui/qml/main.qml:133
+#: ui/qml/main.qml:140
 msgid "Logs"
 msgstr "Logg"
 
-#: ui/qml/main.qml:164
+#: ui/qml/main.qml:177
 msgid "Not signed in"
 msgstr "Inte inloggad"
 
-#: ui/qml/main.qml:171
+#: ui/qml/main.qml:184
 msgid "Signed in to Proton Drive"
 msgstr "Inloggad på Proton Drive"
 
-#: ui/qml/main.qml:172
+#: ui/qml/main.qml:185
 msgid "Sign in to sync this computer with Proton Drive."
 msgstr "Logga in för att synkronisera den här datorn med Proton Drive."
 
 #. TRANSLATORS: heading above the bar showing how much of the account is used
-#: ui/qml/main.qml:193
+#: ui/qml/main.qml:206
 msgid "Storage"
 msgstr "Lagring"
 
-#: ui/qml/main.qml:221
+#: ui/qml/main.qml:234
 msgid "{used} of {total} used"
 msgstr "{used} av {total} använt"
 
 #. TRANSLATORS: label before the path of the sync folder, as in "Syncing to /home/you/ProtonDrive"
-#: ui/qml/main.qml:233
+#: ui/qml/main.qml:246
 msgid "Syncing to"
 msgstr "Synkroniseringsmapp"
 
-#: ui/qml/main.qml:237
+#: ui/qml/main.qml:250
 msgid "nowhere yet"
 msgstr "ingen än"
 
 #. TRANSLATORS: button that opens a folder picker to sync somewhere else
-#: ui/qml/main.qml:244
+#: ui/qml/main.qml:257 ui/qml/main.qml:324
 msgid "Change…"
 msgstr "Ändra…"
 
 #. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves alone
-#: ui/qml/main.qml:251
+#: ui/qml/main.qml:264
 msgid "Ignore file…"
 msgstr "Ignoreringsfil…"
 
-#: ui/qml/main.qml:263
+#: ui/qml/main.qml:276
 msgid "Also download Proton Photos"
 msgstr "Hämta även Proton Photos"
 
-#: ui/qml/main.qml:271
+#: ui/qml/main.qml:284
+#, fuzzy
 msgid ""
-"Read-only: your timeline is copied into {folder}. Photos are never uploaded, "
-"changed or deleted in Proton Photos, and the copy is checked every half hour."
-msgstr "Skrivskyddat: din tidslinje kopieras till den här mappen: {folder}. Foton laddas aldrig upp, ändras eller tas bort i Proton Photos, och kopian kontrolleras varje halvtimme."
+"Your timeline is copied into {folder}, checked every half hour. Nothing in "
+"Proton Photos is changed or deleted by it."
+msgstr ""
+"Skrivskyddat: din tidslinje kopieras till den här mappen: {folder}. Foton "
+"laddas aldrig upp, ändras eller tas bort i Proton Photos, och kopian "
+"kontrolleras varje halvtimme."
 
-#: ui/qml/main.qml:272
+#: ui/qml/main.qml:285
 msgid "your Pictures folder"
 msgstr "din mapp Bilder"
 
-#: ui/qml/main.qml:319
+#: ui/qml/main.qml:297
+msgid "Upload photos from a folder"
+msgstr ""
+
+#: ui/qml/main.qml:333
+msgid "Delete uploaded photos instead of moving them to the trash"
+msgstr ""
+
+#: ui/qml/main.qml:341
+msgid ""
+"Photos and videos put in this folder go up to Proton Photos within a minute, "
+"then leave the folder. Anything that cannot be uploaded stays."
+msgstr ""
+
+#: ui/qml/main.qml:388
 msgid "Drive on the web"
 msgstr "Drive på webben"
 
-#: ui/qml/main.qml:324
+#: ui/qml/main.qml:393
 msgid "Proton account"
 msgstr "Proton-konto"
 
 #. TRANSLATORS: button that reloads the account details from Proton
-#: ui/qml/main.qml:330
+#: ui/qml/main.qml:399
 msgid "Refresh"
 msgstr "Uppdatera"
 
-#: ui/qml/main.qml:336
+#: ui/qml/main.qml:405
 msgid "Sign in"
 msgstr "Logga in"
 
-#: ui/qml/main.qml:379
+#: ui/qml/main.qml:448
 msgid "Read the licence"
 msgstr "Läs licensen"
 
-#: ui/qml/main.qml:397
+#: ui/qml/main.qml:466
 msgid "Search the log"
 msgstr "Sök i loggen"
 
 #. TRANSLATORS: right-click menu item, copies the selected log text
-#: ui/qml/main.qml:443
+#: ui/qml/main.qml:512
 msgid "Copy"
 msgstr "Kopiera"
 
 #. TRANSLATORS: right-click menu item, selects the whole log view
-#: ui/qml/main.qml:449
+#: ui/qml/main.qml:518
 msgid "Select all"
 msgstr "Markera allt"
 
-#: ui/qml/main.qml:466
+#: ui/qml/main.qml:535
 msgid "No lines match"
 msgstr "Inga rader matchar"
 
-#: ui/qml/main.qml:466
+#: ui/qml/main.qml:535
 msgid "Nothing logged yet"
 msgstr "Inget loggat än"
 
-#: ui/qml/main.qml:468
+#: ui/qml/main.qml:537
 msgid "No line since the sync daemon started contains “{term}”."
 msgstr "Ingen rad sedan synkroniseringstjänsten startade innehåller ”{term}”."
 
-#: ui/qml/main.qml:469
+#: ui/qml/main.qml:538
 msgid "This shows what has happened since the sync daemon started."
 msgstr "Här visas vad som har hänt sedan synkroniseringstjänsten startade."
 
 #. TRANSLATORS: start of "Keep logs for [30] days"; the number and "days" follow
-#: ui/qml/main.qml:478
+#: ui/qml/main.qml:547
 msgid "Keep logs for"
 msgstr "Spara loggar i"
 
 #. TRANSLATORS: end of "Keep logs for [30] days"
-#: ui/qml/main.qml:488
+#: ui/qml/main.qml:557
 msgid "days"
 msgstr "dagar"
 
 #. TRANSLATORS: verb, label before a dropdown choosing which log levels are written to disk
-#: ui/qml/main.qml:493
+#: ui/qml/main.qml:562
 msgid "Store"
 msgstr "Lagra"
 
 #. TRANSLATORS: dropdown choice, store warnings and errors only
-#: ui/qml/main.qml:501
+#: ui/qml/main.qml:570
 msgid "Warnings and errors"
 msgstr "Varningar och fel"
 
 #. TRANSLATORS: dropdown choice, store every log line
-#: ui/qml/main.qml:503
+#: ui/qml/main.qml:572
 msgid "Everything"
 msgstr "Allt"
 
 #. TRANSLATORS: dropdown choice, store errors only
-#: ui/qml/main.qml:505
+#: ui/qml/main.qml:574
 msgid "Errors only"
 msgstr "Endast fel"
 
-#: ui/qml/main.qml:514
+#: ui/qml/main.qml:583
 msgid "{n} line"
 msgid_plural "{n} lines"
 msgstr[0] "{n} rad"

@@ -32,7 +32,8 @@ use crate::api::Api;
 struct LinkDetails {
     #[serde(rename = "Link")]
     link: Link,
-    #[serde(rename = "File")]
+    /// The photos links route names the same object `Photo`.
+    #[serde(rename = "File", alias = "Photo")]
     file: Option<File>,
     #[serde(rename = "Folder")]
     folder: Option<Folder>,
@@ -117,6 +118,19 @@ struct File {
 struct ActiveRevision {
     #[serde(rename = "RevisionID")]
     id: String,
+}
+
+/// What a photo carries beyond a plain file.
+pub struct PhotoMeta {
+    pub mime: &'static str,
+    /// When it was taken, unix seconds.
+    pub capture_time: i64,
+    /// JPEG or WebP, at most 512 px a side and under 60 KiB once encrypted.
+    pub thumbnail: Option<Vec<u8>>,
+    /// Width and height in pixels, as displayed.
+    pub size: Option<(u32, u32)>,
+    /// Timeline tags: 1 screenshot, 2 video, and so on.
+    pub tags: Vec<u8>,
 }
 
 /// A decrypted node with its unlocked key.
@@ -683,6 +697,52 @@ impl<P: PGPProviderSync> Drive<P> {
         data: &mut impl Read,
         mtime: i64,
     ) -> Result<(String, String)> {
+        self.upload_as(parent, name, existing, data, mtime, None).await
+    }
+
+    /// Uploads a photo onto the timeline under `root`, the photos root.
+    /// Returns its link id.
+    pub async fn upload_photo(&self, root: &Node<P::PrivateKey>, name: &str, data: &mut impl Read, mtime: i64, photo: &PhotoMeta) -> Result<String> {
+        Ok(self.upload_as(root, name, None, data, mtime, Some(photo)).await?.0)
+    }
+
+    /// Whether the timeline under `root` already holds this exact photo: same
+    /// name, same content. Only reads `data` when a name matches.
+    pub async fn photo_exists(&self, root: &Node<P::PrivateKey>, name: &str, data: &mut impl Read) -> Result<bool> {
+        #[derive(Deserialize)]
+        struct R {
+            #[serde(rename = "DuplicateHashes", default)]
+            hashes: Vec<Dup>,
+        }
+        #[derive(Deserialize)]
+        struct Dup {
+            #[serde(rename = "ContentHash")]
+            content_hash: Option<String>,
+            #[serde(rename = "LinkState")]
+            state: Option<i64>,
+        }
+        let hash_key = self.hash_key(root)?;
+        let path = format!("drive/volumes/{}/photos/duplicates", root.volume_id);
+        let r: R = self.api.post(&path, &json!({ "NameHashes": [name_hash(&hash_key, name)] })).await?;
+        let active: Vec<String> = r.hashes.into_iter().filter(|d| d.state == Some(1)).filter_map(|d| d.content_hash).collect();
+        if active.is_empty() {
+            return Ok(false);
+        }
+        let mut sha1 = Sha1::new();
+        std::io::copy(data, &mut sha1)?;
+        let mine = name_hash(&hash_key, &hex::encode(sha1.finalize()));
+        Ok(active.iter().any(|h| h.eq_ignore_ascii_case(&mine)))
+    }
+
+    async fn upload_as(
+        &self,
+        parent: &Node<P::PrivateKey>,
+        name: &str,
+        existing: Option<&Node<P::PrivateKey>>,
+        data: &mut impl Read,
+        mtime: i64,
+        photo: Option<&PhotoMeta>,
+    ) -> Result<(String, String)> {
         // 1. Draft: a new file node, or a new revision on an existing one.
         let (link_id, revision_id, node_key, session_key) = match existing {
             Some(node) => {
@@ -723,7 +783,7 @@ impl<P: PGPProviderSync> Drive<P> {
                     .with_encryption_key(&public)
                     .encrypt_session_key(&session_key)
                     .map_err(|e| anyhow!("content key packet: {e}"))?;
-                body.insert("MIMEType".into(), "application/octet-stream".into());
+                body.insert("MIMEType".into(), photo.map_or("application/octet-stream", |p| p.mime).into());
                 body.insert("ContentKeyPacket".into(), B64.encode(&packet).into());
                 body.insert("ContentKeyPacketSignature".into(), self.sign_detached(&key, session_key.export().as_ref())?.into());
                 body.insert("SignatureAddress".into(), self.email.clone().into());
@@ -768,6 +828,8 @@ impl<P: PGPProviderSync> Drive<P> {
         struct Prep {
             #[serde(rename = "UploadLinks")]
             links: Vec<Target>,
+            #[serde(rename = "ThumbnailLinks", default)]
+            thumbnails: Vec<Target>,
         }
         #[derive(Deserialize)]
         struct Target {
@@ -786,6 +848,22 @@ impl<P: PGPProviderSync> Drive<P> {
         }
 
         let mut manifest = Vec::new();
+        // A thumbnail goes up with the first batch and leads the manifest.
+        // Same content key as the blocks, signed inline.
+        let mut thumbnail = match photo.and_then(|p| p.thumbnail.as_deref()) {
+            Some(plain) => {
+                let ciphertext = self
+                    .pgp
+                    .new_encryptor()
+                    .with_session_key_ref(&session_key)
+                    .with_signing_key(&self.signing_key)
+                    .encrypt_raw(plain, DataEncoding::Bytes)
+                    .map_err(|e| anyhow!("encrypt thumbnail: {e}"))?;
+                manifest.extend_from_slice(&Sha256::digest(&ciphertext));
+                Some(ciphertext)
+            }
+            None => None,
+        };
         let mut block_sizes = Vec::new();
         let mut sha1 = Sha1::new();
         let mut total = 0u64;
@@ -843,7 +921,7 @@ impl<P: PGPProviderSync> Drive<P> {
                         "LinkID": link_id,
                         "RevisionID": revision_id,
                         "BlockList": entries,
-                        "ThumbnailList": [],
+                        "ThumbnailList": if thumbnail.is_some() { json!([{ "Type": 1 }]) } else { json!([]) },
                     }),
                 )
                 .await?;
@@ -851,7 +929,11 @@ impl<P: PGPProviderSync> Drive<P> {
             // Pair each block with its target: by Index when the API says which,
             // else by position, as the reference client does.
             let mut targets = prep.links;
-            let mut jobs = Vec::with_capacity(batch.len());
+            let mut jobs = Vec::with_capacity(batch.len() + 1);
+            if let Some(ciphertext) = thumbnail.take() {
+                let t = prep.thumbnails.into_iter().next().ok_or_else(|| anyhow!("no upload link for the thumbnail"))?;
+                jobs.push((t, Prepared { index: 0, ciphertext, entry: serde_json::Value::Null }));
+            }
             for p in batch {
                 let at = targets
                     .iter()
@@ -864,9 +946,10 @@ impl<P: PGPProviderSync> Drive<P> {
             let api = &self.api;
             let outcomes: Vec<Result<()>> = stream::iter(jobs)
                 .map(|(t, p)| async move {
-                    api.post_block(&t.bare_url, &t.token, p.ciphertext)
-                        .await
-                        .with_context(|| format!("upload block {}", p.index))
+                    api.post_block(&t.bare_url, &t.token, p.ciphertext).await.with_context(|| match p.index {
+                        0 => "upload thumbnail".to_owned(),
+                        i => format!("upload block {i}"),
+                    })
                 })
                 .buffer_unordered(IN_FLIGHT)
                 .collect()
@@ -879,25 +962,34 @@ impl<P: PGPProviderSync> Drive<P> {
         }
 
         // 4. Seal the revision: signed manifest plus encrypted extended attributes.
-        let xattr = json!({ "Common": {
+        let sha1 = hex::encode(sha1.finalize());
+        let mut xattr = json!({ "Common": {
             "Size": total,
             "ModificationTime": iso8601(mtime),
             "BlockSizes": block_sizes,
-            "Digests": { "SHA1": hex::encode(sha1.finalize()) },
+            "Digests": { "SHA1": sha1 },
         }});
-        let path = format!("drive/v2/volumes/{}/files/{link_id}/revisions/{revision_id}", self.volume_id);
-        let _: serde_json::Value = self
-            .api
-            .put(
-                &path,
-                &json!({
-                    "ManifestSignature": self.sign_detached(&self.signing_key, &manifest)?,
-                    "SignatureAddress": self.email,
-                    "ChecksumVerified": false,
-                    "XAttr": self.encrypt_to(&node_key, xattr.to_string().as_bytes(), Some(&self.signing_key), false)?,
-                }),
-            )
-            .await?;
+        if let Some((w, h)) = photo.and_then(|p| p.size) {
+            xattr["Media"] = json!({ "Width": w, "Height": h });
+        }
+        let mut commit = json!({
+            "ManifestSignature": self.sign_detached(&self.signing_key, &manifest)?,
+            "SignatureAddress": self.email,
+            "ChecksumVerified": false,
+            "XAttr": self.encrypt_to(&node_key, xattr.to_string().as_bytes(), Some(&self.signing_key), false)?,
+        });
+        if let Some(p) = photo {
+            // What the timeline sorts by, and what duplicates are found by.
+            commit["Photo"] = json!({
+                "CaptureTime": p.capture_time,
+                "ContentHash": name_hash(&self.hash_key(parent)?, &sha1),
+                "MainPhotoLinkID": null,
+                "Tags": p.tags,
+                "Exif": null,
+            });
+        }
+        let path = format!("drive/v2/volumes/{}/files/{link_id}/revisions/{revision_id}", parent.volume_id);
+        let _: serde_json::Value = self.api.put(&path, &commit).await?;
         Ok((link_id, revision_id))
     }
 

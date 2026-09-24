@@ -24,9 +24,9 @@ Simple KDE Proton Drive sync Client designed to have a simple solution.
 Messing with the timeline is harder than you might think.
 
 - Read-only timeline
-- Ingestion Folder, by default ~/Pictures/ProtonDriveIngestion
+- Ingestion Folder: photos put in it go up to Proton Photos, then leave it
 
-What works today is the read-only half: ``kpdrive photos`` fetches once, and
+The timeline is copied down: ``kpdrive photos`` fetches once, and
 *photos_sync* has the daemon do it every half hour. Photos land in
 ``<photos_sync_folder>/YYYY/MM/``, each file's modified time set to when the
 photo was taken. That folder may not be inside the sync folder, or the file
@@ -34,11 +34,26 @@ sync would upload the whole library back into Drive as ordinary files. The
 first run downloads the whole timeline, which on most accounts is the largest
 thing kpdrive will ever do.
 
-Ingestion is not built yet. What it has to produce for each photo, what happens
-to the local file afterwards, and the things the download half gets wrong
-today, are in [docs/photos-plan.md](docs/photos-plan.md). For now: a photo
-deleted in Proton stays on disk, a photo edited in Proton keeps its old copy,
-and deleting a local copy brings it back on the next pass.
+The copy is only a copy: a photo deleted in Proton stays on disk, a photo
+edited in Proton keeps its old copy, and deleting a local copy brings it back
+on the next pass. See [docs/photos-plan.md](docs/photos-plan.md).
+
+Ingestion is the other direction. Set *photos_ingestion_folder* (or pick it in
+the window) and the daemon uploads each photo or video put there into Proton
+Photos, then moves the file to the desktop trash, or deletes it with
+*photos_ingestion_perm_rm*. ``kpdrive ingest`` does one pass by hand when no
+daemon is running. Details:
+
+- A file goes up once it has stopped changing between two looks, so a copy in
+  progress is left alone. The daemon looks every thirty seconds.
+- Taken: JPEG, PNG, WebP, GIF, TIFF, HEIC/HEIF, MP4 and MOV. Anything else stays.
+- The capture time comes from EXIF, with its recorded offset when there is one
+  and in your local time zone otherwise, else from the file's modified time.
+- A photo Proton Photos already holds (same name and content, say because your
+  phone backed it up) is not uploaded again, only removed locally.
+- HEIC and video go up without a timeline thumbnail, as kpdrive cannot decode
+  them.
+- A file that fails stays in the folder and is tried again an hour later.
 
 #### Photos Timeline Edge Cases
 
@@ -60,6 +75,7 @@ kpdrive get <remote> [local]
 kpdrive put <local> [remote-folder]   # new file, or new revision if the name exists
 kpdrive mkdir <remote>
 kpdrive photos [--dest DIR]   # download the Photos timeline
+kpdrive ingest [--folder DIR] # upload the ingestion folder into Photos once
 kpdrive share <path> [--copy] [--password P] [--expires-days N]
 kpdrive unshare <path>
 kpdrive setup [--root DIR]    # local folder, ignore file, Places entry, autostart, launcher
@@ -80,8 +96,8 @@ Missing keys take the default, so the file only needs what you change.
 - *log_retention_days* : Days of logs, `30` by default
 - *photos_sync* : boolean, true if the daemon downloads photos as well, every half hour. `false` by default
 - *photos_sync_folder* : path of the folder photos are copied into, by default `~/Pictures/ProtonDrive`. May not be inside *sync_folder*
-- *photos_ingestion_folder* : path of the folder to ingest Photos from, `~/Pictures/ProtonDriveIngestion` when it lands. **Not acted on yet**, see [docs/photos-plan.md](docs/photos-plan.md)
-- *photos_ingestion_perm_rm* : boolean, true if an ingested photo is deleted outright on successful upload, otherwise moved to trash. `false` by default. **Not acted on yet**
+- *photos_ingestion_folder* : path of a folder whose photos are uploaded into Proton Photos and then removed from it. Unset (off) by default. May not overlap *sync_folder* or *photos_sync_folder*
+- *photos_ingestion_perm_rm* : boolean, true if an ingested photo is deleted outright on successful upload, otherwise moved to trash. `false` by default
 
 `<sync_folder>/.protonignore` lists paths sync leaves alone, in `.gitignore`
 syntax; the window's **Ignore file…** opens it.

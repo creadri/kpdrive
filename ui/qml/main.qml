@@ -29,6 +29,13 @@ Kirigami.ApplicationWindow {
         onAccepted: root.chooseFolder(decodeURIComponent(selectedFolder.toString().replace(/^file:\/\//, "")))
     }
 
+    FolderDialog {
+        id: ingestDialog
+        title: backend.i18n("Choose the folder to upload photos from")
+        currentFolder: backend.ingestFolder.length > 0 ? "file://" + encodeURI(backend.ingestFolder) : ""
+        onAccepted: backend.changeIngestFolder(decodeURIComponent(selectedFolder.toString().replace(/^file:\/\//, "")))
+    }
+
     // The same question the CLI asks, with the same two answers.
     KirigamiDialogs.PromptDialog {
         id: occupiedPrompt
@@ -274,8 +281,64 @@ Kirigami.ApplicationWindow {
                         Controls.Label {
                             Layout.fillWidth: true
                             Layout.leftMargin: Kirigami.Units.gridUnit * 2
-                            text: backend.i18n("Read-only: your timeline is copied into {folder}. Photos are never uploaded, changed or deleted in Proton Photos, and the copy is checked every half hour.")
+                            text: backend.i18n("Your timeline is copied into {folder}, checked every half hour. Nothing in Proton Photos is changed or deleted by it.")
                                   .replace("{folder}", backend.photosFolder.length > 0 ? backend.photosFolder : backend.i18n("your Pictures folder"))
+                            wrapMode: Text.WordWrap
+                            opacity: 0.7
+                            font: Kirigami.Theme.smallFont
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+
+                        Controls.CheckBox {
+                            text: backend.i18n("Upload photos from a folder")
+                            checked: backend.ingestFolder.length > 0
+                            // Turning it on means picking the folder; the box
+                            // follows the setting, not the click.
+                            onToggled: {
+                                checked = Qt.binding(function() { return backend.ingestFolder.length > 0 })
+                                if (backend.ingestFolder.length > 0) {
+                                    backend.changeIngestFolder("")
+                                } else {
+                                    ingestDialog.open()
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 2
+                            visible: backend.ingestFolder.length > 0
+
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                text: backend.ingestFolder
+                                elide: Text.ElideMiddle
+                                font.family: "monospace"
+                            }
+
+                            Controls.Button {
+                                text: backend.i18n("Change…")
+                                icon.name: "folder-open"
+                                onClicked: ingestDialog.open()
+                            }
+                        }
+
+                        Controls.CheckBox {
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 2
+                            visible: backend.ingestFolder.length > 0
+                            text: backend.i18n("Delete uploaded photos instead of moving them to the trash")
+                            checked: backend.ingestPermRm
+                            onToggled: backend.changeIngestPermRm(checked)
+                        }
+
+                        Controls.Label {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.gridUnit * 2
+                            text: backend.i18n("Photos and videos put in this folder go up to Proton Photos within a minute, then leave the folder. Anything that cannot be uploaded stays.")
                             wrapMode: Text.WordWrap
                             opacity: 0.7
                             font: Kirigami.Theme.smallFont

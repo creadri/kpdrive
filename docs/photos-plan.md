@@ -43,6 +43,32 @@ Three details that are easy to miss and that the rest of this plan depends on:
 
 ## Ingestion: uploading a photo
 
+**Built** (`src/ingest.rs`, `Drive::upload_photo`), verified live against an
+account: upload, duplicate detection, trash. The protocol, read off Proton's
+SDK (`ProtonDriveApps/sdk`, `internal/photos/upload.ts`) and web client:
+
+- A photo is an ordinary file created under the photos share's root link; the
+  create, verification and block calls are the Drive ones. Only the commit
+  differs: it carries `Photo: { CaptureTime, ContentHash, MainPhotoLinkID,
+  Tags, Exif: null }`, of which `CaptureTime` (unix seconds) and `ContentHash`
+  are required.
+- `ContentHash` is the name-hash HMAC (the photos root's hash key) over the
+  lowercase hex SHA-1 of the content.
+- Thumbnails are optional. Type 1 is at most 512 px and 60 KiB encrypted,
+  encrypted with the content session key and signed inline, requested as
+  `ThumbnailList: [{Type: 1}]` and uploaded to `ThumbnailLinks`; its SHA-256
+  leads the manifest, before the blocks.
+- `POST drive/volumes/{vid}/photos/duplicates {NameHashes}` answers with each
+  match's `ContentHash` and `LinkState`; an active match with the same content
+  hash is the same photo.
+
+Choices made: HEIC and video go up without a thumbnail; a photo the server
+already has is removed locally like an uploaded one; settledness is "same size
+and mtime as the previous look", checked every daemon pass (30 s) rather than
+with a watch of its own; a failure is retried after an hour.
+
+What follows is the plan as written before it was built.
+
 Why ingestion and not editing the timeline: the README's design notes settle
 that. Proton Photos decides where a photo sits in the timeline, and editing a
 photo's metadata can move it, so the only honest operation from a desktop
