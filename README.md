@@ -2,7 +2,11 @@
 
 Simple KDE Proton Drive sync Client designed to have a simple solution.
 
-![Main Window](docs/screenshots/kpdrive-main-ui-0.2.0.png)
+## Screenshots
+
+![Main Window](docs/screenshots/kpdrive-main-ui-0.5.0.png)
+
+![Settings](docs/screenshots/kpdrive-ui-settings-0.5.0.png)
 
 ## Features
 
@@ -11,6 +15,7 @@ Simple KDE Proton Drive sync Client designed to have a simple solution.
 - **KDE** and **Dolphin** integration
 - **.protonignore** with same syntax as .gitignore to ignore files to upload. .protonignore is still pushed though.
 - **Localization** support
+- **Conditional Sync Pause** currently based either on power management or network
 
 ## Design decisions
 
