@@ -61,6 +61,13 @@ pub struct Config {
     /// by the CLI, it just does not reach the log file below this.
     #[serde(default = "default_level")]
     pub log_level: LogLevel,
+    /// Paused by hand: no file sync, photo download or ingestion until resumed.
+    #[serde(default)]
+    pub sync_paused: bool,
+    /// NetworkManager connection names that pause syncing while connected,
+    /// such as a phone's hotspot.
+    #[serde(default)]
+    pub pause_on_networks: Vec<String>,
 }
 
 fn default_level() -> LogLevel {
@@ -81,6 +88,8 @@ impl Default for Config {
             photos_ingestion_folder: None,
             photos_ingestion_perm_rm: false,
             log_level: default_level(),
+            sync_paused: false,
+            pause_on_networks: Vec::new(),
         }
     }
 }

@@ -47,6 +47,10 @@ enum Cmd {
         #[arg(long)]
         dest: Option<std::path::PathBuf>,
     },
+    /// Pause syncing, photos included, until `resume`. Survives restarts.
+    Pause,
+    /// Resume syncing after `pause`. Networks set to pause still do.
+    Resume,
     /// Upload the photo ingestion folder into Proton Photos once, then trash
     /// (or with photos_ingestion_perm_rm, delete) each file that went up.
     Ingest {
@@ -132,6 +136,19 @@ async fn main() -> Result<()> {
         Cmd::Sync { root, watch, force, adopt, photos } => sync(root, watch, force, adopt, photos).await,
         Cmd::Photos { dest } => photos(dest).await,
         Cmd::Ingest { folder } => ingest(folder).await,
+        Cmd::Pause => {
+            kpdrive::pause::set(true)?;
+            println!("paused; `kpdrive resume` picks up where it left off");
+            Ok(())
+        }
+        Cmd::Resume => {
+            kpdrive::pause::set(false)?;
+            match kpdrive::pause::reason() {
+                Some(why) => println!("{why}"),
+                None => println!("resumed"),
+            }
+            Ok(())
+        }
         Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
         Cmd::Setup { root } => setup(root).await,
         Cmd::Mkdir { remote } => mkdir(&remote).await,

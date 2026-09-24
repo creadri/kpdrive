@@ -45,6 +45,8 @@ struct Snapshot {
     /// relative to it.
     photos_root: Option<PathBuf>,
     photos: HashSet<PathBuf>,
+    /// Why nothing is syncing, when it is paused.
+    paused: Option<String>,
 }
 
 impl Snapshot {
@@ -59,6 +61,7 @@ impl Snapshot {
             "offline": self.offline,
             "lastSync": self.last_sync,
             "error": self.last_error,
+            "paused": self.paused,
         })
         .to_string()
     }
@@ -94,11 +97,18 @@ impl ksni::Tray for Tray {
     }
     fn overlay_icon_name(&self) -> String {
         let s = self.snap.read().expect("snapshot lock");
-        if s.last_error.is_some() || s.signed_out { "emblem-error".into() } else { String::new() }
+        if s.last_error.is_some() || s.signed_out {
+            "emblem-error".into()
+        } else if s.paused.is_some() {
+            "media-playback-pause".into()
+        } else {
+            String::new()
+        }
     }
     fn tool_tip(&self) -> ksni::ToolTip {
         let s = self.snap.read().expect("snapshot lock");
         let description = match (s.signed_out, &s.last_error, s.syncing) {
+            _ if s.paused.is_some() => s.paused.clone().unwrap_or_default(),
             (true, ..) => crate::i18n::t("Signed out. Sign in from the account window.").into(),
             (_, Some(e), _) => e.clone(),
             (_, None, true) => crate::i18n::t("Syncing…").into(),
@@ -132,8 +142,23 @@ impl ksni::Tray for Tray {
             StandardItem {
                 label: crate::i18n::t("Sync now").into(),
                 icon_name: "view-refresh".into(),
+                enabled: self.snap.read().expect("snapshot lock").paused.is_none(),
                 activate: Box::new(|t: &mut Self| {
                     let _ = t.cmds.send(Cmd::Sync);
+                }),
+                ..Default::default()
+            }
+            .into(),
+            // Only the manual pause is toggled here: a network pause lifts
+            // itself when the network goes.
+            CheckmarkItem {
+                label: crate::i18n::t("Pause sync").into(),
+                checked: crate::config::load().sync_paused,
+                activate: Box::new(|_: &mut Self| {
+                    let paused = crate::config::load().sync_paused;
+                    if let Err(e) = crate::pause::set(!paused) {
+                        crate::log::error(&format!("cannot save the pause: {e:#}"));
+                    }
                 }),
                 ..Default::default()
             }
@@ -344,6 +369,8 @@ pub struct Report {
     pub items: usize,
     pub last_sync: Option<i64>,
     pub error: Option<String>,
+    /// Why syncing is paused, when it is.
+    pub paused: Option<String>,
 }
 
 impl Report {
@@ -356,6 +383,9 @@ impl Report {
         }
         if !self.answered {
             return t("A sync daemon is running but is too old to say what it is doing. Restart it.").into();
+        }
+        if let Some(p) = &self.paused {
+            return p.clone();
         }
         if self.signed_out {
             return t("Signed out. Syncing resumes once you sign in.").into();
@@ -418,6 +448,7 @@ pub fn ask() -> Report {
         report.items = v["items"].as_u64().unwrap_or(0) as usize;
         report.last_sync = v["lastSync"].as_i64();
         report.error = v["error"].as_str().map(str::to_owned);
+        report.paused = v["paused"].as_str().map(str::to_owned);
     }
     report
 }
@@ -618,6 +649,27 @@ where
                     continue;
                 }
             }
+        }
+        // Paused: no pass at all, but keep waiting as usual, so a resume, a
+        // network change or Quit is noticed. Local changes meanwhile stay
+        // flagged and are swept once it resumes.
+        let pause = crate::pause::reason();
+        if pause != snap.read().expect("snapshot lock").paused {
+            match &pause {
+                Some(why) => crate::log::write("INFO", why),
+                None => crate::log::write("INFO", "sync resumed"),
+            }
+            snap.write().expect("snapshot lock").paused = pause.clone();
+            if let Some(t) = &tray {
+                t.update(|_| {}).await;
+            }
+        }
+        if pause.is_some() {
+            force = false;
+            if !wait_for_work(&mut rx, &mut fs_rx, POLL, &mut force, &mut fs_dirty).await? {
+                break;
+            }
+            continue;
         }
         // Sweep the folder only when something says to: a burst of events, no
         // watcher at all, the hourly safety net, or an explicit Sync now.

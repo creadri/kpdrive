@@ -6,6 +6,7 @@ pub mod config;
 pub mod daemon;
 pub mod drive;
 pub mod log;
+pub mod pause;
 pub mod i18n;
 pub mod ingest;
 pub mod photos;

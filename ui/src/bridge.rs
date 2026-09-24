@@ -37,6 +37,13 @@ pub mod qobject {
         #[qproperty(bool, daemon_running, cxx_name = "daemonRunning")]
         #[qproperty(bool, sync_failed, cxx_name = "syncFailed")]
         #[qproperty(bool, sync_offline, cxx_name = "syncOffline")]
+        /// Paused for any reason, as the daemon last said.
+        #[qproperty(bool, sync_paused, cxx_name = "syncPaused")]
+        /// Paused by hand, as the setting says.
+        #[qproperty(bool, paused_by_hand, cxx_name = "pausedByHand")]
+        #[qproperty(QStringList, networks)]
+        #[qproperty(QStringList, pause_networks, cxx_name = "pauseNetworks")]
+        #[qproperty(QStringList, active_networks, cxx_name = "activeNetworks")]
         #[qproperty(QString, sync_folder, cxx_name = "syncFolder")]
         #[qproperty(QString, ignore_file, cxx_name = "ignoreFile")]
         #[qproperty(QString, version)]
@@ -86,6 +93,26 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "changeIngestPermRm"]
         fn change_ingest_perm_rm(self: Pin<&mut Self>, on: bool);
+
+        /// Pause or resume syncing by hand.
+        #[qinvokable]
+        #[cxx_name = "changePaused"]
+        fn change_paused(self: Pin<&mut Self>, paused: bool);
+
+        /// Pause, or stop pausing, while connected to `network`.
+        #[qinvokable]
+        #[cxx_name = "changeNetworkPause"]
+        fn change_network_pause(self: Pin<&mut Self>, network: &QString, on: bool);
+
+        /// Re-read the network connections NetworkManager knows.
+        #[qinvokable]
+        #[cxx_name = "reloadNetworks"]
+        fn reload_networks(self: Pin<&mut Self>);
+
+        /// Download the photos timeline into `folder` from now on.
+        #[qinvokable]
+        #[cxx_name = "changePhotosFolder"]
+        fn change_photos_folder(self: Pin<&mut Self>, folder: &QString);
 
         /// One translated string, for QML to put in a label. Named `i18n`
         /// rather than `tr`, which already exists on every QObject.
@@ -171,6 +198,11 @@ pub struct BackendRust {
     daemon_running: bool,
     sync_failed: bool,
     sync_offline: bool,
+    sync_paused: bool,
+    paused_by_hand: bool,
+    networks: QStringList,
+    pause_networks: QStringList,
+    active_networks: QStringList,
     sync_folder: QString,
     ignore_file: QString,
     version: QString,
@@ -199,6 +231,11 @@ impl Default for BackendRust {
             daemon_running: false,
             sync_failed: false,
             sync_offline: false,
+            sync_paused: false,
+            paused_by_hand: false,
+            networks: QStringList::default(),
+            pause_networks: QStringList::default(),
+            active_networks: QStringList::default(),
             sync_folder: QString::default(),
             ignore_file: QString::default(),
             version: QString::from(env!("CARGO_PKG_VERSION")),
@@ -274,6 +311,8 @@ impl cxx_qt::Initialize for qobject::Backend {
         let ingest = kpdrive::ingest::folder().map(|d| d.display().to_string()).unwrap_or_default();
         self.as_mut().set_ingest_folder(QString::from(&ingest));
         self.as_mut().set_ingest_perm_rm(config.photos_ingestion_perm_rm);
+        self.as_mut().set_paused_by_hand(config.sync_paused);
+        self.as_mut().reload_networks();
         self.as_mut().show_folder();
         self.as_mut().refresh_sync_status();
         self.as_mut().reload_logs("");
@@ -363,6 +402,7 @@ impl qobject::Backend {
         self.as_mut().set_sync_offline(report.offline);
         self.as_mut().set_sync_failed(report.signed_out || (report.error.is_some() && !report.offline));
         self.as_mut().set_sync_status(QString::from(&report.sentence()));
+        self.as_mut().set_sync_paused(report.paused.is_some());
     }
 
     pub fn sync_now(self: Pin<&mut Self>) {
@@ -458,6 +498,70 @@ impl qobject::Backend {
             None => kpdrive::i18n::t("No longer uploading photos"),
         };
         self.as_mut().set_status(QString::from(told));
+    }
+
+    pub fn change_paused(mut self: Pin<&mut Self>, paused: bool) {
+        if let Err(e) = kpdrive::pause::set(paused) {
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
+            return;
+        }
+        self.as_mut().set_paused_by_hand(paused);
+        self.refresh_sync_status();
+    }
+
+    pub fn change_network_pause(mut self: Pin<&mut Self>, network: &QString, on: bool) {
+        let network = network.to_string();
+        let mut config = kpdrive::config::load();
+        config.pause_on_networks.retain(|n| n != &network);
+        if on {
+            config.pause_on_networks.push(network);
+        }
+        if let Err(e) = kpdrive::config::save(&config) {
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
+            return;
+        }
+        // Takes effect at once when that network is the one in use.
+        kpdrive::daemon::poke();
+        self.as_mut().reload_networks();
+    }
+
+    /// Every connection NetworkManager knows, plus any chosen one it has
+    /// since forgotten, so that one can still be unticked.
+    pub fn reload_networks(mut self: Pin<&mut Self>) {
+        let chosen = kpdrive::config::load().pause_on_networks;
+        let mut known = kpdrive::pause::known_connections();
+        known.extend(chosen.iter().filter(|c| !known.contains(c)).cloned().collect::<Vec<_>>());
+        let list = |names: &[String]| {
+            let mut l = QStringList::default();
+            for n in names {
+                l.append(QString::from(n));
+            }
+            l
+        };
+        self.as_mut().set_networks(list(&known));
+        self.as_mut().set_pause_networks(list(&chosen));
+        self.as_mut().set_active_networks(list(&kpdrive::pause::active_connections()));
+    }
+
+    pub fn change_photos_folder(mut self: Pin<&mut Self>, folder: &QString) {
+        let folder = std::path::PathBuf::from(folder.to_string());
+        if folder.as_os_str().is_empty() {
+            return;
+        }
+        // The same guards as the CLI, plus the ingestion folder: photos
+        // downloaded into it would be uploaded straight back.
+        let checked = kpdrive::photos::check_dest(&folder, current_root().as_deref())
+            .and_then(|_| match kpdrive::ingest::folder() {
+                Some(ingest) => kpdrive::ingest::check_folder(&ingest, &[&folder]),
+                None => Ok(()),
+            })
+            .and_then(|_| kpdrive::photos::set_dest(folder.clone()));
+        if let Err(e) = checked {
+            self.as_mut().set_status(QString::from(&format!("{e:#}")));
+            return;
+        }
+        self.as_mut().set_photos_folder(QString::from(&folder.display().to_string()));
+        self.as_mut().set_status(QString::from(kpdrive::i18n::t("Photos will be downloaded into that folder from the next pass")));
     }
 
     pub fn change_ingest_perm_rm(mut self: Pin<&mut Self>, on: bool) {

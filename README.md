@@ -76,6 +76,7 @@ kpdrive put <local> [remote-folder]   # new file, or new revision if the name ex
 kpdrive mkdir <remote>
 kpdrive photos [--dest DIR]   # download the Photos timeline
 kpdrive ingest [--folder DIR] # upload the ingestion folder into Photos once
+kpdrive pause | resume        # stop syncing until resumed; survives restarts
 kpdrive share <path> [--copy] [--password P] [--expires-days N]
 kpdrive unshare <path>
 kpdrive setup [--root DIR]    # local folder, ignore file, Places entry, autostart, launcher
@@ -98,6 +99,8 @@ Missing keys take the default, so the file only needs what you change.
 - *photos_sync_folder* : path of the folder photos are copied into, by default `~/Pictures/ProtonDrive`. May not be inside *sync_folder*
 - *photos_ingestion_folder* : path of a folder whose photos are uploaded into Proton Photos and then removed from it. Unset (off) by default. May not overlap *sync_folder* or *photos_sync_folder*
 - *photos_ingestion_perm_rm* : boolean, true if an ingested photo is deleted outright on successful upload, otherwise moved to trash. `false` by default
+- *sync_paused* : boolean, true while paused by hand (`kpdrive pause`, the tray or the window): no file sync, photo download or ingestion. `false` by default
+- *pause_on_networks* : NetworkManager connection names, as the network applet shows them, that pause syncing while connected, such as a phone's hotspot. Checked at least every thirty seconds; a sync already under way finishes first. Empty by default
 
 `<sync_folder>/.protonignore` lists paths sync leaves alone, in `.gitignore`
 syntax; the window's **Ignore file…** opens it.
