@@ -179,12 +179,14 @@ Kirigami.ApplicationWindow {
                         id: sidebar
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        interactive: false
                         clip: true
                         spacing: Kirigami.Units.smallSpacing / 2
                         model: [
                             { name: backend.i18n("Account & activity"), icon: "folder-cloud" },
                             { name: backend.i18n("Settings"), icon: "configure" },
                             { name: backend.i18n("Logs"), icon: "view-history" },
+                            { name: backend.i18n("About"), icon: "help-about" },
                         ]
                         delegate: Controls.ItemDelegate {
                             required property var modelData
@@ -195,22 +197,6 @@ Kirigami.ApplicationWindow {
                             highlighted: ListView.isCurrentItem
                             onClicked: sidebar.currentIndex = index
                         }
-                    }
-
-                    Controls.Label {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: Kirigami.Units.smallSpacing
-                        text: "kpdrive " + backend.version + " · " + backend.license
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.7
-                        wrapMode: Text.WordWrap
-                    }
-
-                    Controls.Button {
-                        text: backend.i18n("Read the licence")
-                        flat: true
-                        font: Kirigami.Theme.smallFont
-                        onClicked: root.open("https://www.gnu.org/licenses/gpl-3.0.html", "the licence")
                     }
                 }
             }
@@ -732,6 +718,73 @@ Kirigami.ApplicationWindow {
                                     explanation: search.text.length > 0
                                                  ? backend.i18n("No line since the sync daemon started contains “{term}”.").replace("{term}", search.text)
                                                  : backend.i18n("This shows what has happened since the sync daemon started.")
+                                }
+                            }
+                        }
+                    }
+
+                    // ---- About ----------------------------------------------
+                    Controls.ScrollView {
+                        id: aboutScroll
+                        contentWidth: availableWidth
+
+                        ColumnLayout {
+                            width: aboutScroll.availableWidth
+                            spacing: Kirigami.Units.largeSpacing
+
+                            Item { implicitHeight: Kirigami.Units.gridUnit }
+
+                            Kirigami.Icon {
+                                Layout.alignment: Qt.AlignHCenter
+                                source: "folder-cloud"
+                                implicitWidth: Kirigami.Units.iconSizes.enormous
+                                implicitHeight: Kirigami.Units.iconSizes.enormous
+                            }
+
+                            Kirigami.Heading {
+                                Layout.alignment: Qt.AlignHCenter
+                                level: 1
+                                text: "kpdrive"
+                            }
+
+                            Controls.Label {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: backend.i18n("Proton Drive sync client for KDE Plasma")
+                                opacity: 0.7
+                            }
+
+                            Kirigami.FormLayout {
+                                Layout.fillWidth: true
+
+                                Controls.Label {
+                                    Kirigami.FormData.label: backend.i18n("Version:")
+                                    text: backend.version
+                                }
+
+                                RowLayout {
+                                    Kirigami.FormData.label: backend.i18n("Licence:")
+
+                                    Controls.Label { text: backend.license }
+                                    Controls.Button {
+                                        text: backend.i18n("Read the licence")
+                                        icon.name: "license"
+                                        onClicked: root.open("https://www.gnu.org/licenses/gpl-3.0.html", "the licence")
+                                    }
+                                }
+
+                                RowLayout {
+                                    Kirigami.FormData.label: backend.i18n("Project:")
+
+                                    Controls.Button {
+                                        text: backend.i18n("Source code")
+                                        icon.name: "internet-services"
+                                        onClicked: root.open("https://github.com/creadri/kpdrive", "the project page")
+                                    }
+                                    Controls.Button {
+                                        text: backend.i18n("Report a bug")
+                                        icon.name: "tools-report-bug"
+                                        onClicked: root.open("https://github.com/creadri/kpdrive/issues", "the issue tracker")
+                                    }
                                 }
                             }
                         }
