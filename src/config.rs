@@ -34,6 +34,33 @@ impl LogLevel {
     }
 }
 
+/// Where the machine draws power from, as Plasma's power management tells the
+/// three apart.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Power {
+    Ac,
+    Battery,
+    LowBattery,
+}
+
+impl Power {
+    pub const ALL: [Self; 3] = [Self::Ac, Self::Battery, Self::LowBattery];
+
+    /// The name as it appears in the config file.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Ac => "ac",
+            Self::Battery => "battery",
+            Self::LowBattery => "low_battery",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.name() == name)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
     /// Days of activity log to keep. Older day-files are deleted.
@@ -68,6 +95,14 @@ pub struct Config {
     /// such as a phone's hotspot.
     #[serde(default)]
     pub pause_on_networks: Vec<String>,
+    /// Power sources that pause syncing while in use. A low battery by default,
+    /// so a sync does not drain what is left.
+    #[serde(default = "default_power_pause")]
+    pub pause_on_power: Vec<Power>,
+}
+
+fn default_power_pause() -> Vec<Power> {
+    vec![Power::LowBattery]
 }
 
 fn default_level() -> LogLevel {
@@ -90,6 +125,7 @@ impl Default for Config {
             log_level: default_level(),
             sync_paused: false,
             pause_on_networks: Vec::new(),
+            pause_on_power: default_power_pause(),
         }
     }
 }

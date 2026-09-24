@@ -232,8 +232,11 @@ Kirigami.ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     currentIndex: sidebar.currentIndex
-                    // Networks come and go; the list is read when shown.
-                    onCurrentIndexChanged: if (currentIndex === 1) backend.reloadNetworks()
+                    // Networks and power come and go; both are read when shown.
+                    onCurrentIndexChanged: if (currentIndex === 1) {
+                        backend.reloadNetworks()
+                        backend.reloadPower()
+                    }
 
                     // ---- Account & activity ---------------------------------
                     Controls.ScrollView {
@@ -395,8 +398,8 @@ Kirigami.ApplicationWindow {
                                         enabled: backend.daemonRunning && !backend.syncBusy && !backend.syncPaused
                                         onClicked: backend.syncNow()
                                     }
-                                    // The manual pause only; a network pause
-                                    // lifts itself when the network goes.
+                                    // The manual pause only; a network or power
+                                    // pause lifts itself when that changes.
                                     Controls.Button {
                                         text: backend.pausedByHand ? backend.i18n("Resume") : backend.i18n("Pause")
                                         icon.name: backend.pausedByHand ? "media-playback-start" : "media-playback-pause"
@@ -580,6 +583,45 @@ Kirigami.ApplicationWindow {
                                     text: backend.networks.length > 0
                                           ? backend.i18n("Syncing pauses while any ticked network is connected, such as a phone's hotspot. A sync already under way finishes first.")
                                           : backend.i18n("NetworkManager lists no networks to choose from.")
+                                    wrapMode: Text.WordWrap
+                                    opacity: 0.7
+                                    font: Kirigami.Theme.smallFont
+                                }
+                            }
+
+                            Kirigami.Separator {
+                                Kirigami.FormData.isSection: true
+                                Kirigami.FormData.label: backend.i18n("Power")
+                            }
+
+                            ColumnLayout {
+                                Kirigami.FormData.label: backend.i18n("Pause while on:")
+                                Kirigami.FormData.labelAlignment: Qt.AlignTop
+                                spacing: Kirigami.Units.smallSpacing
+
+                                Repeater {
+                                    model: [
+                                        { name: "ac", text: backend.i18n("AC power") },
+                                        { name: "battery", text: backend.i18n("Battery") },
+                                        { name: "low_battery", text: backend.i18n("Low battery") }
+                                    ]
+                                    delegate: Controls.CheckBox {
+                                        required property var modelData
+                                        // Pausing on battery covers a low one too.
+                                        readonly property bool covered: modelData.name === "low_battery"
+                                                                        && backend.pausePower.indexOf("battery") >= 0
+                                        text: backend.powerNow === modelData.name
+                                              ? backend.i18n("{power} (now)").replace("{power}", modelData.text)
+                                              : modelData.text
+                                        enabled: !covered
+                                        checked: covered || backend.pausePower.indexOf(modelData.name) >= 0
+                                        onToggled: backend.changePowerPause(modelData.name, checked)
+                                    }
+                                }
+
+                                Controls.Label {
+                                    Layout.maximumWidth: Kirigami.Units.gridUnit * 18
+                                    text: backend.i18n("Low battery is the level set in the system's power management settings. A sync already under way finishes first.")
                                     wrapMode: Text.WordWrap
                                     opacity: 0.7
                                     font: Kirigami.Theme.smallFont

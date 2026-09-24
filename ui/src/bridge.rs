@@ -44,6 +44,10 @@ pub mod qobject {
         #[qproperty(QStringList, networks)]
         #[qproperty(QStringList, pause_networks, cxx_name = "pauseNetworks")]
         #[qproperty(QStringList, active_networks, cxx_name = "activeNetworks")]
+        /// Power sources that pause, by config name: ac, battery, low_battery.
+        #[qproperty(QStringList, pause_power, cxx_name = "pausePower")]
+        /// The power source in use, by the same names.
+        #[qproperty(QString, power_now, cxx_name = "powerNow")]
         #[qproperty(QString, sync_folder, cxx_name = "syncFolder")]
         #[qproperty(QString, ignore_file, cxx_name = "ignoreFile")]
         #[qproperty(QString, version)]
@@ -108,6 +112,16 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "reloadNetworks"]
         fn reload_networks(self: Pin<&mut Self>);
+
+        /// Pause, or stop pausing, while on the power source named `power`.
+        #[qinvokable]
+        #[cxx_name = "changePowerPause"]
+        fn change_power_pause(self: Pin<&mut Self>, power: &QString, on: bool);
+
+        /// Re-read which power source is in use.
+        #[qinvokable]
+        #[cxx_name = "reloadPower"]
+        fn reload_power(self: Pin<&mut Self>);
 
         /// Download the photos timeline into `folder` from now on.
         #[qinvokable]
@@ -203,6 +217,8 @@ pub struct BackendRust {
     networks: QStringList,
     pause_networks: QStringList,
     active_networks: QStringList,
+    pause_power: QStringList,
+    power_now: QString,
     sync_folder: QString,
     ignore_file: QString,
     version: QString,
@@ -236,6 +252,8 @@ impl Default for BackendRust {
             networks: QStringList::default(),
             pause_networks: QStringList::default(),
             active_networks: QStringList::default(),
+            pause_power: QStringList::default(),
+            power_now: QString::default(),
             sync_folder: QString::default(),
             ignore_file: QString::default(),
             version: QString::from(env!("CARGO_PKG_VERSION")),
@@ -313,6 +331,7 @@ impl cxx_qt::Initialize for qobject::Backend {
         self.as_mut().set_ingest_perm_rm(config.photos_ingestion_perm_rm);
         self.as_mut().set_paused_by_hand(config.sync_paused);
         self.as_mut().reload_networks();
+        self.as_mut().reload_power();
         self.as_mut().show_folder();
         self.as_mut().refresh_sync_status();
         self.as_mut().reload_logs("");
@@ -541,6 +560,30 @@ impl qobject::Backend {
         self.as_mut().set_networks(list(&known));
         self.as_mut().set_pause_networks(list(&chosen));
         self.as_mut().set_active_networks(list(&kpdrive::pause::active_connections()));
+    }
+
+    pub fn change_power_pause(mut self: Pin<&mut Self>, power: &QString, on: bool) {
+        let Some(power) = kpdrive::config::Power::parse(&power.to_string()) else { return };
+        let mut config = kpdrive::config::load();
+        config.pause_on_power.retain(|p| *p != power);
+        if on {
+            config.pause_on_power.push(power);
+        }
+        if let Err(e) = kpdrive::config::save(&config) {
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
+            return;
+        }
+        kpdrive::daemon::poke();
+        self.as_mut().reload_power();
+    }
+
+    pub fn reload_power(mut self: Pin<&mut Self>) {
+        let mut chosen = QStringList::default();
+        for p in kpdrive::config::load().pause_on_power {
+            chosen.append(QString::from(p.name()));
+        }
+        self.as_mut().set_pause_power(chosen);
+        self.as_mut().set_power_now(QString::from(kpdrive::pause::power().name()));
     }
 
     pub fn change_photos_folder(mut self: Pin<&mut Self>, folder: &QString) {

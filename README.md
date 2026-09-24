@@ -101,6 +101,7 @@ Missing keys take the default, so the file only needs what you change.
 - *photos_ingestion_perm_rm* : boolean, true if an ingested photo is deleted outright on successful upload, otherwise moved to trash. `false` by default
 - *sync_paused* : boolean, true while paused by hand (`kpdrive pause`, the tray or the window): no file sync, photo download or ingestion. `false` by default
 - *pause_on_networks* : NetworkManager connection names, as the network applet shows them, that pause syncing while connected, such as a phone's hotspot. Checked at least every thirty seconds; a sync already under way finishes first. Empty by default
+- *pause_on_power* : power sources that pause syncing while in use, any of `"ac"`, `"battery"` and `"low_battery"`, as Plasma's power management tells them apart (low means the level set in System Settings; without PowerDevil, the kernel's battery level against 20%). `"battery"` covers a low battery too. `["low_battery"]` by default
 
 `<sync_folder>/.protonignore` lists paths sync leaves alone, in `.gitignore`
 syntax; the window's **Ignore file…** opens it.
