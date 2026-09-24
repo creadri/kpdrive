@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 - 2026-09-24
+
+- Updated translations to match new UI design
+- Trash the local copy of a photo deleted in Proton
+- Pause syncing on a chosen power source, low battery by default
+- added about section in ui
+- added sync pause added network selector for auto-pause
+- Photo ingestion, and photo downloads that actually download
+
 ## 0.4.1 - 2026-09-23
 
 - No changes, changes are limited to dev build and package info

@@ -124,6 +124,14 @@ cargo test --release --workspace --offline --locked
 %{_datadir}/kio/servicemenus/kpdrive-share.desktop
 
 %changelog
+* Thu Sep 24 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.5.0-1
+- Updated translations to match new UI design
+- Trash the local copy of a photo deleted in Proton
+- Pause syncing on a chosen power source, low battery by default
+- added about section in ui
+- added sync pause added network selector for auto-pause
+- Photo ingestion, and photo downloads that actually download
+
 * Wed Sep 23 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.4.1-1
 - No changes, changes are limited to dev build and package info
 
