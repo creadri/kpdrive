@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-24 11:58+0200\n"
+"POT-Creation-Date: 2026-09-24 14:30+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,131 +18,135 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
-#: src/daemon.rs:102
+#: src/daemon.rs:112
 msgid "Signed out. Sign in from the account window."
 msgstr ""
 
-#: src/daemon.rs:104 src/daemon.rs:371
+#: src/daemon.rs:114 src/daemon.rs:401
 msgid "Syncing…"
 msgstr ""
 
-#: src/daemon.rs:106 src/daemon.rs:374
+#: src/daemon.rs:116 src/daemon.rs:404
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:116 ui/qml/main.qml:382
+#: src/daemon.rs:126 ui/qml/main.qml:409
 msgid "Open folder"
 msgstr ""
 
-#: src/daemon.rs:126
+#: src/daemon.rs:136
 msgid "Account and logs…"
 msgstr ""
 
-#: src/daemon.rs:133 ui/qml/main.qml:360
+#: src/daemon.rs:143 ui/qml/main.qml:396
 msgid "Sync now"
 msgstr ""
 
-#: src/daemon.rs:143
+#: src/daemon.rs:155
+msgid "Pause sync"
+msgstr ""
+
+#: src/daemon.rs:168
 msgid "Quit"
 msgstr ""
 
 #. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no route"
-#: src/daemon.rs:303
+#: src/daemon.rs:328
 msgid "{reason}; retrying"
 msgstr ""
 
-#: src/daemon.rs:314
+#: src/daemon.rs:339
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr ""
 
-#: src/daemon.rs:325
+#: src/daemon.rs:350
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:326
+#: src/daemon.rs:351
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:327
+#: src/daemon.rs:352
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:355
+#: src/daemon.rs:382
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
 msgstr ""
 
-#: src/daemon.rs:358
+#: src/daemon.rs:385
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
 msgstr ""
 
-#: src/daemon.rs:361
+#: src/daemon.rs:391
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr ""
 
-#: src/daemon.rs:365
+#: src/daemon.rs:395
 msgid "{reason}. Still trying."
 msgstr ""
 
-#: src/daemon.rs:366
+#: src/daemon.rs:396
 msgid "Last sync failed: {reason}"
 msgstr ""
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:380
+#: src/daemon.rs:410
 msgid "just now"
 msgstr ""
 
-#: src/daemon.rs:382
+#: src/daemon.rs:412
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:385
+#: src/daemon.rs:415
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] ""
 msgstr[1] ""
 
 #. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes ago"
-#: src/daemon.rs:389
+#: src/daemon.rs:419
 msgid "{items}, checked {ago}"
 msgstr ""
 
-#: src/daemon.rs:606
+#: src/daemon.rs:637
 msgid "Signed in again. Syncing resumed."
 msgstr ""
 
-#: src/daemon.rs:660
+#: src/daemon.rs:712
 msgid "Signed out. Sign in from the account window to resume syncing."
 msgstr ""
 
-#: src/daemon.rs:693
+#: src/daemon.rs:745
 msgid "Sync resumed"
 msgstr ""
 
-#: src/daemon.rs:710
+#: src/daemon.rs:762
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:731
+#: src/daemon.rs:783
 msgid "{n} photo uploaded to Proton Photos"
 msgid_plural "{n} photos uploaded to Proton Photos"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/i18n.rs:155 ui/qml/main.qml:405
+#: src/i18n.rs:155 ui/qml/main.qml:334
 msgid "Sign out"
 msgstr ""
 
@@ -151,6 +155,26 @@ msgid "{n} photo"
 msgid_plural "{n} photos"
 msgstr[0] ""
 msgstr[1] ""
+
+#: src/pause.rs:20
+msgid "Paused"
+msgstr ""
+
+#: src/pause.rs:27
+msgid "Paused while on AC power"
+msgstr ""
+
+#: src/pause.rs:28
+msgid "Paused while on battery"
+msgstr ""
+
+#: src/pause.rs:29
+msgid "Paused while the battery is low"
+msgstr ""
+
+#: src/pause.rs:40
+msgid "Paused while connected to {network}"
+msgstr ""
 
 #: src/sync.rs:121
 msgid "Sync into it and keep what is already there"
@@ -168,282 +192,422 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: ui/src/bridge.rs:189
+#: ui/src/bridge.rs:237
 msgid "Starting…"
 msgstr ""
 
-#: ui/src/bridge.rs:233
+#: ui/src/bridge.rs:288
 msgid "Confirm the code {code} in your browser"
 msgstr ""
 
-#: ui/src/bridge.rs:247
+#: ui/src/bridge.rs:302
 msgid "Sign-in failed: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:259
+#: ui/src/bridge.rs:314
 msgid "Signed out"
 msgstr ""
 
-#: ui/src/bridge.rs:262
+#: ui/src/bridge.rs:317
 msgid "Sign-out failed: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:324
+#: ui/src/bridge.rs:382
 msgid "{note}. Restart the sync daemon to use it."
 msgstr ""
 
-#: ui/src/bridge.rs:327
+#: ui/src/bridge.rs:385
 msgid "Cannot change the folder: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:334
+#: ui/src/bridge.rs:392
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr ""
 
-#: ui/src/bridge.rs:338
+#: ui/src/bridge.rs:396
 msgid "Cannot create the ignore file: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:375
+#: ui/src/bridge.rs:434
 msgid "Checking the account…"
 msgstr ""
 
-#: ui/src/bridge.rs:381
+#: ui/src/bridge.rs:440
 msgid "Opening the browser…"
 msgstr ""
 
-#: ui/src/bridge.rs:387
+#: ui/src/bridge.rs:446
 msgid "Signing out…"
 msgstr ""
 
-#: ui/src/bridge.rs:413
+#: ui/src/bridge.rs:472
 msgid "Cannot read the log: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:423 ui/src/bridge.rs:451 ui/src/bridge.rs:467
-#: ui/src/bridge.rs:480 ui/src/bridge.rs:498
+#: ui/src/bridge.rs:482 ui/src/bridge.rs:510 ui/src/bridge.rs:524
+#: ui/src/bridge.rs:539 ui/src/bridge.rs:573 ui/src/bridge.rs:614
+#: ui/src/bridge.rs:627 ui/src/bridge.rs:645
 msgid "Cannot save the setting: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:431
+#: ui/src/bridge.rs:490
 msgid "Proton Photos will be downloaded with the next sync"
 msgstr ""
 
-#: ui/src/bridge.rs:432
+#: ui/src/bridge.rs:491
 msgid "Proton Photos will be left alone"
 msgstr ""
 
-#: ui/src/bridge.rs:457
+#: ui/src/bridge.rs:516
 msgid "Photos put in that folder will be uploaded to Proton Photos"
 msgstr ""
 
-#: ui/src/bridge.rs:458
+#: ui/src/bridge.rs:517
 msgid "No longer uploading photos"
 msgstr ""
 
-#: ui/src/bridge.rs:485
+#: ui/src/bridge.rs:607
+msgid "Photos will be downloaded into that folder from the next pass"
+msgstr ""
+
+#: ui/src/bridge.rs:632
 msgid "Storing everything from now on"
 msgstr ""
 
-#: ui/src/bridge.rs:486
+#: ui/src/bridge.rs:633
 msgid "Storing warnings and errors from now on"
 msgstr ""
 
-#: ui/src/bridge.rs:487
+#: ui/src/bridge.rs:634
 msgid "Storing errors from now on"
 msgstr ""
 
-#: ui/src/bridge.rs:503
+#: ui/src/bridge.rs:650
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] ""
 msgstr[1] ""
 
-#: ui/src/bridge.rs:504
+#: ui/src/bridge.rs:651
 msgid "Cannot prune the log: {reason}"
 msgstr ""
 
-#: ui/qml/main.qml:26
+#: ui/qml/main.qml:28
 msgid "Choose the Proton Drive folder"
 msgstr ""
 
-#: ui/qml/main.qml:34
+#: ui/qml/main.qml:35
+msgid "Choose where Proton Photos are downloaded"
+msgstr ""
+
+#: ui/qml/main.qml:42
 msgid "Choose the folder to upload photos from"
 msgstr ""
 
-#: ui/qml/main.qml:45
+#: ui/qml/main.qml:53
 msgid "The folder is not empty"
 msgstr ""
 
-#: ui/qml/main.qml:80
+#: ui/qml/main.qml:104
 msgid "Opened {what}"
 msgstr ""
 
-#: ui/qml/main.qml:82
+#: ui/qml/main.qml:106
 msgid "Could not open {what} ({url})"
 msgstr ""
 
-#. TRANSLATORS: tab label, the page showing the signed-in account
-#: ui/qml/main.qml:138
-msgid "Account"
+#: ui/qml/main.qml:186
+msgid "Account & activity"
 msgstr ""
 
-#. TRANSLATORS: tab label, the page showing the activity log
-#: ui/qml/main.qml:140
+#: ui/qml/main.qml:187
+msgid "Settings"
+msgstr ""
+
+#: ui/qml/main.qml:188 ui/qml/main.qml:633
 msgid "Logs"
 msgstr ""
 
-#: ui/qml/main.qml:177
+#: ui/qml/main.qml:189
+msgid "About"
+msgstr ""
+
+#: ui/qml/main.qml:269
 msgid "Not signed in"
 msgstr ""
 
-#: ui/qml/main.qml:184
+#: ui/qml/main.qml:276
 msgid "Signed in to Proton Drive"
 msgstr ""
 
-#: ui/qml/main.qml:185
+#: ui/qml/main.qml:277
 msgid "Sign in to sync this computer with Proton Drive."
 msgstr ""
 
-#. TRANSLATORS: heading above the bar showing how much of the account is used
-#: ui/qml/main.qml:206
-msgid "Storage"
+#: ui/qml/main.qml:294
+msgid "Storage:"
 msgstr ""
 
-#: ui/qml/main.qml:234
+#: ui/qml/main.qml:323
 msgid "{used} of {total} used"
 msgstr ""
 
-#. TRANSLATORS: label before the path of the sync folder, as in "Syncing to /home/you/ProtonDrive"
-#: ui/qml/main.qml:246
-msgid "Syncing to"
+#: ui/qml/main.qml:331
+msgid "Account:"
 msgstr ""
 
-#: ui/qml/main.qml:250
+#: ui/qml/main.qml:334
+msgid "Sign in"
+msgstr ""
+
+#. TRANSLATORS: button that reloads the account details from Proton
+#: ui/qml/main.qml:341
+msgid "Refresh"
+msgstr ""
+
+#: ui/qml/main.qml:350
+msgid "On the web:"
+msgstr ""
+
+#: ui/qml/main.qml:353
+msgid "Drive on the web"
+msgstr ""
+
+#: ui/qml/main.qml:358
+msgid "Proton account"
+msgstr ""
+
+#: ui/qml/main.qml:366
+msgid "Activity"
+msgstr ""
+
+#: ui/qml/main.qml:373
+msgid "Sync:"
+msgstr ""
+
+#: ui/qml/main.qml:404
+msgid "Resume"
+msgstr ""
+
+#: ui/qml/main.qml:404
+msgid "Pause"
+msgstr ""
+
+#: ui/qml/main.qml:429
+msgid "Files"
+msgstr ""
+
+#: ui/qml/main.qml:433
+msgid "Sync folder:"
+msgstr ""
+
+#: ui/qml/main.qml:437
 msgid "nowhere yet"
 msgstr ""
 
 #. TRANSLATORS: button that opens a folder picker to sync somewhere else
-#: ui/qml/main.qml:257 ui/qml/main.qml:324
+#: ui/qml/main.qml:443 ui/qml/main.qml:490 ui/qml/main.qml:533
 msgid "Change…"
 msgstr ""
 
+#: ui/qml/main.qml:450
+msgid "Ignored paths:"
+msgstr ""
+
 #. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves alone
-#: ui/qml/main.qml:264
+#: ui/qml/main.qml:452
 msgid "Ignore file…"
 msgstr ""
 
-#: ui/qml/main.qml:276
+#: ui/qml/main.qml:459
+msgid "Photos"
+msgstr ""
+
+#: ui/qml/main.qml:463
+msgid "Download:"
+msgstr ""
+
+#: ui/qml/main.qml:467
 msgid "Also download Proton Photos"
 msgstr ""
 
-#: ui/qml/main.qml:284
+#: ui/qml/main.qml:473
 msgid ""
-"Your timeline is copied into {folder}, checked every half hour. Nothing in "
-"Proton Photos is changed or deleted by it."
+"Your timeline is copied here every half hour. Nothing in Proton Photos is "
+"changed or deleted by it."
 msgstr ""
 
-#: ui/qml/main.qml:285
+#: ui/qml/main.qml:481
+msgid "Download folder:"
+msgstr ""
+
+#: ui/qml/main.qml:485
 msgid "your Pictures folder"
 msgstr ""
 
-#: ui/qml/main.qml:297
+#: ui/qml/main.qml:497
+msgid "Upload:"
+msgstr ""
+
+#: ui/qml/main.qml:501
 msgid "Upload photos from a folder"
 msgstr ""
 
-#: ui/qml/main.qml:333
-msgid "Delete uploaded photos instead of moving them to the trash"
-msgstr ""
-
-#: ui/qml/main.qml:341
+#: ui/qml/main.qml:515
 msgid ""
 "Photos and videos put in this folder go up to Proton Photos within a minute, "
 "then leave the folder. Anything that cannot be uploaded stays."
 msgstr ""
 
-#: ui/qml/main.qml:388
-msgid "Drive on the web"
+#: ui/qml/main.qml:523
+msgid "Upload folder:"
 msgstr ""
 
-#: ui/qml/main.qml:393
-msgid "Proton account"
+#: ui/qml/main.qml:540
+msgid "After upload:"
 msgstr ""
 
-#. TRANSLATORS: button that reloads the account details from Proton
-#: ui/qml/main.qml:399
-msgid "Refresh"
+#: ui/qml/main.qml:542
+msgid "Delete instead of moving to the trash"
 msgstr ""
 
-#: ui/qml/main.qml:405
-msgid "Sign in"
+#: ui/qml/main.qml:549
+msgid "Network"
 msgstr ""
 
-#: ui/qml/main.qml:448
-msgid "Read the licence"
+#: ui/qml/main.qml:553 ui/qml/main.qml:598
+msgid "Pause while on:"
 msgstr ""
 
-#: ui/qml/main.qml:466
-msgid "Search the log"
+#: ui/qml/main.qml:573
+msgid "{network} (connected)"
 msgstr ""
 
-#. TRANSLATORS: right-click menu item, copies the selected log text
-#: ui/qml/main.qml:512
-msgid "Copy"
+#: ui/qml/main.qml:584
+msgid ""
+"Syncing pauses while any ticked network is connected, such as a phone's "
+"hotspot. A sync already under way finishes first."
 msgstr ""
 
-#. TRANSLATORS: right-click menu item, selects the whole log view
-#: ui/qml/main.qml:518
-msgid "Select all"
+#: ui/qml/main.qml:585
+msgid "NetworkManager lists no networks to choose from."
 msgstr ""
 
-#: ui/qml/main.qml:535
-msgid "No lines match"
+#: ui/qml/main.qml:594
+msgid "Power"
 msgstr ""
 
-#: ui/qml/main.qml:535
-msgid "Nothing logged yet"
+#: ui/qml/main.qml:604
+msgid "AC power"
 msgstr ""
 
-#: ui/qml/main.qml:537
-msgid "No line since the sync daemon started contains “{term}”."
+#: ui/qml/main.qml:605
+msgid "Battery"
 msgstr ""
 
-#: ui/qml/main.qml:538
-msgid "This shows what has happened since the sync daemon started."
+#: ui/qml/main.qml:606
+msgid "Low battery"
 msgstr ""
 
-#. TRANSLATORS: start of "Keep logs for [30] days"; the number and "days" follow
-#: ui/qml/main.qml:547
-msgid "Keep logs for"
+#: ui/qml/main.qml:614
+msgid "{power} (now)"
 msgstr ""
 
-#. TRANSLATORS: end of "Keep logs for [30] days"
-#: ui/qml/main.qml:557
+#: ui/qml/main.qml:624
+msgid ""
+"Low battery is the level set in the system's power management settings. A "
+"sync already under way finishes first."
+msgstr ""
+
+#: ui/qml/main.qml:637
+msgid "Keep logs for:"
+msgstr ""
+
+#. TRANSLATORS: after the number in "Keep logs for: [30] days"
+#: ui/qml/main.qml:646
 msgid "days"
 msgstr ""
 
-#. TRANSLATORS: verb, label before a dropdown choosing which log levels are written to disk
-#: ui/qml/main.qml:562
-msgid "Store"
+#. TRANSLATORS: label before a dropdown choosing which log levels are written to disk
+#: ui/qml/main.qml:651
+msgid "Store:"
 msgstr ""
 
 #. TRANSLATORS: dropdown choice, store warnings and errors only
-#: ui/qml/main.qml:570
+#: ui/qml/main.qml:656
 msgid "Warnings and errors"
 msgstr ""
 
 #. TRANSLATORS: dropdown choice, store every log line
-#: ui/qml/main.qml:572
+#: ui/qml/main.qml:658
 msgid "Everything"
 msgstr ""
 
 #. TRANSLATORS: dropdown choice, store errors only
-#: ui/qml/main.qml:574
+#: ui/qml/main.qml:660
 msgid "Errors only"
 msgstr ""
 
-#: ui/qml/main.qml:583
+#: ui/qml/main.qml:681
+msgid "Search the log"
+msgstr ""
+
+#: ui/qml/main.qml:686
 msgid "{n} line"
 msgid_plural "{n} lines"
 msgstr[0] ""
 msgstr[1] ""
+
+#. TRANSLATORS: right-click menu item, copies the selected log text
+#: ui/qml/main.qml:736
+msgid "Copy"
+msgstr ""
+
+#. TRANSLATORS: right-click menu item, selects the whole log view
+#: ui/qml/main.qml:742
+msgid "Select all"
+msgstr ""
+
+#: ui/qml/main.qml:759
+msgid "No lines match"
+msgstr ""
+
+#: ui/qml/main.qml:759
+msgid "Nothing logged yet"
+msgstr ""
+
+#: ui/qml/main.qml:761
+msgid "No line since the sync daemon started contains “{term}”."
+msgstr ""
+
+#: ui/qml/main.qml:762
+msgid "This shows what has happened since the sync daemon started."
+msgstr ""
+
+#: ui/qml/main.qml:794
+msgid "Proton Drive sync client for KDE Plasma"
+msgstr ""
+
+#: ui/qml/main.qml:802
+msgid "Version:"
+msgstr ""
+
+#: ui/qml/main.qml:807
+msgid "Licence:"
+msgstr ""
+
+#: ui/qml/main.qml:811
+msgid "Read the licence"
+msgstr ""
+
+#: ui/qml/main.qml:818
+msgid "Project:"
+msgstr ""
+
+#: ui/qml/main.qml:821
+msgid "Source code"
+msgstr ""
+
+#: ui/qml/main.qml:826
+msgid "Report a bug"
+msgstr ""
