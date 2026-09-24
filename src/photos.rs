@@ -5,14 +5,14 @@
 //! locally under `<dest>/YYYY/MM/`, which is what every photo tool expects and
 //! what keeps a large library navigable.
 //!
-//! ponytail: download only. Uploading a photo means generating a thumbnail and
-//! reading EXIF for the capture time, which needs an image decoder; add that
-//! when someone actually wants to push photos up from the desktop.
+//! Download only, as far as the timeline goes: nothing here uploads, renames
+//! or deletes in the account (ingestion, in `ingest`, is the way up). A photo
+//! deleted in Proton has its copy moved to the desktop trash.
 
 use anyhow::{Context, Result, bail};
 use proton_crypto::crypto::PGPProviderSync;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
@@ -97,7 +97,7 @@ pub fn default_dest() -> Result<PathBuf> {
 /// photo state around it. `None` when the account has no photos library.
 ///
 /// Photos are download only: this never uploads, renames or deletes anything
-/// in the account, so the copy on disk is a copy and nothing more.
+/// in the account. Photos gone from the timeline are trashed here.
 pub async fn pass<P: PGPProviderSync>(drive: &Drive<P>, sync_root: Option<&Path>) -> Result<Option<(usize, PathBuf)>> {
     let mut state = load_state()?.unwrap_or_default();
     state.dest = dest()?;
@@ -119,6 +119,7 @@ pub async fn run<P: PGPProviderSync>(drive: &Drive<P>, state: &mut State) -> Res
     // otherwise fetch the same photo twice.
     wanted.sort_by(|a, b| a.capture_time.cmp(&b.capture_time).then_with(|| a.id.cmp(&b.id)));
     wanted.dedup_by(|a, b| a.id == b.id);
+    trash_deleted(state, &wanted)?;
 
     let missing: Vec<_> = wanted
         .iter()
@@ -168,6 +169,51 @@ pub async fn run<P: PGPProviderSync>(drive: &Drive<P>, state: &mut State) -> Res
         }
     }
     Ok(Some(fetched))
+}
+
+/// Moves the copies of photos deleted in Proton to the desktop trash, so they
+/// can still be restored from there, and forgets them.
+fn trash_deleted(state: &mut State, timeline: &[crate::drive::TimelinePhoto]) -> Result<()> {
+    let live: HashSet<&str> = timeline.iter().map(|p| p.id.as_str()).collect();
+    let Some(gone) = deleted(state, &live) else {
+        crate::log::warn(&format!(
+            "the photos timeline lists none of the {} photos already downloaded; not trashing any of them",
+            state.photos.len()
+        ));
+        return Ok(());
+    };
+    if gone.is_empty() {
+        return Ok(());
+    }
+    for id in gone {
+        let rel = state.photos[&id].path.clone();
+        let local = state.dest.join(&rel);
+        if local.exists() {
+            if let Err(e) = crate::ingest::remove(&local, false) {
+                // Kept in the state, so the next pass tries again.
+                crate::log::error(&format!("error: {}: {e:#}", rel.display()));
+                continue;
+            }
+            crate::log::info(&format!("trashed photo {} (deleted in Proton)", rel.display()));
+        }
+        // The YYYY/MM folders it leaves empty; remove_dir refuses any that are not.
+        for dir in rel.ancestors().skip(1).filter(|d| !d.as_os_str().is_empty()) {
+            if fs::remove_dir(state.dest.join(dir)).is_err() {
+                break;
+            }
+        }
+        state.photos.remove(&id);
+        save_state(state)?;
+    }
+    Ok(())
+}
+
+/// The downloaded photos missing from the timeline, or `None` when that is
+/// every one of them: a timeline that suddenly lists none of the library is far
+/// more likely a fault on the way than the whole library deleted at once.
+fn deleted(state: &State, live: &HashSet<&str>) -> Option<Vec<String>> {
+    let gone: Vec<String> = state.photos.keys().filter(|id| !live.contains(id.as_str())).cloned().collect();
+    (gone.len() < state.photos.len() || gone.is_empty()).then_some(gone)
 }
 
 async fn fetch<P: PGPProviderSync>(
@@ -254,6 +300,19 @@ mod tests {
             assert!(dated_path(&dir, taken, bad).is_none(), "{bad:?}");
         }
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn deleted_photos_but_never_all_of_them() {
+        let entry = |p: &str| Entry { path: p.into(), revision: None };
+        let mut state = State::default();
+        assert_eq!(deleted(&state, &HashSet::new()), Some(vec![]));
+        state.photos.insert("a".into(), entry("2023/11/a.jpg"));
+        state.photos.insert("b".into(), entry("2023/11/b.jpg"));
+        assert_eq!(deleted(&state, &HashSet::from(["a", "b", "c"])), Some(vec![]));
+        assert_eq!(deleted(&state, &HashSet::from(["a"])), Some(vec!["b".to_owned()]));
+        assert_eq!(deleted(&state, &HashSet::from(["c"])), None);
+        assert_eq!(deleted(&state, &HashSet::new()), None);
     }
 
     #[test]

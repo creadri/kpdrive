@@ -34,9 +34,11 @@ sync would upload the whole library back into Drive as ordinary files. The
 first run downloads the whole timeline, which on most accounts is the largest
 thing kpdrive will ever do.
 
-The copy is only a copy: a photo deleted in Proton stays on disk, a photo
-edited in Proton keeps its old copy, and deleting a local copy brings it back
-on the next pass. See [docs/photos-plan.md](docs/photos-plan.md).
+The copy is only a copy: a photo deleted in Proton is moved to the desktop
+trash on the next pass, a photo edited in Proton keeps its old copy, and
+deleting a local copy brings it back on the next pass. If the timeline ever
+lists none of the photos already downloaded, nothing is trashed: that looks
+more like a fault than a whole library deleted at once.
 
 Ingestion is the other direction. Set *photos_ingestion_folder* (or pick it in
 the window) and the daemon uploads each photo or video put there into Proton

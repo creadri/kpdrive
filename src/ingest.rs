@@ -157,7 +157,7 @@ fn candidates(folder: &Path) -> Vec<PathBuf> {
 /// Moves `path` to the desktop trash, or deletes it with `perm_rm`. The trash
 /// goes through `gio`, which knows the per-filesystem trash directories a
 /// phone mount or an SD card needs.
-fn remove(path: &Path, perm_rm: bool) -> Result<()> {
+pub(crate) fn remove(path: &Path, perm_rm: bool) -> Result<()> {
     if perm_rm {
         return fs::remove_file(path).with_context(|| format!("delete {}", path.display()));
     }
