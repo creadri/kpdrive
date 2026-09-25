@@ -17,6 +17,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
+use crate::account::Account;
 use crate::drive::{Drive, civil_utc};
 
 #[derive(Serialize, Deserialize, Default)]
@@ -24,6 +25,9 @@ pub struct State {
     pub dest: PathBuf,
     /// link id → what we wrote for it.
     pub photos: BTreeMap<String, Entry>,
+    /// The file this state is kept in, which is the account's.
+    #[serde(skip)]
+    pub file: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -33,48 +37,36 @@ pub struct Entry {
     pub revision: Option<String>,
 }
 
-pub fn state_path() -> PathBuf {
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| Path::new(&std::env::var_os("HOME").expect("HOME")).join(".local/share"));
-    base.join("kpdrive/photos.json")
+pub fn state_path(account: &Account) -> PathBuf {
+    account.dir().join("photos.json")
 }
 
-pub fn load_state() -> Result<Option<State>> {
-    match fs::read(state_path()) {
-        Ok(bytes) => Ok(Some(serde_json::from_slice(&bytes).context("photos.json is corrupt")?)),
+pub fn load_state(account: &Account) -> Result<Option<State>> {
+    let file = state_path(account);
+    match fs::read(&file) {
+        Ok(bytes) => {
+            let mut state: State = serde_json::from_slice(&bytes).with_context(|| format!("{} is corrupt", file.display()))?;
+            state.file = file;
+            Ok(Some(state))
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e).context("read photos.json"),
+        Err(e) => Err(e).with_context(|| format!("read {}", file.display())),
     }
 }
 
 pub fn save_state(state: &State) -> Result<()> {
-    let path = state_path();
+    let path = &state.file;
+    anyhow::ensure!(!path.as_os_str().is_empty(), "photo state has nowhere to be saved");
     fs::create_dir_all(path.parent().expect("state path has a parent"))?;
     let tmp = path.with_extension("json.tmp");
     fs::write(&tmp, serde_json::to_vec_pretty(state)?)?;
-    fs::rename(&tmp, &path)?;
+    fs::rename(&tmp, path)?;
     Ok(())
 }
 
-/// Where photos go: the setting, what an earlier version recorded, or the
-/// default. Recording it in the photo state came first; the setting is where
-/// it belongs, and an existing folder is adopted rather than re-downloaded.
-pub fn dest() -> Result<PathBuf> {
-    if let Some(dir) = crate::config::load().photos_sync_folder.filter(|d| !d.as_os_str().is_empty()) {
-        return Ok(dir);
-    }
-    if let Some(old) = load_state()?.map(|s| s.dest).filter(|d| !d.as_os_str().is_empty()) {
-        return Ok(old);
-    }
-    default_dest()
-}
-
-/// Points the photo download at `dir` from now on.
-pub fn set_dest(dir: PathBuf) -> Result<()> {
-    let mut config = crate::config::load();
-    config.photos_sync_folder = Some(dir);
-    crate::config::save(&config)
+/// Points the account's photo download at `dir` from now on.
+pub fn set_dest(account: &Account, dir: PathBuf) -> Result<()> {
+    account.update(|a| a.photos_sync_folder = Some(dir))
 }
 
 /// `~/Pictures/ProtonDrive`, honouring a localized or relocated Pictures folder.
@@ -98,10 +90,11 @@ pub fn default_dest() -> Result<PathBuf> {
 ///
 /// Photos are download only: this never uploads, renames or deletes anything
 /// in the account. Photos gone from the timeline are trashed here.
-pub async fn pass<P: PGPProviderSync>(drive: &Drive<P>, sync_root: Option<&Path>) -> Result<Option<(usize, PathBuf)>> {
-    let mut state = load_state()?.unwrap_or_default();
-    state.dest = dest()?;
-    check_dest(&state.dest, sync_root)?;
+pub async fn pass<P: PGPProviderSync>(drive: &Drive<P>, account: &Account) -> Result<Option<(usize, PathBuf)>> {
+    let mut state = load_state(account)?.unwrap_or_else(|| State { file: state_path(account), ..Default::default() });
+    state.dest = account.photos_folder()?;
+    check_dest(&state.dest, account.sync_folder().as_deref())?;
+    account.check_folder(&state.dest)?;
     let fetched = run(drive, &mut state).await?;
     save_state(&state)?;
     Ok(fetched.map(|n| (n, state.dest)))

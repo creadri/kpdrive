@@ -19,6 +19,10 @@ pub mod qobject {
     extern "RustQt" {
         #[qobject]
         #[qml_element]
+        /// Every account, by username, in the order they were added.
+        #[qproperty(QStringList, accounts)]
+        /// The account the per-account fields below are about.
+        #[qproperty(QString, current_account, cxx_name = "currentAccount")]
         #[qproperty(QString, username)]
         #[qproperty(f64, used_bytes, cxx_name = "usedBytes")]
         #[qproperty(f64, total_bytes, cxx_name = "totalBytes")]
@@ -151,12 +155,24 @@ pub mod qobject {
         #[qinvokable]
         fn refresh(self: Pin<&mut Self>);
 
-        /// Sign in through the browser.
+        /// Sign in through the browser: adds an account, or signs one that
+        /// is already here back in.
         #[qinvokable]
         fn login(self: Pin<&mut Self>);
 
+        /// Sign the selected account out. It keeps its folder.
         #[qinvokable]
         fn logout(self: Pin<&mut Self>);
+
+        /// Forget the selected account and what it synced; its files stay.
+        #[qinvokable]
+        #[cxx_name = "removeAccount"]
+        fn remove_account(self: Pin<&mut Self>);
+
+        /// Show `username`'s account, folders and settings.
+        #[qinvokable]
+        #[cxx_name = "selectAccount"]
+        fn select_account(self: Pin<&mut Self>, username: &QString);
 
         /// Show the log lines containing `term`.
         #[qinvokable]
@@ -186,14 +202,19 @@ use std::sync::mpsc::{Sender, channel};
 /// a selection can cross lines, so this is also what bounds what that costs.
 const LOG_LINES: usize = 100;
 
-/// What the window asks the worker to do.
+/// What the window asks the worker to do, and for which account.
 enum Task {
-    Refresh,
+    /// Move a single-account setup over, once, before anything else.
+    Migrate,
+    Refresh(String),
     Login,
-    Logout,
+    Logout(String),
+    Remove(String),
 }
 
 pub struct BackendRust {
+    accounts: QStringList,
+    current_account: QString,
     username: QString,
     used_bytes: f64,
     total_bytes: f64,
@@ -229,6 +250,8 @@ pub struct BackendRust {
 impl Default for BackendRust {
     fn default() -> Self {
         Self {
+            accounts: QStringList::default(),
+            current_account: QString::default(),
             username: QString::default(),
             used_bytes: 0.0,
             total_bytes: 0.0,
@@ -281,7 +304,13 @@ impl cxx_qt::Initialize for qobject::Backend {
             };
             while let Ok(task) = rx.recv() {
                 match task {
-                    Task::Refresh => load_account(&runtime, &qt),
+                    Task::Migrate => {
+                        if let Err(e) = runtime.block_on(kpdrive::account::migrate()) {
+                            kpdrive::log::write("ERROR", &format!("could not move the account to the new layout: {e:#}"));
+                        }
+                        let _ = qt.queue(|b| b.reload_accounts(None));
+                    }
+                    Task::Refresh(username) => load_account(&runtime, &qt, &username),
                     Task::Login => {
                         let signal = qt.clone();
                         let result = runtime.block_on(kpdrive::account::login(|url, code| {
@@ -293,29 +322,46 @@ impl cxx_qt::Initialize for qobject::Backend {
                             });
                         }));
                         match result {
-                            Ok(_) => {
-                                // The daemon is still holding the session this
-                                // sign-in replaced; it reloads when poked.
+                            Ok((account, _)) => {
+                                // The daemon starts on a new account, or takes
+                                // up the session this sign-in replaced.
                                 kpdrive::daemon::poke();
-                                load_account(&runtime, &qt);
+                                let _ = qt.queue(move |b| b.reload_accounts(Some(account.username)));
                             }
                             Err(e) => report(&qt, kpdrive::i18n::fill(kpdrive::i18n::t("Sign-in failed: {reason}"), &[("reason", &format!("{e:#}"))])),
                         }
                     }
-                    Task::Logout => match runtime.block_on(kpdrive::account::logout()) {
-                        Ok(()) => {
-                            kpdrive::daemon::poke();
-                            let _ = qt.queue(|mut b| {
-                                b.as_mut().set_logged_in(false);
-                                b.as_mut().set_username(QString::default());
-                                b.as_mut().set_used_bytes(0.0);
-                                b.as_mut().set_total_bytes(0.0);
-                                b.as_mut().set_busy(false);
-                                b.as_mut().set_status(QString::from(kpdrive::i18n::t("Signed out")));
-                            });
+                    Task::Logout(username) => {
+                        let account = kpdrive::account::Account { username };
+                        match runtime.block_on(account.logout()) {
+                            Ok(()) => {
+                                kpdrive::daemon::poke();
+                                let _ = qt.queue(|mut b| {
+                                    b.as_mut().set_logged_in(false);
+                                    b.as_mut().set_used_bytes(0.0);
+                                    b.as_mut().set_total_bytes(0.0);
+                                    b.as_mut().set_busy(false);
+                                    b.as_mut().set_status(QString::from(kpdrive::i18n::t("Signed out")));
+                                });
+                            }
+                            Err(e) => report(&qt, kpdrive::i18n::fill(kpdrive::i18n::t("Sign-out failed: {reason}"), &[("reason", &format!("{e:#}"))])),
                         }
-                        Err(e) => report(&qt, kpdrive::i18n::fill(kpdrive::i18n::t("Sign-out failed: {reason}"), &[("reason", &format!("{e:#}"))])),
-                    },
+                    }
+                    Task::Remove(username) => {
+                        let account = kpdrive::account::Account { username };
+                        match runtime.block_on(account.remove()) {
+                            Ok(()) => {
+                                kpdrive::daemon::poke();
+                                let told = kpdrive::i18n::fill(kpdrive::i18n::t("Removed {account}. Its files were left where they are."), &[("account", &account.username)]);
+                                let _ = qt.queue(move |mut b| {
+                                    b.as_mut().set_busy(false);
+                                    b.as_mut().reload_accounts(None);
+                                    b.as_mut().set_status(QString::from(&told));
+                                });
+                            }
+                            Err(e) => report(&qt, kpdrive::i18n::fill(kpdrive::i18n::t("Cannot remove the account: {reason}"), &[("reason", &format!("{e:#}"))])),
+                        }
+                    }
                 }
             }
         });
@@ -323,26 +369,75 @@ impl cxx_qt::Initialize for qobject::Backend {
         let config = kpdrive::config::load();
         self.as_mut().set_retention_days(config.log_retention_days as i32);
         self.as_mut().set_log_level(QString::from(config.log_level.name()));
-        self.as_mut().set_sync_photos(config.photos_sync);
-        let photos = kpdrive::photos::dest().map(|d| d.display().to_string()).unwrap_or_default();
-        self.as_mut().set_photos_folder(QString::from(&photos));
-        let ingest = kpdrive::ingest::folder().map(|d| d.display().to_string()).unwrap_or_default();
-        self.as_mut().set_ingest_folder(QString::from(&ingest));
-        self.as_mut().set_ingest_perm_rm(config.photos_ingestion_perm_rm);
         self.as_mut().set_paused_by_hand(config.sync_paused);
         self.as_mut().reload_networks();
         self.as_mut().reload_power();
-        self.as_mut().show_folder();
-        self.as_mut().refresh_sync_status();
         self.as_mut().reload_logs("");
-        self.refresh();
+        // The accounts are shown once the migration has had its turn.
+        self.as_mut().set_busy(true);
+        self.send(Task::Migrate);
     }
 }
 
 impl qobject::Backend {
+    /// The selected account, if there is one.
+    fn account(&self) -> Option<kpdrive::account::Account> {
+        let name = self.current_account().to_string();
+        kpdrive::account::all().into_iter().find(|a| a.username == name)
+    }
+
+    /// Re-reads the accounts and shows `select`, or the one already shown, or
+    /// the first.
+    fn reload_accounts(mut self: Pin<&mut Self>, select: Option<String>) {
+        let accounts = kpdrive::account::all();
+        let mut list = QStringList::default();
+        for a in &accounts {
+            list.append(QString::from(&a.username));
+        }
+        self.as_mut().set_accounts(list);
+        let shown = self.current_account().to_string();
+        let pick = select
+            .and_then(|s| accounts.iter().find(|a| a.username.eq_ignore_ascii_case(&s)))
+            .or_else(|| accounts.iter().find(|a| a.username == shown))
+            .or(accounts.first())
+            .map(|a| a.username.clone())
+            .unwrap_or_default();
+        self.as_mut().show_account(pick);
+    }
+
+    pub fn select_account(self: Pin<&mut Self>, username: &QString) {
+        self.show_account(username.to_string());
+    }
+
+    /// Fills every per-account field for `username`, then asks Proton for
+    /// its details.
+    fn show_account(mut self: Pin<&mut Self>, username: String) {
+        self.as_mut().set_current_account(QString::from(&username));
+        self.as_mut().set_username(QString::from(&username));
+        self.as_mut().set_used_bytes(0.0);
+        self.as_mut().set_total_bytes(0.0);
+        let account = self.account();
+        let settings = account.as_ref().map(|a| a.settings()).unwrap_or_default();
+        self.as_mut().set_sync_photos(settings.photos_sync);
+        let photos = account.as_ref().and_then(|a| a.photos_folder().ok()).map(|d| d.display().to_string()).unwrap_or_default();
+        self.as_mut().set_photos_folder(QString::from(&photos));
+        let ingest = account.as_ref().and_then(|a| a.ingest_folder()).map(|d| d.display().to_string()).unwrap_or_default();
+        self.as_mut().set_ingest_folder(QString::from(&ingest));
+        self.as_mut().set_ingest_perm_rm(settings.photos_ingestion_perm_rm);
+        self.as_mut().show_folder();
+        self.as_mut().refresh_sync_status();
+        match account {
+            Some(_) => self.refresh(),
+            None => {
+                self.as_mut().set_logged_in(false);
+                self.as_mut().set_busy(false);
+            }
+        }
+    }
+
     /// Reads the configured folder into the two path properties.
     fn show_folder(mut self: Pin<&mut Self>) {
-        let root = current_root();
+        let root = self.account().and_then(|a| current_root(&a));
         let folder = root.as_ref().map(|r| r.display().to_string()).unwrap_or_default();
         let ignore = root.map(|r| r.join(kpdrive::sync::IGNORE_FILE).display().to_string()).unwrap_or_default();
         self.as_mut().set_sync_folder(QString::from(&folder));
@@ -353,7 +448,7 @@ impl qobject::Backend {
     /// nothing to ask. The wording comes from the same place the CLI reads it.
     pub fn folder_question(self: Pin<&mut Self>, folder: &QString) -> QString {
         let folder = std::path::PathBuf::from(folder.to_string());
-        let state = kpdrive::sync::load_state().ok().flatten().unwrap_or_default();
+        let state = self.account().and_then(|a| kpdrive::sync::load_state(&a).ok().flatten()).unwrap_or_default();
         QString::from(&kpdrive::sync::folder_question(&state, &folder).unwrap_or_default())
     }
 
@@ -370,16 +465,17 @@ impl qobject::Backend {
         if folder.as_os_str().is_empty() {
             return;
         }
-        let mut state = kpdrive::sync::load_state().ok().flatten().unwrap_or_default();
+        let Some(account) = self.account() else { return };
         let occupied = match choice.to_string().as_str() {
             "rename" => kpdrive::sync::Occupied::Rename,
             _ => kpdrive::sync::Occupied::Merge,
         };
-        match kpdrive::sync::set_folder(&mut state, folder, occupied) {
+        let changed = kpdrive::sync::open_state(&account).and_then(|mut state| kpdrive::sync::set_folder(&account, &mut state, folder, occupied));
+        match changed {
             Ok(note) => {
-                // A running daemon holds the old path in memory.
-                let running = kpdrive::daemon::socket_path().exists();
-                let note = if running { kpdrive::i18n::fill(kpdrive::i18n::t("{note}. Restart the sync daemon to use it."), &[("note", &note)]) } else { note };
+                // The daemon notices the new folder when poked, and starts
+                // that account again from there.
+                kpdrive::daemon::poke();
                 self.as_mut().set_status(QString::from(&note));
             }
             Err(e) => self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot change the folder: {reason}"), &[("reason", &format!("{e:#}"))]))),
@@ -388,7 +484,7 @@ impl qobject::Backend {
     }
 
     pub fn open_ignore_file(mut self: Pin<&mut Self>) {
-        let Some(root) = current_root() else {
+        let Some(root) = self.account().and_then(|a| current_root(&a)) else {
             self.as_mut().set_status(QString::from(kpdrive::i18n::t("No sync folder yet. Run: kpdrive setup")));
             return;
         };
@@ -414,25 +510,32 @@ impl qobject::Backend {
     /// The daemon's own account of itself, in the words `kpdrive status` uses.
     pub fn refresh_sync_status(mut self: Pin<&mut Self>) {
         let report = kpdrive::daemon::ask();
+        let name = self.current_account().to_string();
+        let mine = report.account(&name).cloned().unwrap_or_default();
         self.as_mut().set_daemon_running(report.running);
-        self.as_mut().set_sync_busy(report.syncing);
+        self.as_mut().set_sync_busy(mine.syncing);
         // An outage clears itself, so it reads as something to wait out
         // rather than something that went wrong.
-        self.as_mut().set_sync_offline(report.offline);
-        self.as_mut().set_sync_failed(report.signed_out || (report.error.is_some() && !report.offline));
-        self.as_mut().set_sync_status(QString::from(&report.sentence()));
+        self.as_mut().set_sync_offline(mine.offline);
+        self.as_mut().set_sync_failed(mine.signed_out || (mine.error.is_some() && !mine.offline));
+        let sentence = report.sentence(Some(&name).filter(|n| !n.is_empty()).map(String::as_str));
+        self.as_mut().set_sync_status(QString::from(&sentence));
         self.as_mut().set_sync_paused(report.paused.is_some());
     }
 
     pub fn sync_now(self: Pin<&mut Self>) {
-        kpdrive::daemon::poke();
+        match self.account() {
+            Some(a) => kpdrive::daemon::poke_account(&a.username),
+            None => kpdrive::daemon::poke(),
+        }
         self.refresh_sync_status();
     }
 
     pub fn refresh(mut self: Pin<&mut Self>) {
+        let Some(account) = self.account() else { return };
         self.as_mut().set_busy(true);
         self.as_mut().set_status(QString::from(kpdrive::i18n::t("Checking the account…")));
-        self.send(Task::Refresh);
+        self.send(Task::Refresh(account.username));
     }
 
     pub fn login(mut self: Pin<&mut Self>) {
@@ -442,9 +545,17 @@ impl qobject::Backend {
     }
 
     pub fn logout(mut self: Pin<&mut Self>) {
+        let Some(account) = self.account() else { return };
         self.as_mut().set_busy(true);
         self.as_mut().set_status(QString::from(kpdrive::i18n::t("Signing out…")));
-        self.send(Task::Logout);
+        self.send(Task::Logout(account.username));
+    }
+
+    pub fn remove_account(mut self: Pin<&mut Self>) {
+        let Some(account) = self.account() else { return };
+        self.as_mut().set_busy(true);
+        self.as_mut().set_status(QString::from(kpdrive::i18n::t("Removing the account…")));
+        self.send(Task::Remove(account.username));
     }
 
     fn send(self: Pin<&mut Self>, task: Task) {
@@ -475,10 +586,8 @@ impl qobject::Backend {
     }
 
     pub fn change_sync_photos(mut self: Pin<&mut Self>, on: bool) {
-        // Load and amend: building a fresh Config would drop the other settings.
-        let mut config = kpdrive::config::load();
-        config.photos_sync = on;
-        if let Err(e) = kpdrive::config::save(&config) {
+        let Some(account) = self.account() else { return };
+        if let Err(e) = account.update(|a| a.photos_sync = on) {
             self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
             return;
         }
@@ -494,25 +603,24 @@ impl qobject::Backend {
     }
 
     pub fn change_ingest_folder(mut self: Pin<&mut Self>, folder: &QString) {
+        let Some(account) = self.account() else { return };
         let folder = std::path::PathBuf::from(folder.to_string());
         if !folder.as_os_str().is_empty() {
-            let (root, dest) = (current_root(), kpdrive::photos::dest().ok());
+            let (root, dest) = (current_root(&account), account.photos_folder().ok());
             let others: Vec<&std::path::Path> = root.as_deref().into_iter().chain(dest.as_deref()).collect();
-            if let Err(e) = kpdrive::ingest::check_folder(&folder, &others) {
+            if let Err(e) = kpdrive::ingest::check_folder(&folder, &others).and_then(|_| account.check_folder(&folder)) {
                 self.as_mut().set_status(QString::from(&format!("{e:#}")));
                 return;
             }
         }
-        // Load and amend: building a fresh Config would drop the other settings.
-        let mut config = kpdrive::config::load();
-        config.photos_ingestion_folder = Some(folder.clone()).filter(|f| !f.as_os_str().is_empty());
-        if let Err(e) = kpdrive::config::save(&config) {
+        let chosen = Some(folder.clone()).filter(|f| !f.as_os_str().is_empty());
+        if let Err(e) = account.update(|a| a.photos_ingestion_folder = chosen.clone()) {
             self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
             return;
         }
         self.as_mut().set_ingest_folder(QString::from(&folder.display().to_string()));
         kpdrive::daemon::poke();
-        let told = match config.photos_ingestion_folder {
+        let told = match chosen {
             Some(_) => kpdrive::i18n::t("Photos put in that folder will be uploaded to Proton Photos"),
             None => kpdrive::i18n::t("No longer uploading photos"),
         };
@@ -587,18 +695,20 @@ impl qobject::Backend {
     }
 
     pub fn change_photos_folder(mut self: Pin<&mut Self>, folder: &QString) {
+        let Some(account) = self.account() else { return };
         let folder = std::path::PathBuf::from(folder.to_string());
         if folder.as_os_str().is_empty() {
             return;
         }
         // The same guards as the CLI, plus the ingestion folder: photos
         // downloaded into it would be uploaded straight back.
-        let checked = kpdrive::photos::check_dest(&folder, current_root().as_deref())
-            .and_then(|_| match kpdrive::ingest::folder() {
+        let checked = kpdrive::photos::check_dest(&folder, current_root(&account).as_deref())
+            .and_then(|_| match account.ingest_folder() {
                 Some(ingest) => kpdrive::ingest::check_folder(&ingest, &[&folder]),
                 None => Ok(()),
             })
-            .and_then(|_| kpdrive::photos::set_dest(folder.clone()));
+            .and_then(|_| account.check_folder(&folder))
+            .and_then(|_| kpdrive::photos::set_dest(&account, folder.clone()));
         if let Err(e) = checked {
             self.as_mut().set_status(QString::from(&format!("{e:#}")));
             return;
@@ -608,9 +718,8 @@ impl qobject::Backend {
     }
 
     pub fn change_ingest_perm_rm(mut self: Pin<&mut Self>, on: bool) {
-        let mut config = kpdrive::config::load();
-        config.photos_ingestion_perm_rm = on;
-        if let Err(e) = kpdrive::config::save(&config) {
+        let Some(account) = self.account() else { return };
+        if let Err(e) = account.update(|a| a.photos_ingestion_perm_rm = on) {
             self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
             return;
         }
@@ -655,19 +764,26 @@ impl qobject::Backend {
     }
 }
 
-/// The configured sync folder, falling back to what the sync state recorded.
-fn current_root() -> Option<std::path::PathBuf> {
-    kpdrive::config::load()
-        .sync_folder
-        .or_else(|| kpdrive::sync::load_state().ok().flatten().map(|s| s.root))
+/// The account's sync folder, falling back to what its sync state recorded.
+fn current_root(account: &kpdrive::account::Account) -> Option<std::path::PathBuf> {
+    account
+        .sync_folder()
+        .or_else(|| kpdrive::sync::load_state(account).ok().flatten().map(|s| s.root))
         .filter(|p| !p.as_os_str().is_empty())
 }
 
-/// Loads the account details and pushes them into the window.
-fn load_account(runtime: &tokio::runtime::Runtime, qt: &cxx_qt::CxxQtThread<qobject::Backend>) {
-    match runtime.block_on(kpdrive::account::info()) {
+/// Loads `username`'s details and pushes them into the window, unless it
+/// shows another account by the time they arrive.
+fn load_account(runtime: &tokio::runtime::Runtime, qt: &cxx_qt::CxxQtThread<qobject::Backend>, username: &str) {
+    let account = kpdrive::account::Account { username: username.to_owned() };
+    let asked = username.to_owned();
+    let still = move |b: &Pin<&mut qobject::Backend>| b.current_account().to_string() == asked;
+    match runtime.block_on(account.info()) {
         Ok(info) => {
             let _ = qt.queue(move |mut b| {
+                if !still(&b) {
+                    return;
+                }
                 b.as_mut().set_username(QString::from(&info.username));
                 b.as_mut().set_used_bytes(info.used_bytes as f64);
                 b.as_mut().set_total_bytes(info.total_bytes as f64);
@@ -684,6 +800,9 @@ fn load_account(runtime: &tokio::runtime::Runtime, qt: &cxx_qt::CxxQtThread<qobj
                 kpdrive::log::write("ERROR", &format!("account refresh failed: {e:#}"));
             }
             let _ = qt.queue(move |mut b| {
+                if !still(&b) {
+                    return;
+                }
                 b.as_mut().set_logged_in(false);
                 b.as_mut().set_busy(false);
                 b.as_mut().set_status(QString::from(&message));

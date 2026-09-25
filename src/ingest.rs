@@ -13,6 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use crate::account::Account;
 use crate::drive::{Drive, PhotoMeta};
 
 /// A file already in Proton Photos, by what it looked like at the time.
@@ -39,30 +40,25 @@ pub struct Seen {
     failed: HashMap<PathBuf, Instant>,
 }
 
-fn record_path() -> PathBuf {
-    crate::photos::state_path().with_file_name("ingest.json")
+fn record_path(account: &Account) -> PathBuf {
+    account.dir().join("ingest.json")
 }
 
-fn load_record() -> Result<Record> {
-    match fs::read(record_path()) {
+fn load_record(account: &Account) -> Result<Record> {
+    match fs::read(record_path(account)) {
         Ok(bytes) => serde_json::from_slice(&bytes).context("ingest.json is corrupt"),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Record::new()),
         Err(e) => Err(e).context("read ingest.json"),
     }
 }
 
-fn save_record(record: &Record) -> Result<()> {
-    let path = record_path();
+fn save_record(account: &Account, record: &Record) -> Result<()> {
+    let path = record_path(account);
     fs::create_dir_all(path.parent().expect("record path has a parent"))?;
     let tmp = path.with_extension(format!("json.{}.tmp", std::process::id()));
     fs::write(&tmp, serde_json::to_vec_pretty(record)?)?;
     fs::rename(&tmp, &path)?;
     Ok(())
-}
-
-/// The ingestion folder, when one is set.
-pub fn folder() -> Option<PathBuf> {
-    crate::config::load().photos_ingestion_folder.filter(|d| !d.as_os_str().is_empty())
 }
 
 /// Refuses an ingestion folder that overlaps the sync folder or the photos
@@ -169,15 +165,17 @@ pub(crate) fn remove(path: &Path, perm_rm: bool) -> Result<()> {
 /// One look at the ingestion folder. A file goes up once it has looked the
 /// same on two consecutive looks, so a copy still in progress is left alone;
 /// `seen` carries the previous look. Returns how many photos went up.
-pub async fn pass<P: PGPProviderSync>(drive: &Drive<P>, seen: &mut Seen, others: &[&Path]) -> Result<usize> {
-    let Some(folder) = folder() else { return Ok(0) };
+pub async fn pass<P: PGPProviderSync>(drive: &Drive<P>, account: &Account, seen: &mut Seen) -> Result<usize> {
+    let Some(folder) = account.ingest_folder() else { return Ok(0) };
     if !folder.is_dir() {
         // An unplugged card or phone: nothing to do until it is back.
         return Ok(0);
     }
-    check_folder(&folder, others)?;
-    let perm_rm = crate::config::load().photos_ingestion_perm_rm;
-    let mut record = load_record()?;
+    let own: Vec<PathBuf> = account.sync_folder().into_iter().chain(account.photos_folder().ok()).collect();
+    check_folder(&folder, &own.iter().map(PathBuf::as_path).collect::<Vec<_>>())?;
+    account.check_folder(&folder)?;
+    let perm_rm = account.settings().photos_ingestion_perm_rm;
+    let mut record = load_record(account)?;
     let files = candidates(&folder);
     seen.looks.retain(|p, _| files.contains(p));
     seen.failed.retain(|p, at| files.contains(p) && at.elapsed() < RETRY_AFTER);
@@ -186,7 +184,7 @@ pub async fn pass<P: PGPProviderSync>(drive: &Drive<P>, seen: &mut Seen, others:
     let before = record.len();
     record.retain(|p, e| stat(p) == Some((e.size, e.mtime)));
     if record.len() != before {
-        save_record(&record)?;
+        save_record(account, &record)?;
     }
 
     let mut root = None;
@@ -218,12 +216,12 @@ pub async fn pass<P: PGPProviderSync>(drive: &Drive<P>, seen: &mut Seen, others:
             }
             seen.looks.remove(&path);
             record.insert(path.clone(), Ingested { size: now.0, mtime: now.1 });
-            save_record(&record)?;
+            save_record(account, &record)?;
         }
         match remove(&path, perm_rm) {
             Ok(()) => {
                 record.remove(&path);
-                save_record(&record)?;
+                save_record(account, &record)?;
             }
             Err(e) => crate::log::warn(&format!("in Proton Photos but not removed: {e:#}")),
         }

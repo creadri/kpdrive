@@ -2,7 +2,6 @@
 //! the Dolphin overlay plugin (and anyone else) can ask for per-file status.
 
 use anyhow::{Context, Result};
-use proton_crypto::crypto::PGPProviderSync;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
@@ -10,7 +9,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixListener;
 use tokio::sync::mpsc;
 
-use crate::drive::Drive;
+use crate::account::Account;
 use crate::sync::{self, Entry, State, local_matches};
 
 const POLL: std::time::Duration = std::time::Duration::from_secs(30);
@@ -28,7 +27,8 @@ const PHOTOS_EVERY: std::time::Duration = std::time::Duration::from_secs(1800);
 /// limits can lose events.
 const SWEEP_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
 
-/// What the tray, the socket and the window see; refreshed after every pass.
+/// What the tray, the socket and the window see of one account; refreshed
+/// after every pass.
 #[derive(Default)]
 struct Snapshot {
     root: PathBuf,
@@ -45,15 +45,12 @@ struct Snapshot {
     /// relative to it.
     photos_root: Option<PathBuf>,
     photos: HashSet<PathBuf>,
-    /// Why nothing is syncing, when it is paused.
-    paused: Option<String>,
 }
 
 impl Snapshot {
-    /// One line of JSON for the window, which has no other way to know what
-    /// this daemon is doing.
-    fn report(&self) -> String {
+    fn json(&self, username: &str) -> serde_json::Value {
         serde_json::json!({
+            "username": username,
             "root": self.root.display().to_string(),
             "items": self.entries.len(),
             "syncing": self.syncing,
@@ -61,21 +58,86 @@ impl Snapshot {
             "offline": self.offline,
             "lastSync": self.last_sync,
             "error": self.last_error,
-            "paused": self.paused,
         })
-        .to_string()
+    }
+
+    /// One line for the tray's tooltip.
+    fn sentence(&self) -> String {
+        match (self.signed_out, &self.last_error, self.syncing) {
+            (true, ..) => crate::i18n::t("Signed out. Sign in from the account window.").into(),
+            (_, Some(e), _) => e.clone(),
+            (_, None, true) => crate::i18n::t("Syncing…").into(),
+            (_, None, false) => crate::i18n::fill(
+                crate::i18n::tn("{n} item in sync", "{n} items in sync", self.entries.len() as u64),
+                &[("n", &self.entries.len().to_string())],
+            ),
+        }
     }
 }
 
-type Shared = Arc<RwLock<Snapshot>>;
+/// Every account's snapshot, in the order the accounts were added, and why
+/// syncing is paused, when it is.
+#[derive(Default)]
+struct Board {
+    accounts: Vec<(String, Snapshot)>,
+    paused: Option<String>,
+}
+
+impl Board {
+    /// Changes an account's snapshot. One the supervisor has since dropped
+    /// stays dropped: a loop finishing its last pass must not bring it back.
+    fn update(&mut self, username: &str, change: impl FnOnce(&mut Snapshot)) {
+        if let Some((_, s)) = self.accounts.iter_mut().find(|(u, _)| u == username) {
+            change(s);
+        }
+    }
+
+    /// One line of JSON for the window. The top-level fields sum the accounts
+    /// up, as a window from before there were several expects them.
+    fn report(&self) -> String {
+        let snaps = || self.accounts.iter().map(|(_, s)| s);
+        serde_json::json!({
+            "root": snaps().next().map(|s| s.root.display().to_string()).unwrap_or_default(),
+            "items": snaps().map(|s| s.entries.len()).sum::<usize>(),
+            "syncing": snaps().any(|s| s.syncing),
+            "signedOut": self.accounts.is_empty() || snaps().any(|s| s.signed_out),
+            "offline": snaps().any(|s| s.offline),
+            "lastSync": snaps().filter_map(|s| s.last_sync).max(),
+            "error": snaps().find_map(|s| s.last_error.clone()),
+            "paused": self.paused,
+            "accounts": self.accounts.iter().map(|(u, s)| s.json(u)).collect::<Vec<_>>(),
+        })
+        .to_string()
+    }
+
+    /// Per-path status for overlays, from whichever account the path is in.
+    fn status(&self, path: &Path) -> &'static str {
+        self.accounts.iter().map(|(_, s)| status(s, path)).find(|s| *s != "NONE").unwrap_or("NONE")
+    }
+
+    /// Every folder the overlays should look at, as a JSON array.
+    fn folders(&self) -> String {
+        let mut out: Vec<String> = Vec::new();
+        for (_, s) in &self.accounts {
+            if !s.root.as_os_str().is_empty() {
+                out.push(s.root.display().to_string());
+            }
+            out.extend(s.photos_root.as_ref().map(|p| p.display().to_string()));
+        }
+        serde_json::Value::from(out).to_string()
+    }
+}
+
+type Shared = Arc<RwLock<Board>>;
 
 enum Cmd {
-    Sync,
+    /// Sync now: every account, or the one named.
+    Sync(Option<String>),
     Quit,
 }
 
 struct Tray {
-    snap: Shared,
+    board: Shared,
     cmds: mpsc::UnboundedSender<Cmd>,
 }
 
@@ -96,42 +158,55 @@ impl ksni::Tray for Tray {
         "folder-cloud".into()
     }
     fn overlay_icon_name(&self) -> String {
-        let s = self.snap.read().expect("snapshot lock");
-        if s.last_error.is_some() || s.signed_out {
+        let b = self.board.read().expect("board lock");
+        if b.accounts.is_empty() || b.accounts.iter().any(|(_, s)| s.last_error.is_some() || s.signed_out) {
             "emblem-error".into()
-        } else if s.paused.is_some() {
+        } else if b.paused.is_some() {
             "media-playback-pause".into()
         } else {
             String::new()
         }
     }
     fn tool_tip(&self) -> ksni::ToolTip {
-        let s = self.snap.read().expect("snapshot lock");
-        let description = match (s.signed_out, &s.last_error, s.syncing) {
-            _ if s.paused.is_some() => s.paused.clone().unwrap_or_default(),
-            (true, ..) => crate::i18n::t("Signed out. Sign in from the account window.").into(),
-            (_, Some(e), _) => e.clone(),
-            (_, None, true) => crate::i18n::t("Syncing…").into(),
-            (_, None, false) => crate::i18n::fill(
-                crate::i18n::tn("{n} item in sync", "{n} items in sync", s.entries.len() as u64),
-                &[("n", &s.entries.len().to_string())],
-            ),
+        let b = self.board.read().expect("board lock");
+        let description = match (&b.paused, b.accounts.as_slice()) {
+            (Some(why), _) => why.clone(),
+            (None, []) => crate::i18n::t("Signed out. Sign in from the account window.").into(),
+            (None, [(_, only)]) => only.sentence(),
+            (None, many) => many.iter().map(|(u, s)| format!("{u}: {}", s.sentence())).collect::<Vec<_>>().join("\n"),
         };
         ksni::ToolTip { title: "Proton Drive".into(), description, ..Default::default() }
     }
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
         use ksni::menu::*;
-        vec![
+        let (roots, paused): (Vec<(String, PathBuf)>, bool) = {
+            let b = self.board.read().expect("board lock");
+            (b.accounts.iter().map(|(u, s)| (u.clone(), s.root.clone())).collect(), b.paused.is_some())
+        };
+        let open = |label: String, root: PathBuf| -> MenuItem<Self> {
             StandardItem {
-                label: crate::i18n::t("Open folder").into(),
+                label,
                 icon_name: "folder-open".into(),
-                activate: Box::new(|t: &mut Self| {
-                    let root = t.snap.read().expect("snapshot lock").root.clone();
-                    let _ = spawn_detached(std::process::Command::new("xdg-open").arg(root));
+                activate: Box::new(move |_: &mut Self| {
+                    let _ = spawn_detached(std::process::Command::new("xdg-open").arg(&root));
                 }),
                 ..Default::default()
             }
+            .into()
+        };
+        // One account opens straight away; several are listed by name.
+        let folder = match roots.len() {
+            0 | 1 => open(crate::i18n::t("Open folder").into(), roots.first().map(|(_, r)| r.clone()).unwrap_or_default()),
+            _ => SubMenu {
+                label: crate::i18n::t("Open folder").into(),
+                icon_name: "folder-open".into(),
+                submenu: roots.into_iter().map(|(u, r)| open(u, r)).collect(),
+                ..Default::default()
+            }
             .into(),
+        };
+        vec![
+            folder,
             StandardItem {
                 label: crate::i18n::t("Account and logs…").into(),
                 icon_name: "user-identity".into(),
@@ -142,15 +217,15 @@ impl ksni::Tray for Tray {
             StandardItem {
                 label: crate::i18n::t("Sync now").into(),
                 icon_name: "view-refresh".into(),
-                enabled: self.snap.read().expect("snapshot lock").paused.is_none(),
+                enabled: !paused,
                 activate: Box::new(|t: &mut Self| {
-                    let _ = t.cmds.send(Cmd::Sync);
+                    let _ = t.cmds.send(Cmd::Sync(None));
                 }),
                 ..Default::default()
             }
             .into(),
-            // Only the manual pause is toggled here: a network pause lifts
-            // itself when the network goes.
+            // Only the manual pause is toggled here: a network or power pause
+            // lifts itself when that changes.
             CheckmarkItem {
                 label: crate::i18n::t("Pause sync").into(),
                 checked: crate::config::load().sync_paused,
@@ -234,22 +309,24 @@ pub fn socket_path() -> PathBuf {
         .join("kpdrive.sock")
 }
 
-/// Reads what the photo download has written, for the overlays. Only at
-/// startup and after a photo pass: that is the only time it changes.
-fn refresh_photos(snap: &Shared) {
-    let Ok(Some(state)) = crate::photos::load_state() else { return };
+
+/// Reads what the account's photo download has written, for the overlays.
+/// Only at startup and after a photo pass: that is the only time it changes.
+fn refresh_photos(board: &Shared, account: &Account) {
+    let Ok(Some(state)) = crate::photos::load_state(account) else { return };
     let mut photos = HashSet::new();
     for entry in state.photos.values() {
         photos.extend(entry.path.ancestors().map(Path::to_path_buf));
     }
-    let mut s = snap.write().expect("snapshot lock");
-    s.photos_root = Some(state.dest).filter(|d| !d.as_os_str().is_empty());
-    s.photos = photos;
+    board.write().expect("board lock").update(&account.username, |s| {
+        s.photos_root = Some(state.dest).filter(|d| !d.as_os_str().is_empty());
+        s.photos = photos;
+    });
 }
 
 /// Per-path status for overlays: OK, SYNC (pending), NONE (not ours).
 fn status(snap: &Snapshot, path: &Path) -> &'static str {
-    let Ok(rel) = path.strip_prefix(&snap.root) else {
+    let Some(rel) = path.strip_prefix(&snap.root).ok().filter(|_| !snap.root.as_os_str().is_empty()) else {
         // Photos are download only, so a photo is either here or not ours.
         return match snap.photos_root.as_deref().map(|r| path.strip_prefix(r)) {
             Some(Ok(rel)) if snap.photos.contains(rel) => "OK",
@@ -267,38 +344,45 @@ fn status(snap: &Snapshot, path: &Path) -> &'static str {
     }
 }
 
-async fn serve_socket(snap: Shared, cmds: mpsc::UnboundedSender<Cmd>) -> Result<()> {
+async fn serve_socket(board: Shared, cmds: mpsc::UnboundedSender<Cmd>) -> Result<()> {
     let path = socket_path();
     let _ = std::fs::remove_file(&path);
     let listener = UnixListener::bind(&path).with_context(|| format!("bind {}", path.display()))?;
     loop {
         let (stream, _) = listener.accept().await?;
-        let snap = snap.clone();
+        let board = board.clone();
         let cmds = cmds.clone();
         tokio::spawn(async move {
             let (r, mut w) = stream.into_split();
             let mut lines = BufReader::new(r).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let reply = match line.split_once(' ') {
-                    Some(("STATUS", p)) => status(&snap.read().expect("snapshot lock"), Path::new(p)).to_string(),
-                    _ if line == "ROOT" => snap.read().expect("snapshot lock").root.display().to_string(),
-                    _ if line == "PHOTOS" => snap
-                        .read()
-                        .expect("snapshot lock")
-                        .photos_root
-                        .as_ref()
-                        .map(|p| p.display().to_string())
-                        .unwrap_or_default(),
-                    _ if line == "STATE" => snap.read().expect("snapshot lock").report(),
-                    _ if line == "SYNC" => {
-                        let _ = cmds.send(Cmd::Sync);
-                        "OK".into()
+                let reply = {
+                    let b = board.read().expect("board lock");
+                    let first = b.accounts.first().map(|(_, s)| s);
+                    match line.split_once(' ') {
+                        Some(("STATUS", p)) => b.status(Path::new(p)).to_string(),
+                        Some(("SYNC", who)) => {
+                            let _ = cmds.send(Cmd::Sync(Some(who.to_owned())));
+                            "OK".into()
+                        }
+                        // The first account's, for overlay plugins from before
+                        // there were several; newer ones ask for FOLDERS.
+                        _ if line == "ROOT" => first.map(|s| s.root.display().to_string()).unwrap_or_default(),
+                        _ if line == "PHOTOS" => {
+                            first.and_then(|s| s.photos_root.as_ref()).map(|p| p.display().to_string()).unwrap_or_default()
+                        }
+                        _ if line == "FOLDERS" => b.folders(),
+                        _ if line == "STATE" => b.report(),
+                        _ if line == "SYNC" => {
+                            let _ = cmds.send(Cmd::Sync(None));
+                            "OK".into()
+                        }
+                        _ if line == "QUIT" => {
+                            let _ = cmds.send(Cmd::Quit);
+                            "OK".into()
+                        }
+                        _ => "ERR".into(),
                     }
-                    _ if line == "QUIT" => {
-                        let _ = cmds.send(Cmd::Quit);
-                        "OK".into()
-                    }
-                    _ => "ERR".into(),
                 };
                 if w.write_all(format!("{reply}\n").as_bytes()).await.is_err() {
                     break;
@@ -372,6 +456,7 @@ fn spell(d: std::time::Duration) -> String {
     fill(template, &[("n", &n.to_string())])
 }
 
+
 /// What a daemon is doing, as anything outside it sees it. `running: false`
 /// is the answer when there is no daemon to ask.
 #[derive(Default, Debug, Clone)]
@@ -380,6 +465,18 @@ pub struct Report {
     /// Whether it answered the question. An older daemon holds the socket but
     /// does not know this command.
     pub answered: bool,
+    /// Why syncing is paused, when it is.
+    pub paused: Option<String>,
+    /// Each account the daemon runs, in the order they were added.
+    pub accounts: Vec<AccountReport>,
+}
+
+/// What the daemon is doing for one account.
+#[derive(Default, Debug, Clone)]
+pub struct AccountReport {
+    /// Empty from a daemon older than accounts, which only ever had one.
+    pub username: String,
+    pub root: String,
     pub syncing: bool,
     pub signed_out: bool,
     /// Proton cannot be reached. Still trying, and nothing is wrong as such.
@@ -387,15 +484,20 @@ pub struct Report {
     pub items: usize,
     pub last_sync: Option<i64>,
     pub error: Option<String>,
-    /// Why syncing is paused, when it is.
-    pub paused: Option<String>,
 }
 
 impl Report {
-    /// One sentence, worded once, so the window and `kpdrive status` say the
-    /// same thing about the same daemon.
-    pub fn sentence(&self) -> String {
-        use crate::i18n::{fill, t, tn};
+    /// The daemon's account of `username`. A daemon older than accounts
+    /// answers for whoever asks.
+    pub fn account(&self, username: &str) -> Option<&AccountReport> {
+        self.accounts.iter().find(|a| a.username.eq_ignore_ascii_case(username) || a.username.is_empty())
+    }
+
+    /// One sentence about `username`, or about the first account, worded
+    /// once so the window and `kpdrive status` say the same thing about the
+    /// same daemon.
+    pub fn sentence(&self, username: Option<&str>) -> String {
+        use crate::i18n::t;
         if !self.running {
             return t("The sync daemon is not running. Start it with: kpdrive sync --watch").into();
         }
@@ -405,6 +507,20 @@ impl Report {
         if let Some(p) = &self.paused {
             return p.clone();
         }
+        let account = match username {
+            Some(u) => self.account(u),
+            None => self.accounts.first(),
+        };
+        match account {
+            Some(a) => a.sentence(),
+            None => t("Signed out. Syncing resumes once you sign in.").into(),
+        }
+    }
+}
+
+impl AccountReport {
+    fn sentence(&self) -> String {
+        use crate::i18n::{fill, t, tn};
         if self.signed_out {
             return t("Signed out. Syncing resumes once you sign in.").into();
         }
@@ -436,6 +552,19 @@ impl Report {
         // TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes ago"
         fill(t("{items}, checked {ago}"), &[("items", &items), ("ago", &ago)])
     }
+
+    fn parse(v: &serde_json::Value) -> Self {
+        Self {
+            username: v["username"].as_str().unwrap_or_default().to_owned(),
+            root: v["root"].as_str().unwrap_or_default().to_owned(),
+            syncing: v["syncing"].as_bool().unwrap_or(false),
+            signed_out: v["signedOut"].as_bool().unwrap_or(false),
+            offline: v["offline"].as_bool().unwrap_or(false),
+            items: v["items"].as_u64().unwrap_or(0) as usize,
+            last_sync: v["lastSync"].as_i64(),
+            error: v["error"].as_str().map(str::to_owned),
+        }
+    }
 }
 
 /// Asks a running daemon what it is doing. A local socket with a short
@@ -460,29 +589,44 @@ pub fn ask() -> Report {
     };
     if let Some(v) = spoke() {
         report.answered = true;
-        report.syncing = v["syncing"].as_bool().unwrap_or(false);
-        report.signed_out = v["signedOut"].as_bool().unwrap_or(false);
-        report.offline = v["offline"].as_bool().unwrap_or(false);
-        report.items = v["items"].as_u64().unwrap_or(0) as usize;
-        report.last_sync = v["lastSync"].as_i64();
-        report.error = v["error"].as_str().map(str::to_owned);
         report.paused = v["paused"].as_str().map(str::to_owned);
+        report.accounts = match v["accounts"].as_array() {
+            Some(list) => list.iter().map(AccountReport::parse).collect(),
+            // A daemon from before accounts: its one account is the top level.
+            None => vec![AccountReport::parse(&v)],
+        };
     }
     report
 }
 
 /// Tells a running daemon to sync now, which is also how it is nudged to pick
-/// up a session that has just changed. Silent when there is no daemon.
+/// up an account or a session that has just changed. Silent when there is no
+/// daemon.
 pub fn poke() {
+    send("SYNC\n");
+}
+
+/// As [`poke`], for one account.
+pub fn poke_account(username: &str) {
+    send(&format!("SYNC {username}\n"));
+}
+
+fn send(line: &str) {
     use std::io::Write;
     if let Ok(mut stream) = std::os::unix::net::UnixStream::connect(socket_path()) {
         let _ = stream.set_write_timeout(Some(std::time::Duration::from_millis(300)));
-        let _ = stream.write_all(b"SYNC\n");
+        let _ = stream.write_all(line.as_bytes());
     }
 }
 
+/// A desktop notification. Said on an account's behalf, it names the account
+/// once there is more than one to tell apart.
 pub fn notify(body: &str) {
-    let _ = spawn_detached(std::process::Command::new("notify-send").args(["-a", "kpdrive", "-i", "folder-cloud", "Proton Drive", body]));
+    let title = match crate::log::account() {
+        Some(a) if crate::config::load().accounts.len() > 1 => format!("Proton Drive ({a})"),
+        _ => "Proton Drive".into(),
+    };
+    let _ = spawn_detached(std::process::Command::new("notify-send").args(["-a", "kpdrive", "-i", "folder-cloud", &title, body]));
 }
 
 /// What the daemon is able to do at all, as distinct from how the last pass
@@ -496,14 +640,15 @@ enum Health {
     Offline,
 }
 
-fn refresh(snap: &Shared, state: &State, syncing: bool, error: Option<String>, health: Health) {
-    let mut s = snap.write().expect("snapshot lock");
-    s.root = state.root.clone();
-    s.entries = state.nodes.values().map(|e| (e.path.clone(), e.clone())).collect();
-    s.syncing = syncing;
-    s.last_error = error;
-    s.signed_out = health == Health::SignedOut;
-    s.offline = health == Health::Offline;
+fn refresh(board: &Shared, username: &str, state: &State, syncing: bool, error: Option<String>, health: Health) {
+    board.write().expect("board lock").update(username, |s| {
+        s.root = state.root.clone();
+        s.entries = state.nodes.values().map(|e| (e.path.clone(), e.clone())).collect();
+        s.syncing = syncing;
+        s.last_error = error;
+        s.signed_out = health == Health::SignedOut;
+        s.offline = health == Health::Offline;
+    });
 }
 
 fn now() -> i64 {
@@ -524,10 +669,10 @@ async fn wait_for_work(
 ) -> Result<bool> {
     tokio::select! {
         cmd = rx.recv() => match cmd {
-            Some(Cmd::Sync) => {
+            Some(Cmd::Sync(_)) => {
                 *force = true;
                 // Several clicks during one pass mean one forced pass, not several.
-                while let Ok(Cmd::Sync) = rx.try_recv() {}
+                while let Ok(Cmd::Sync(_)) = rx.try_recv() {}
             }
             Some(Cmd::Quit) | None => return Ok(false),
         },
@@ -575,40 +720,40 @@ fn watch(root: &Path, changed: mpsc::UnboundedSender<()>) -> Option<notify::Reco
     Some(watcher)
 }
 
-/// Runs until Quit.
-///
-/// `persist` is called with the session after each pass so rotated tokens
-/// reach the keyring. `reopen` builds a fresh [`Drive`] from whatever session
-/// the keyring holds now: the window can sign out and back in while this is
-/// running, which leaves the session in hand dead, and only the keyring knows
-/// the new one.
-pub async fn run<P, F, Fut>(
-    mut drive: Drive<P>,
-    mut state: State,
-    mut persist: impl FnMut(&Drive<P>),
-    reopen: F,
-    always_photos: bool,
-) -> Result<()>
-where
-    P: PGPProviderSync,
-    F: Fn() -> Fut,
-    Fut: std::future::Future<Output = Result<Drive<P>>>,
-{
-    let snap: Shared = Arc::default();
-    refresh(&snap, &state, false, None, Health::Ok);
-    refresh_photos(&snap);
-    let (tx, mut rx) = mpsc::unbounded_channel();
 
+/// An account's loop, as the supervisor keeps track of it.
+struct Running {
+    account: Account,
+    /// The sync folder it started with. A different one means a restart.
+    folder: Option<PathBuf>,
+    cmds: mpsc::UnboundedSender<Cmd>,
+    task: tokio::task::JoinHandle<()>,
+}
+
+/// Runs until Quit: one loop per account, under one tray icon and one status
+/// socket. The accounts are read again whenever the daemon is poked, so one
+/// added or removed in the window starts or stops at once, and one whose
+/// folder moved starts again from the new place.
+///
+/// `always_photos` brings the photos timeline down for every account, whatever
+/// its setting says.
+pub async fn run(always_photos: bool) -> Result<()> {
+    tokio::task::LocalSet::new().run_until(supervise(always_photos)).await
+}
+
+async fn supervise(always_photos: bool) -> Result<()> {
+    let board: Shared = Arc::default();
+    let (tx, mut rx) = mpsc::unbounded_channel();
     {
-        let (snap, tx) = (snap.clone(), tx.clone());
+        let (board, tx) = (board.clone(), tx.clone());
         tokio::spawn(async move {
-            if let Err(e) = serve_socket(snap, tx).await {
+            if let Err(e) = serve_socket(board, tx).await {
                 // Without it the overlay icons and the window learn nothing.
                 crate::log::error(&format!("status socket unavailable: {e:#}"));
             }
         });
     }
-    let tray = match ksni::TrayMethods::spawn(Tray { snap: snap.clone(), cmds: tx.clone() }).await {
+    let tray = match ksni::TrayMethods::spawn(Tray { board: board.clone(), cmds: tx.clone() }).await {
         Ok(handle) => Some(handle),
         Err(e) => {
             eprintln!("tray unavailable: {e}");
@@ -618,6 +763,132 @@ where
 
     // Opens this run in the log; the window shows everything after it.
     crate::log::mark("daemon started");
+    let mut loops: Vec<Running> = Vec::new();
+    loop {
+        reconcile(&mut loops, &board, &tray, always_photos).await;
+        // Cheap: a directory listing.
+        if let Err(e) = crate::log::prune(crate::config::load().log_retention_days) {
+            crate::log::error(&format!("log retention: {e:#}"));
+        }
+        let cmd = tokio::select! {
+            cmd = rx.recv() => cmd,
+            _ = tokio::time::sleep(POLL) => continue,
+        };
+        match cmd {
+            Some(Cmd::Sync(target)) => {
+                // A poke is also how a new account or session is announced.
+                reconcile(&mut loops, &board, &tray, always_photos).await;
+                for r in &loops {
+                    if target.as_deref().is_none_or(|t| r.account.username.eq_ignore_ascii_case(t)) {
+                        let _ = r.cmds.send(Cmd::Sync(None));
+                    }
+                }
+            }
+            Some(Cmd::Quit) | None => break,
+        }
+    }
+    for r in &loops {
+        let _ = r.cmds.send(Cmd::Quit);
+    }
+    for r in loops {
+        let _ = r.task.await;
+    }
+    crate::log::write("INFO", "daemon stopped");
+    let _ = std::fs::remove_file(socket_path());
+    Ok(())
+}
+
+/// Brings the running loops in line with the accounts in the config.
+async fn reconcile(loops: &mut Vec<Running>, board: &Shared, tray: &Option<ksni::Handle<Tray>>, always_photos: bool) {
+    let accounts = crate::account::all();
+    // A loop is stopped, and waited for, before anything replaces it: two
+    // loops on one account would both write its state.
+    let mut i = 0;
+    while i < loops.len() {
+        let r = &loops[i];
+        let wanted = accounts.iter().any(|a| *a == r.account && a.sync_folder() == r.folder);
+        if wanted {
+            i += 1;
+            continue;
+        }
+        let r = loops.remove(i);
+        let _ = r.cmds.send(Cmd::Quit);
+        let _ = r.task.await;
+        // A loop that was mid-pass when its account was removed saved its
+        // state on the way out, after the removal cleared it.
+        if !accounts.contains(&r.account) {
+            let _ = std::fs::remove_dir_all(r.account.dir());
+        }
+    }
+    for account in &accounts {
+        if loops.iter().any(|r| r.account == *account) {
+            continue;
+        }
+        let (cmds, rx) = mpsc::unbounded_channel();
+        let folder = account.sync_folder();
+        // Local: the sync's futures are not all Send, and nothing is gained by
+        // moving an account's loop between threads.
+        let task = tokio::task::spawn_local(account_loop(account.clone(), board.clone(), rx, tray.clone(), always_photos));
+        loops.push(Running { account: account.clone(), folder, cmds, task });
+    }
+    {
+        let mut b = board.write().expect("board lock");
+        let mut old = std::mem::take(&mut b.accounts);
+        for account in &accounts {
+            let snap = match old.iter().position(|(u, _)| *u == account.username) {
+                Some(at) => old.remove(at).1,
+                None => Snapshot { root: account.sync_folder().unwrap_or_default(), ..Default::default() },
+            };
+            b.accounts.push((account.username.clone(), snap));
+        }
+    }
+    if let Some(t) = tray {
+        t.update(|_| {}).await;
+    }
+}
+
+/// One account's loop, with every line it logs tagged with the account.
+async fn account_loop(account: Account, board: Shared, rx: mpsc::UnboundedReceiver<Cmd>, tray: Option<ksni::Handle<Tray>>, always_photos: bool) {
+    let name = account.username.clone();
+    let result = crate::log::for_account(&name, sync_account(&account, &board, rx, &tray, always_photos)).await;
+    if let Err(e) = result {
+        crate::log::for_account(&name, async { crate::log::error(&format!("stopped syncing: {e:#}")) }).await;
+        board.write().expect("board lock").update(&name, |s| s.last_error = Some(format!("{e:#}")));
+        if let Some(t) = &tray {
+            t.update(|_| {}).await;
+        }
+    }
+}
+
+async fn sync_account(
+    account: &Account,
+    board: &Shared,
+    mut rx: mpsc::UnboundedReceiver<Cmd>,
+    tray: &Option<ksni::Handle<Tray>>,
+    always_photos: bool,
+) -> Result<()> {
+    let name = account.username.as_str();
+    let update_tray = || async {
+        if let Some(t) = tray {
+            t.update(|_| {}).await;
+        }
+    };
+    let mut state = sync::open_state(account)?;
+    match account.sync_folder() {
+        Some(folder) => state.root = folder,
+        // Added by hand to the config, or by a version that set no folder.
+        None => {
+            if state.root.as_os_str().is_empty() {
+                state.root = crate::config::default_sync_folder()?;
+            }
+            account.check_folder(&state.root)?;
+            let root = state.root.clone();
+            account.update(|a| a.sync_folder = Some(root))?;
+        }
+    }
+    refresh(board, name, &state, false, None, Health::Ok);
+    refresh_photos(board, account);
+
     let (fs_tx, mut fs_rx) = mpsc::unbounded_channel::<()>();
     let watcher = watch(&state.root, fs_tx);
     if watcher.is_some() {
@@ -629,8 +900,8 @@ where
     // Consecutive failed passes: the wait grows and the user hears about the
     // outage once, not every 30 seconds.
     let mut failures: u32 = 0;
-    // Set when the keyring has no session to work with. Passes stop until one
-    // appears rather than failing every thirty seconds.
+    // Set while the keyring has no session to work with. Passes stop until
+    // one appears rather than failing every thirty seconds.
     let mut signed_out = false;
     let mut outage = Outage::default();
     // None until the first look, so switching photos on in the window starts
@@ -640,45 +911,86 @@ where
     // The last ingestion failure, so a standing one is logged once rather
     // than every thirty seconds.
     let mut ingest_error: Option<String> = None;
+    // Opened at the first pass, and again whenever the session in hand dies:
+    // the window can sign out and back in while this runs, and only the
+    // keyring knows the new session.
+    let mut drive = None;
+    let mut session = None;
+    let mut had_drive = false;
     loop {
-        let mut retry_now = false;
         let mut health = Health::Ok;
-        if signed_out {
-            match reopen().await {
-                Ok(fresh) => {
-                    drive = fresh;
-                    signed_out = false;
-                    failures = 0;
-                    crate::log::write("INFO", "signed in again; syncing resumed");
-                    notify(crate::i18n::t("Signed in again. Syncing resumed."));
-                }
-                Err(_) => {
-                    // Still nothing. Wait for a sign-in, quietly, but stay as
-                    // ready to quit as any other wait is.
-                    refresh(&snap, &state, false, None, Health::SignedOut);
-                    if let Some(t) = &tray {
-                        t.update(|_| {}).await;
+        if drive.is_none() {
+            match account.open_drive().await {
+                Ok((fresh, s)) => {
+                    drive = Some(fresh);
+                    session = Some(s);
+                    if signed_out {
+                        crate::log::write("INFO", "signed in again; syncing resumed");
+                        notify(crate::i18n::t("Signed in again. Syncing resumed."));
+                    } else if had_drive {
+                        crate::log::write("INFO", "the session changed; picked up the new one");
                     }
-                    if !wait_for_work(&mut rx, &mut fs_rx, POLL, &mut force, &mut fs_dirty).await? {
+                    signed_out = false;
+                    had_drive = true;
+                }
+                Err(e) => {
+                    // A session revoked elsewhere is as good as none.
+                    let no_session = crate::api::session_expired(&e) || matches!(account.session().await, Ok(None));
+                    let error = if no_session {
+                        // Signed out while running is worth a word; starting
+                        // without a session is how a signed-out account is.
+                        if !signed_out && had_drive {
+                            crate::log::warn("signed out elsewhere; waiting for a sign-in");
+                            notify(crate::i18n::t("Signed out. Sign in from the account window to resume syncing."));
+                        }
+                        signed_out = true;
+                        health = Health::SignedOut;
+                        None
+                    } else if crate::api::offline(&e) {
+                        let reason = crate::api::offline_reason(&e);
+                        if let Some(line) = outage.failing(std::time::Instant::now(), &reason) {
+                            crate::log::warn(&line);
+                            notify(&line);
+                        }
+                        failures += 1;
+                        health = Health::Offline;
+                        Some(reason)
+                    } else {
+                        let msg = format!("{e:#}");
+                        if failures == 0 {
+                            crate::log::error(&format!("cannot open the account: {msg}"));
+                        }
+                        failures += 1;
+                        Some(msg)
+                    };
+                    refresh(board, name, &state, false, error, health);
+                    update_tray().await;
+                    let wait = if signed_out { POLL } else { POLL * 2u32.pow(failures.min(3)) };
+                    if !wait_for_work(&mut rx, &mut fs_rx, wait, &mut force, &mut fs_dirty).await? {
                         break;
                     }
                     continue;
                 }
             }
         }
+        let d = drive.as_mut().expect("opened above");
         // Paused: no pass at all, but keep waiting as usual, so a resume, a
         // network change or Quit is noticed. Local changes meanwhile stay
         // flagged and are swept once it resumes.
         let pause = crate::pause::reason();
-        if pause != snap.read().expect("snapshot lock").paused {
+        let noticed = {
+            let mut b = board.write().expect("board lock");
+            let changed = b.paused != pause;
+            b.paused = pause.clone();
+            changed
+        };
+        if noticed {
+            // Whichever account's loop sees it first says so, once.
             match &pause {
                 Some(why) => crate::log::write("INFO", why),
                 None => crate::log::write("INFO", "sync resumed"),
             }
-            snap.write().expect("snapshot lock").paused = pause.clone();
-            if let Some(t) = &tray {
-                t.update(|_| {}).await;
-            }
+            update_tray().await;
         }
         if pause.is_some() {
             force = false;
@@ -694,18 +1006,11 @@ where
             last_sweep = std::time::Instant::now();
         }
         fs_dirty = false;
-        // Cheap: a directory listing, once per pass.
-        if let Err(e) = crate::log::prune(crate::config::load().log_retention_days) {
-            crate::log::error(&format!("log retention: {e:#}"));
-        }
-        refresh(&snap, &state, true, None, Health::Ok);
-        if let Some(t) = &tray {
-            t.update(|_| {}).await;
-        }
-        let error = match sync::run_with(&mut drive, &mut state, force, check_local).await {
+        refresh(board, name, &state, true, None, Health::Ok);
+        update_tray().await;
+        let error = match sync::run_with(d, &mut state, force, check_local).await {
             Ok(Some(notes)) => {
-                crate::log::write("INFO", &format!("synced to {}", state.root.display()));
-                println!("synced to {}", state.root.display());
+                crate::log::info(&format!("synced to {}", state.root.display()));
                 if !notes.is_empty() {
                     notify(&notes.join("\n"));
                 }
@@ -714,21 +1019,11 @@ where
             Ok(None) => None,
             // A session that died under us is not a sync failure: the window
             // signed out, or signed in again and stored a different session.
-            // Take whatever the keyring holds now and carry on.
-            Err(e) if crate::api::session_expired(&e) => match reopen().await {
-                Ok(fresh) => {
-                    drive = fresh;
-                    retry_now = true;
-                    crate::log::write("INFO", "the session changed; picked up the new one");
-                    None
-                }
-                Err(_) => {
-                    signed_out = true;
-                    crate::log::warn("signed out elsewhere; waiting for a sign-in");
-                    notify(crate::i18n::t("Signed out. Sign in from the account window to resume syncing."));
-                    continue;
-                }
-            },
+            // The next turn takes whatever the keyring holds now.
+            Err(e) if crate::api::session_expired(&e) => {
+                drive = None;
+                continue;
+            }
             // Nothing reached Proton: a state to show, not a failure to
             // record every thirty seconds. The tray and the window carry it
             // for as long as it lasts; the log gets the two ends of it.
@@ -765,11 +1060,11 @@ where
         }
         // Photos ride along with a pass that worked: the timeline is a second
         // library on a volume of its own, and download only.
-        if error.is_none() && (always_photos || crate::config::load().photos_sync) {
+        if error.is_none() && (always_photos || account.settings().photos_sync) {
             let due = last_photos.map(|t| t.elapsed() >= PHOTOS_EVERY).unwrap_or(true);
             if due {
                 last_photos = Some(std::time::Instant::now());
-                match crate::photos::pass(&drive, Some(&state.root)).await {
+                match crate::photos::pass(d, account).await {
                     Ok(None) => crate::log::write("INFO", "this account has no Proton Photos library"),
                     Ok(Some((0, _))) => {}
                     Ok(Some((n, dest))) => {
@@ -783,15 +1078,13 @@ where
                     // about the folder, which has already synced.
                     Err(e) => crate::log::error(&format!("photos: {e:#}")),
                 }
-                refresh_photos(&snap);
+                refresh_photos(board, account);
             }
         }
         // Ingestion every pass, not half-hourly: a photo dropped in should go
         // up within a minute, and listing one folder is cheap.
-        if error.is_none() && crate::ingest::folder().is_some() {
-            let dest = crate::photos::dest().ok();
-            let others: Vec<&Path> = std::iter::once(state.root.as_path()).chain(dest.as_deref()).collect();
-            match crate::ingest::pass(&drive, &mut ingest_seen, &others).await {
+        if error.is_none() && account.ingest_folder().is_some() {
+            match crate::ingest::pass(d, account, &mut ingest_seen).await {
                 Ok(n) => {
                     ingest_error = None;
                     if n > 0 {
@@ -811,18 +1104,18 @@ where
             }
         }
         force = false;
-        persist(&drive);
-        refresh(&snap, &state, false, error, health);
+        // Rotated tokens reach the keyring, or the next start would find a
+        // refresh token that no longer works.
+        if let Some(s) = d.api.session().filter(|s| session.as_ref() != Some(s)) {
+            if let Err(e) = account.save_session(&s).await {
+                crate::log::error(&format!("could not store the refreshed session: {e:#}"));
+            }
+            session = Some(s);
+        }
+        refresh(board, name, &state, false, error, health);
         // A pass happened, whatever it found: that is what "checked" means.
-        snap.write().expect("snapshot lock").last_sync = Some(now());
-        if let Some(t) = &tray {
-            t.update(|_| {}).await;
-        }
-        // A pass that ended only to take on a new session runs again at once.
-        if retry_now {
-            force = true;
-            continue;
-        }
+        board.write().expect("board lock").update(name, |s| s.last_sync = Some(now()));
+        update_tray().await;
 
         // A fixed 30 s poll of the event stream while healthy (nothing pushes
         // from Proton), doubling per failed pass up to 16 minutes. An outage
@@ -839,8 +1132,6 @@ where
         }
     }
     drop(watcher);
-    crate::log::write("INFO", "daemon stopped");
-    let _ = std::fs::remove_file(socket_path());
     Ok(())
 }
 
@@ -901,31 +1192,72 @@ mod tests {
 
     #[test]
     fn the_sentence_says_what_matters_most_first() {
-        let running = Report { running: true, answered: true, items: 3, last_sync: Some(now()), ..Default::default() };
+        let alice = AccountReport { username: "alice".into(), items: 3, last_sync: Some(now()), ..Default::default() };
+        let running = Report { running: true, answered: true, accounts: vec![alice.clone()], ..Default::default() };
+        let say = |r: &Report| r.sentence(Some("alice"));
         let mute = Report { running: true, ..Default::default() };
-        assert!(mute.sentence().contains("too old"), "{}", mute.sentence());
-        assert!(Report::default().sentence().contains("not running"));
-        assert!(running.sentence().contains("3 items in sync"), "{}", running.sentence());
-        assert!(running.sentence().contains("just now"));
+        assert!(say(&mute).contains("too old"), "{}", say(&mute));
+        assert!(say(&Report::default()).contains("not running"));
+        assert!(say(&running).contains("3 items in sync"), "{}", say(&running));
+        assert!(say(&running).contains("just now"));
+        assert_eq!(running.sentence(None), say(&running), "no name means the first account");
 
-        let stale = Report { last_sync: Some(now() - 600), ..running.clone() };
-        assert!(stale.sentence().contains("10 minutes ago"), "{}", stale.sentence());
+        let with = |a: AccountReport| Report { accounts: vec![a], ..running.clone() };
+        let stale = with(AccountReport { last_sync: Some(now() - 600), ..alice.clone() });
+        assert!(say(&stale).contains("10 minutes ago"), "{}", say(&stale));
 
-        let failed = Report { error: Some("boom".into()), ..running.clone() };
-        assert!(failed.sentence().contains("boom"));
+        let failed = AccountReport { error: Some("boom".into()), ..alice.clone() };
+        assert!(say(&with(failed.clone())).contains("boom"));
 
-        let syncing = Report { syncing: true, ..failed.clone() };
-        assert!(syncing.sentence().contains("boom"), "a failure outranks being busy");
+        let syncing = with(AccountReport { syncing: true, ..failed.clone() });
+        assert!(say(&syncing).contains("boom"), "a failure outranks being busy");
 
-        let off = Report { offline: true, error: Some("cannot reach Proton Drive: no route".into()), ..running.clone() };
-        assert!(off.sentence().contains("Still trying"), "an outage is not a failed sync: {}", off.sentence());
-        assert!(!off.sentence().contains("Last sync failed"));
+        let off = with(AccountReport { offline: true, error: Some("cannot reach Proton Drive: no route".into()), ..alice.clone() });
+        assert!(say(&off).contains("Still trying"), "an outage is not a failed sync: {}", say(&off));
+        assert!(!say(&off).contains("Last sync failed"));
 
-        let out = Report { signed_out: true, ..failed.clone() };
-        assert!(out.sentence().contains("Signed out"), "being signed out outranks the error it caused");
+        let out = Report { accounts: vec![AccountReport { signed_out: true, ..failed.clone() }], ..running.clone() };
+        assert!(say(&out).contains("Signed out"), "being signed out outranks the error it caused");
+
+        let paused = Report { paused: Some("Paused".into()), ..out.clone() };
+        assert_eq!(say(&paused), "Paused", "a pause outranks everything the accounts say");
 
         let gone = Report { running: false, ..out.clone() };
-        assert!(gone.sentence().contains("not running"), "nothing else matters if it is not there");
+        assert!(say(&gone).contains("not running"), "nothing else matters if it is not there");
+
+        let unknown = running.sentence(Some("bob"));
+        assert!(unknown.contains("Signed out"), "an account the daemon has not started yet: {unknown}");
+        let old = Report { accounts: vec![AccountReport { username: String::new(), ..alice.clone() }], ..running.clone() };
+        assert!(old.sentence(Some("bob")).contains("3 items"), "a daemon older than accounts answers for anyone");
+    }
+
+    #[test]
+    fn the_board_speaks_for_every_account() {
+        let mut board = Board::default();
+        assert!(board.report().contains("\"signedOut\":true"), "no account is signed out");
+        let snap = |root: &str, items: usize| Snapshot {
+            root: root.into(),
+            entries: (0..items).map(|i| (PathBuf::from(i.to_string()), Entry { path: i.to_string().into(), is_folder: true, revision: None, mtime: 0, size: 0 })).collect(),
+            ..Default::default()
+        };
+        board.accounts.push(("alice".into(), snap("/a", 2)));
+        board.accounts.push(("bob".into(), snap("/b", 3)));
+        board.update("carol", |s| s.syncing = true);
+        assert_eq!(board.accounts.len(), 2, "an update never adds an account");
+        board.update("bob", |s| s.last_error = Some("boom".into()));
+        let v: serde_json::Value = serde_json::from_str(&board.report()).unwrap();
+        assert_eq!(v["items"], 5);
+        assert_eq!(v["root"], "/a");
+        assert_eq!(v["error"], "boom");
+        assert_eq!(v["accounts"][1]["username"], "bob");
+        assert_eq!(v["accounts"][1]["error"], "boom");
+        let report = Report { running: true, answered: true, accounts: v["accounts"].as_array().unwrap().iter().map(AccountReport::parse).collect(), ..Default::default() };
+        assert!(report.sentence(Some("BOB")).contains("boom"));
+        assert!(report.sentence(Some("alice")).contains("2 items"));
+        assert_eq!(board.status(Path::new("/b/1")), "OK");
+        assert_eq!(board.status(Path::new("/a/0")), "OK");
+        assert_eq!(board.status(Path::new("/c")), "NONE");
+        assert_eq!(serde_json::from_str::<Vec<String>>(&board.folders()).unwrap(), ["/a", "/b"]);
     }
 
     #[test]

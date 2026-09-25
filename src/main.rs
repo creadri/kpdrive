@@ -1,21 +1,29 @@
 
-use kpdrive::{account, config, daemon, i18n, log, photos, setup, sync};
+use kpdrive::account::{self, Account};
+use kpdrive::{config, daemon, i18n, log, photos, setup, sync};
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(version, about = "Proton Drive sync client for KDE Plasma")]
 struct Cli {
+    /// The account to act on, by username or the start of one. Needed once
+    /// there are several; commands given a path in a sync folder find it.
+    #[arg(short, long, global = true)]
+    account: Option<String>,
     #[command(subcommand)]
     cmd: Cmd,
 }
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Sign in via the browser and store the session in KWallet.
+    /// Sign in via the browser and store the session in KWallet. Adds the
+    /// account, or signs an account already here back in.
     Login,
-    /// Show the account behind the stored session.
+    /// Show what the daemon is doing and each account's storage.
     Status,
+    /// List the accounts: who is signed in, and where each one syncs.
+    Accounts,
     /// Show or search the activity log.
     Logs {
         /// Only lines containing this text (case-insensitive).
@@ -28,8 +36,14 @@ enum Cmd {
         #[arg(long)]
         retention: Option<u64>,
     },
-    /// End the session server-side and forget it.
-    Logout,
+    /// End the session server-side and forget it. The account keeps its
+    /// folder, ready for the next sign-in.
+    Logout {
+        /// Also forget the account and what was synced for it. The files in
+        /// its folders stay where they are.
+        #[arg(long)]
+        remove: bool,
+    },
     /// List a remote folder.
     Ls {
         #[arg(default_value = "/")]
@@ -58,7 +72,8 @@ enum Cmd {
         #[arg(long)]
         folder: Option<std::path::PathBuf>,
     },
-    /// Sync Drive with the local folder (two-way). --watch keeps running with a tray icon.
+    /// Sync Drive with the local folder (two-way), for every account or the
+    /// one given. --watch keeps running with a tray icon, for every account.
     Sync {
         /// Local folder; remembered after the first run. Default: ~/ProtonDrive
         #[arg(long)]
@@ -71,8 +86,8 @@ enum Cmd {
         /// them or removed from them.
         #[arg(long)]
         photos: bool,
-        /// Forget what was synced and re-adopt this folder for the account
-        /// signed in. Files are compared by content, so nothing is lost.
+        /// Forget what was synced and re-adopt this folder for the account.
+        /// Files are compared by content, so nothing is lost.
         #[arg(long)]
         adopt: bool,
         /// Walk the tree even if no change was reported.
@@ -126,16 +141,24 @@ enum Cmd {
 #[tokio::main]
 async fn main() -> Result<()> {
     i18n::init();
-    match Cli::parse().cmd {
+    // Before anything reads an account: a single-account setup is moved over
+    // to the per-account layout the first time a new version runs.
+    if let Err(e) = account::migrate().await {
+        eprintln!("could not move the stored account over to the new layout: {e:#}");
+    }
+    let cli = Cli::parse();
+    let who = cli.account.as_deref();
+    match cli.cmd {
         Cmd::Login => login().await,
         Cmd::Status => status().await,
+        Cmd::Accounts => accounts().await,
         Cmd::Logs { search, lines, retention } => logs(&search, lines, retention),
-        Cmd::Logout => do_logout().await,
-        Cmd::Ls { path } => ls(&path).await,
-        Cmd::Get { remote, local } => get(&remote, local).await,
-        Cmd::Sync { root, watch, force, adopt, photos } => sync(root, watch, force, adopt, photos).await,
-        Cmd::Photos { dest } => photos(dest).await,
-        Cmd::Ingest { folder } => ingest(folder).await,
+        Cmd::Logout { remove } => do_logout(&account::select(who)?, remove).await,
+        Cmd::Ls { path } => ls(&account::select(who)?, &path).await,
+        Cmd::Get { remote, local } => get(&account::select(who)?, &remote, local).await,
+        Cmd::Sync { root, watch, force, adopt, photos } => sync(who, root, watch, force, adopt, photos).await,
+        Cmd::Photos { dest } => photos(&account::select(who)?, dest).await,
+        Cmd::Ingest { folder } => ingest(&account::select(who)?, folder).await,
         Cmd::Pause => {
             kpdrive::pause::set(true)?;
             println!("paused; `kpdrive resume` picks up where it left off");
@@ -149,17 +172,17 @@ async fn main() -> Result<()> {
             }
             Ok(())
         }
-        Cmd::Put { local, remote_folder } => put(&local, &remote_folder).await,
-        Cmd::Setup { root } => setup(root).await,
-        Cmd::Mkdir { remote } => mkdir(&remote).await,
-        Cmd::Rm { remote, force } => rm(&remote, force).await,
-        Cmd::Share { remote, copy, password, expires_days } => share(&remote, copy, password.as_deref(), expires_days).await,
-        Cmd::Unshare { remote } => unshare(&remote).await,
+        Cmd::Put { local, remote_folder } => put(&account::select(who)?, &local, &remote_folder).await,
+        Cmd::Setup { root } => setup(&account::select(who)?, root).await,
+        Cmd::Mkdir { remote } => mkdir(&account::select(who)?, &remote).await,
+        Cmd::Rm { remote, force } => rm(who, &remote, force).await,
+        Cmd::Share { remote, copy, password, expires_days } => share(who, &remote, copy, password.as_deref(), expires_days).await,
+        Cmd::Unshare { remote } => unshare(who, &remote).await,
     }
 }
 
 async fn login() -> Result<()> {
-    let username = account::login(|url, code| {
+    let (account, new) = account::login(|url, code| {
         println!("Sign in in your browser. Confirm this code there: {code}\n{url}");
         if daemon::spawn_detached(std::process::Command::new("xdg-open").arg(url)).is_err() {
             eprintln!("could not run xdg-open; open the URL above manually");
@@ -170,7 +193,14 @@ async fn login() -> Result<()> {
         );
     })
     .await?;
-    println!("logged in as {username}");
+    println!("logged in as {}", account.username);
+    if new {
+        if let Some(folder) = account.sync_folder() {
+            println!("syncing to {}; to sync elsewhere: kpdrive setup --account {} --root DIR", folder.display(), account.username);
+        }
+    }
+    // A running daemon starts on a new account, or takes up the new session.
+    daemon::poke();
     Ok(())
 }
 
@@ -194,45 +224,81 @@ fn logs(search: &str, lines: usize, retention: Option<u64>) -> Result<()> {
 async fn status() -> Result<()> {
     // The daemon first: when the session is gone, that is what explains the
     // account line failing, and it is the same sentence the window shows.
-    println!("{}", daemon::ask().sentence());
-    let info = account::info().await?;
-    println!(
-        "{}: {:.1} / {:.1} GiB used",
-        info.username,
-        info.used_bytes as f64 / 1_073_741_824.0,
-        info.total_bytes as f64 / 1_073_741_824.0
-    );
+    let report = daemon::ask();
+    let accounts = account::all();
+    if accounts.is_empty() {
+        println!("{}", report.sentence(None));
+        println!("not logged in: run `kpdrive login`");
+        return Ok(());
+    }
+    for (i, account) in accounts.iter().enumerate() {
+        if i > 0 {
+            println!();
+        }
+        println!("{}: {}", account.username, report.sentence(Some(&account.username)));
+        match account.info().await {
+            Ok(info) => println!(
+                "  {:.1} / {:.1} GiB used",
+                info.used_bytes as f64 / 1_073_741_824.0,
+                info.total_bytes as f64 / 1_073_741_824.0
+            ),
+            Err(e) => println!("  {e:#}"),
+        }
+    }
     Ok(())
 }
 
-async fn do_logout() -> Result<()> {
-    account::logout().await?;
-    println!("logged out");
+async fn accounts() -> Result<()> {
+    let accounts = account::all();
+    if accounts.is_empty() {
+        println!("no accounts: run `kpdrive login`");
+    }
+    for account in accounts {
+        let signed_in = matches!(account.session().await, Ok(Some(_)));
+        let folder = account.sync_folder().map(|f| f.display().to_string()).unwrap_or_else(|| "no folder yet".into());
+        println!("{}\t{}\t{folder}", account.username, if signed_in { "signed in" } else { "signed out" });
+    }
     Ok(())
 }
 
-async fn ls(path: &str) -> Result<()> {
-    let (drive, before) = account::open_drive().await?;
+async fn do_logout(account: &Account, remove: bool) -> Result<()> {
+    if remove {
+        let folders = account.folders();
+        account.remove().await?;
+        println!("removed {}", account.username);
+        for folder in folders.iter().filter(|f| f.exists()) {
+            println!("left in place: {}", folder.display());
+        }
+    } else {
+        account.logout().await?;
+        println!("logged out of {}", account.username);
+    }
+    daemon::poke();
+    Ok(())
+}
+
+async fn ls(account: &Account, path: &str) -> Result<()> {
+    let (drive, before) = account.open_drive().await?;
     let folder = drive.resolve(path).await?;
     for n in drive.list(&folder).await? {
         println!("{} {}", if n.is_folder { "d" } else { "-" }, n.name);
     }
-    account::persist(drive.api, before).await
+    account.persist(drive.api, before).await
 }
 
-async fn get(remote: &str, local: Option<std::path::PathBuf>) -> Result<()> {
-    let (drive, before) = account::open_drive().await?;
+async fn get(account: &Account, remote: &str, local: Option<std::path::PathBuf>) -> Result<()> {
+    let (drive, before) = account.open_drive().await?;
     let file = drive.resolve(remote).await?;
     let dest = local.unwrap_or_else(|| std::path::PathBuf::from(&file.name));
     let mut out = std::io::BufWriter::new(std::fs::File::create(&dest).with_context(|| format!("create {}", dest.display()))?);
     let n = drive.download(&file, &mut out).await?;
     std::io::Write::flush(&mut out)?;
     println!("{} bytes -> {}", n, dest.display());
-    account::persist(drive.api, before).await
+    account.persist(drive.api, before).await
 }
 
-async fn put(local: &std::path::Path, remote_folder: &str) -> Result<()> {
-    let (drive, before) = account::open_drive().await?;
+async fn put(account: &Account, local: &std::path::Path, remote_folder: &str) -> Result<()> {
+    let (drive, before) = account.open_drive().await?;
     let folder = drive.resolve(remote_folder).await?;
     let name = local.file_name().and_then(|n| n.to_str()).context("local path has no file name")?;
     let existing = drive.list(&folder).await?.into_iter().find(|n| n.name == name && !n.is_folder);
@@ -241,12 +307,12 @@ async fn put(local: &std::path::Path, remote_folder: &str) -> Result<()> {
     let mut file = std::fs::File::open(local)?;
     let (link, rev) = drive.upload(&folder, name, existing.as_ref(), &mut file, mtime).await?;
     println!("uploaded {} ({} bytes) link={link} revision={rev}", local.display(), meta.len());
-    account::persist(drive.api, before).await
+    account.persist(drive.api, before).await
 }
 
-async fn share(remote: &str, copy: bool, password: Option<&str>, expires_days: Option<i64>) -> Result<()> {
-    let remote = remote_path(remote)?;
-    let (drive, before) = account::open_drive().await?;
+async fn share(who: Option<&str>, remote: &str, copy: bool, password: Option<&str>, expires_days: Option<i64>) -> Result<()> {
+    let (account, remote) = remote_path(who, remote)?;
+    let (drive, before) = account.open_drive().await?;
     let (parent, node) = drive.resolve_with_parent(&remote).await?;
     let existing = drive.public_link(&node).await?.is_some();
     let url = drive.share(&parent, &node, password, expires_days).await?;
@@ -260,32 +326,37 @@ async fn share(remote: &str, copy: bool, password: Option<&str>, expires_days: O
     } else if let Some(p) = password.filter(|p| !p.is_empty()) {
         println!("password to send separately: {p}");
     }
-    account::persist(drive.api, before).await
+    account.persist(drive.api, before).await
 }
 
-async fn unshare(remote: &str) -> Result<()> {
-    let remote = remote_path(remote)?;
-    let (drive, before) = account::open_drive().await?;
+async fn unshare(who: Option<&str>, remote: &str) -> Result<()> {
+    let (account, remote) = remote_path(who, remote)?;
+    let (drive, before) = account.open_drive().await?;
     let (_, node) = drive.resolve_with_parent(&remote).await?;
     match drive.unshare(&node).await? {
         0 => println!("{remote} has no public link"),
         n => log::info(&format!("removed {n} public link(s) from {remote}")),
     }
-    account::persist(drive.api, before).await
+    account.persist(drive.api, before).await
 }
 
-/// Accepts either a remote path ("a/b.txt") or an absolute local path inside the
-/// sync folder, so Dolphin can pass %f straight through.
-fn remote_path(arg: &str) -> Result<String> {
+/// Accepts either a remote path ("a/b.txt") or an absolute local path inside a
+/// sync folder, so Dolphin can pass %f straight through. A local path says
+/// which account it is for by the folder it is in.
+fn remote_path(who: Option<&str>, arg: &str) -> Result<(Account, String)> {
     let path = std::path::Path::new(arg);
     if !path.is_absolute() {
-        return Ok(arg.trim_start_matches('/').to_owned());
+        return Ok((account::select(who)?, arg.trim_start_matches('/').to_owned()));
     }
-    let root = sync::load_state()?.map(|s| s.root).context("no sync folder yet; run `kpdrive setup`")?;
+    let account = match who {
+        Some(_) => account::select(who)?,
+        None => account::for_path(path).ok_or_else(|| anyhow!("{} is not inside a sync folder", path.display()))?,
+    };
+    let root = account.sync_folder().context("no sync folder yet; run `kpdrive setup`")?;
     let rel = path
         .strip_prefix(&root)
-        .map_err(|_| anyhow!("{} is not inside the sync folder ({})", path.display(), root.display()))?;
-    Ok(rel.to_string_lossy().into_owned())
+        .map_err(|_| anyhow!("{} is not inside the sync folder of {} ({})", path.display(), account.username, root.display()))?;
+    Ok((account, rel.to_string_lossy().into_owned()))
 }
 
 /// Plasma keeps the clipboard alive through klipper once something owns it.
@@ -308,9 +379,9 @@ fn copy_to_clipboard(text: &str) -> bool {
     false
 }
 
-async fn rm(remote: &str, force: bool) -> Result<()> {
-    let remote = remote_path(remote)?;
-    let (drive, before) = account::open_drive().await?;
+async fn rm(who: Option<&str>, remote: &str, force: bool) -> Result<()> {
+    let (account, remote) = remote_path(who, remote)?;
+    let (drive, before) = account.open_drive().await?;
     let (_, node) = drive.resolve_with_parent(&remote).await?;
     if !force {
         use std::io::IsTerminal;
@@ -330,16 +401,16 @@ async fn rm(remote: &str, force: bool) -> Result<()> {
     }
     drive.trash(std::slice::from_ref(&node.id)).await?;
     log::info(&format!("trashed {remote}"));
-    account::persist(drive.api, before).await
+    account.persist(drive.api, before).await
 }
 
-async fn mkdir(remote: &str) -> Result<()> {
-    let (drive, before) = account::open_drive().await?;
+async fn mkdir(account: &Account, remote: &str) -> Result<()> {
+    let (drive, before) = account.open_drive().await?;
     let (parent, name) = remote.trim_end_matches('/').rsplit_once('/').unwrap_or(("", remote));
     let parent = drive.resolve(parent).await?;
     let node = drive.create_folder(&parent, name).await?;
     println!("created folder {} id={}", node.name, node.id);
-    account::persist(drive.api, before).await
+    account.persist(drive.api, before).await
 }
 
 /// Where to sync: an explicit `--root` wins, then the configured folder, then
@@ -383,23 +454,21 @@ fn ask_about(state: &sync::State, root: &std::path::Path) -> Result<sync::Occupi
     }
 }
 
-fn resolve_root(state: &mut sync::State, root: Option<std::path::PathBuf>) -> Result<()> {
+fn resolve_root(account: &Account, state: &mut sync::State, root: Option<std::path::PathBuf>) -> Result<()> {
     if let Some(root) = root {
         let choice = ask_about(state, &root)?;
-        println!("{}", sync::set_folder(state, root, choice)?);
+        println!("{}", sync::set_folder(account, state, root, choice)?);
         return Ok(());
     }
-    let mut config = config::load();
-    match config.sync_folder.clone() {
+    match account.sync_folder() {
         Some(folder) => state.root = folder,
-        None if state.root.as_os_str().is_empty() => {
-            state.root = config::default_sync_folder()?;
-            config.sync_folder = Some(state.root.clone());
-            config::save(&config)?;
-        }
         None => {
-            config.sync_folder = Some(state.root.clone());
-            config::save(&config)?;
+            if state.root.as_os_str().is_empty() {
+                state.root = config::default_sync_folder()?;
+            }
+            account.check_folder(&state.root)?;
+            let root = state.root.clone();
+            account.update(|a| a.sync_folder = Some(root))?;
         }
     }
     // The remembered folder can have gained files of its own, or be one the
@@ -412,9 +481,9 @@ fn resolve_root(state: &mut sync::State, root: Option<std::path::PathBuf>) -> Re
     Ok(())
 }
 
-async fn setup(root: Option<std::path::PathBuf>) -> Result<()> {
-    let mut state = sync::load_state()?.unwrap_or_default();
-    resolve_root(&mut state, root)?;
+async fn setup(account: &Account, root: Option<std::path::PathBuf>) -> Result<()> {
+    let mut state = sync::open_state(account)?;
+    resolve_root(account, &mut state, root)?;
     std::fs::create_dir_all(&state.root)?;
     sync::save_state(&state)?;
     println!("folder: {}", state.root.display());
@@ -422,104 +491,98 @@ async fn setup(root: Option<std::path::PathBuf>) -> Result<()> {
         true => println!("ignore file: {}", state.root.join(sync::IGNORE_FILE).display()),
         false => println!("ignore file: {} (kept)", state.root.join(sync::IGNORE_FILE).display()),
     }
-    if setup::places_entry(&state.root)? {
-        println!("added Proton Drive to Dolphin's Places");
+    // The first account is plain "Proton Drive"; the others are told apart.
+    let title = match account::all().first() == Some(account) {
+        true => "Proton Drive".to_owned(),
+        false => format!("Proton Drive ({})", account.username),
+    };
+    if setup::places_entry(&state.root, &title)? {
+        println!("added {title} to Dolphin's Places");
     }
     println!("autostart: {}", setup::autostart()?.display());
     println!("Dolphin menu: {}", setup::servicemenu()?.display());
     println!("launcher: {}", setup::launcher()?.display());
-    if account::load().await?.is_none() {
-        println!("not logged in yet: run `kpdrive login`");
+    if account.session().await?.is_none() {
+        println!("{} is signed out: run `kpdrive login`", account.username);
     }
     println!("start now with: kpdrive sync --watch   (Dolphin overlay icons: see dolphin-overlay/README.md)");
     Ok(())
 }
 
-async fn photos(dest: Option<std::path::PathBuf>) -> Result<()> {
+async fn photos(account: &Account, dest: Option<std::path::PathBuf>) -> Result<()> {
     // A destination given on the command line is remembered for next time.
     if let Some(dest) = dest {
-        photos::set_dest(dest)?;
+        account.check_folder(&dest)?;
+        photos::set_dest(account, dest)?;
     }
-    let (drive, before) = account::open_drive().await?;
-    let root = sync::load_state()?.map(|s| s.root);
-    match photos::pass(&drive, root.as_deref()).await? {
+    let (drive, before) = account.open_drive().await?;
+    match log::for_account(&account.username, photos::pass(&drive, account)).await? {
         None => println!("this account has no Proton Photos library"),
         Some((0, dest)) => println!("photos up to date in {}", dest.display()),
         Some((n, dest)) => println!("{n} photo(s) into {}", dest.display()),
     }
-    account::persist(drive.api, before).await
+    account.persist(drive.api, before).await
 }
 
-async fn ingest(folder: Option<std::path::PathBuf>) -> Result<()> {
+async fn ingest(account: &Account, folder: Option<std::path::PathBuf>) -> Result<()> {
     if let Some(folder) = folder {
-        let mut config = config::load();
-        config.photos_ingestion_folder = Some(folder);
-        config::save(&config)?;
+        account.check_folder(&folder)?;
+        account.update(|a| a.photos_ingestion_folder = Some(folder))?;
     }
-    let Some(folder) = kpdrive::ingest::folder() else {
-        anyhow::bail!("no ingestion folder: pass --folder, or set photos_ingestion_folder");
+    let Some(folder) = account.ingest_folder() else {
+        anyhow::bail!("no ingestion folder for {}: pass --folder, or set photos_ingestion_folder", account.username);
     };
     // Two passes over one folder would upload the same file twice.
     if daemon::ask().running {
         println!("the daemon is running and ingests {} on its own", folder.display());
         return Ok(());
     }
-    let (drive, before) = account::open_drive().await?;
-    let root = sync::load_state()?.map(|s| s.root);
-    let dest = photos::dest()?;
-    let others: Vec<&std::path::Path> = root.as_deref().into_iter().chain([dest.as_path()]).collect();
+    let (drive, before) = account.open_drive().await?;
     // A file goes up once two looks agree on it: the first look only notes
     // what is there, so a copy still in progress is left alone.
     let mut seen = kpdrive::ingest::Seen::default();
-    kpdrive::ingest::pass(&drive, &mut seen, &others).await?;
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-    let n = kpdrive::ingest::pass(&drive, &mut seen, &others).await?;
+    let n = log::for_account(&account.username, async {
+        kpdrive::ingest::pass(&drive, account, &mut seen).await?;
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        kpdrive::ingest::pass(&drive, account, &mut seen).await
+    })
+    .await?;
     println!("{n} photo(s) uploaded from {}", folder.display());
-    account::persist(drive.api, before).await
+    account.persist(drive.api, before).await
 }
 
-async fn sync(root: Option<std::path::PathBuf>, watch: bool, force: bool, adopt: bool, photos: bool) -> Result<()> {
-    let mut state = sync::load_state()?.unwrap_or_default();
-    resolve_root(&mut state, root)?;
-    if adopt {
-        // Whatever was tracked belonged to another account, or to nobody we
-        // can name. Contents decide what is already there.
-        state.untrack();
-        sync::save_state(&state)?;
-        println!("re-adopting {} for the account signed in", state.root.display());
+async fn sync(who: Option<&str>, root: Option<std::path::PathBuf>, watch: bool, force: bool, adopt: bool, photos: bool) -> Result<()> {
+    // A folder or a re-adoption is about one account, so it has to be clear
+    // which; a plain sync is about all of them.
+    let accounts = match (who, root.is_some() || adopt) {
+        (None, false) => account::all(),
+        _ => vec![account::select(who)?],
+    };
+    let mut root = root;
+    for account in &accounts {
+        let mut state = sync::open_state(account)?;
+        resolve_root(account, &mut state, root.take())?;
+        if adopt {
+            // Whatever was tracked belonged to another account, or to nobody
+            // we can name. Contents decide what is already there.
+            state.untrack();
+            sync::save_state(&state)?;
+            println!("re-adopting {} for {}", state.root.display(), account.username);
+        }
+        if watch {
+            continue;
+        }
+        let (mut drive, before) = account.open_drive().await?;
+        if log::for_account(&account.username, sync::run(&mut drive, &mut state, force)).await?.is_some() {
+            println!("{} synced to {}", account.username, state.root.display());
+        }
+        account.persist(drive.api, before).await?;
     }
-    let (mut drive, before) = account::open_drive().await?;
     if watch {
-        let mut last = before;
-        return daemon::run(drive, state, move |d| {
-            if let Some(s) = d.api.session().filter(|s| *s != last) {
-                // Wallet writes are async; block briefly on a small runtime-free path.
-                let s2 = s.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = account::save(&s2).await {
-                        eprintln!("could not store refreshed session: {e:#}");
-                    }
-                });
-                last = s;
-            }
-        },
-        // Signing out and back in through the window replaces the stored
-        // session; this is how the daemon gets hold of the new one.
-        || async { account::open_drive().await.map(|(drive, _)| drive) },
-        photos,
-        )
-        .await;
+        return daemon::run(photos).await;
     }
-    match sync::run(&mut drive, &mut state, force).await? {
-        Some(_) => println!("synced to {}", state.root.display()),
-        None => {}
+    if accounts.is_empty() {
+        anyhow::bail!("not logged in, run `kpdrive login`");
     }
-    account::persist(drive.api, before).await
+    Ok(())
 }
-
-
-
-
-
-
-

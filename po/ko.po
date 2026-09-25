@@ -9,8 +9,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kpdrive 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-24 14:30+0200\n"
-"PO-Revision-Date: 2026-09-24 14:34+0200\n"
+"POT-Creation-Date: 2026-09-25 20:29+0200\n"
+"PO-Revision-Date: 2026-09-25 20:32+0200\n"
 "Last-Translator: machine translation, needs review by a speaker\n"
 "Language-Team: ko\n"
 "Language: ko\n"
@@ -19,133 +19,133 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: src/daemon.rs:112
+#: src/daemon.rs:67 src/daemon.rs:174
 msgid "Signed out. Sign in from the account window."
 msgstr "로그아웃되었습니다. 계정 창에서 로그인하십시오."
 
-#: src/daemon.rs:114 src/daemon.rs:401
+#: src/daemon.rs:69 src/daemon.rs:535
 msgid "Syncing…"
 msgstr "동기화 중…"
 
-#: src/daemon.rs:116 src/daemon.rs:404
+#: src/daemon.rs:71 src/daemon.rs:538
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] "동기화 중인 항목 {n}개"
 
-#: src/daemon.rs:126 ui/qml/main.qml:409
+#: src/daemon.rs:199 src/daemon.rs:201 ui/qml/main.qml:469
 msgid "Open folder"
 msgstr "폴더 열기"
 
-#: src/daemon.rs:136
+#: src/daemon.rs:211
 msgid "Account and logs…"
 msgstr "계정 및 로그…"
 
-#: src/daemon.rs:143 ui/qml/main.qml:396
+#: src/daemon.rs:218 ui/qml/main.qml:456
 msgid "Sync now"
 msgstr "지금 동기화"
 
-#: src/daemon.rs:155
+#: src/daemon.rs:230
 msgid "Pause sync"
 msgstr "동기화 일시 중지"
 
-#: src/daemon.rs:168
+#: src/daemon.rs:243
 msgid "Quit"
 msgstr "종료"
 
 #. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no
 #. route"
-#: src/daemon.rs:328
+#: src/daemon.rs:430
 msgid "{reason}; retrying"
 msgstr "{reason}. 다시 시도합니다"
 
-#: src/daemon.rs:339
+#: src/daemon.rs:441
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr "{duration} 만에 Proton Drive에 다시 연결되었습니다"
 
-#: src/daemon.rs:350
+#: src/daemon.rs:452
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] "{n}초"
 
-#: src/daemon.rs:351
+#: src/daemon.rs:453
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "{n}분"
 
-#: src/daemon.rs:352
+#: src/daemon.rs:454
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] "{n}시간"
 
-#: src/daemon.rs:382
+#: src/daemon.rs:502
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
 msgstr ""
 "동기화 데몬이 실행 중이 아닙니다. 다음 명령으로 시작하십시오: kpdrive sync --"
 "watch"
 
-#: src/daemon.rs:385
+#: src/daemon.rs:505
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
 msgstr ""
 "동기화 데몬이 실행 중이지만 버전이 오래되어 진행 상태를 알릴 수 없습니다. 다"
 "시 시작하십시오."
 
-#: src/daemon.rs:391
+#: src/daemon.rs:516 src/daemon.rs:525
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr "로그아웃되었습니다. 로그인하면 동기화를 재개합니다."
 
-#: src/daemon.rs:395
+#: src/daemon.rs:529
 msgid "{reason}. Still trying."
 msgstr "{reason}. 계속 시도합니다."
 
-#: src/daemon.rs:396
+#: src/daemon.rs:530
 msgid "Last sync failed: {reason}"
 msgstr "마지막 동기화 실패: {reason}"
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:410
+#: src/daemon.rs:544
 msgid "just now"
 msgstr "방금 전"
 
-#: src/daemon.rs:412
+#: src/daemon.rs:546
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "{n}분 전"
 
-#: src/daemon.rs:415
+#: src/daemon.rs:549
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "{n}시간 전"
 
 #. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes
 #. ago"
-#: src/daemon.rs:419
+#: src/daemon.rs:553
 msgid "{items}, checked {ago}"
 msgstr "{items}, {ago} 확인함"
 
-#: src/daemon.rs:637
+#: src/daemon.rs:924
 msgid "Signed in again. Syncing resumed."
 msgstr "다시 로그인했습니다. 동기화를 재개했습니다."
 
-#: src/daemon.rs:712
+#: src/daemon.rs:938
 msgid "Signed out. Sign in from the account window to resume syncing."
 msgstr "로그아웃되었습니다. 동기화를 재개하려면 계정 창에서 로그인하십시오."
 
-#: src/daemon.rs:745
+#: src/daemon.rs:1050
 msgid "Sync resumed"
 msgstr "동기화 재개됨"
 
-#: src/daemon.rs:762
+#: src/daemon.rs:1067
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] "사진 {n}장을 다운로드했습니다"
 
-#: src/daemon.rs:783
+#: src/daemon.rs:1086
 msgid "{n} photo uploaded to Proton Photos"
 msgid_plural "{n} photos uploaded to Proton Photos"
 msgstr[0] "사진 {n}장을 Proton Photos에 업로드했습니다"
 
-#: src/i18n.rs:155 ui/qml/main.qml:334
+#: src/i18n.rs:155 ui/qml/main.qml:387
 msgid "Sign out"
 msgstr "로그아웃"
 
@@ -174,15 +174,15 @@ msgstr "배터리 부족으로 일시 중지됨"
 msgid "Paused while connected to {network}"
 msgstr "{network}에 연결되어 있어 일시 중지됨"
 
-#: src/sync.rs:121
+#: src/sync.rs:124
 msgid "Sync into it and keep what is already there"
 msgstr "이 폴더에 동기화하고 기존 내용 유지"
 
-#: src/sync.rs:122
+#: src/sync.rs:125
 msgid "Move it aside and start from an empty folder"
 msgstr "폴더를 옮겨 두고 빈 폴더에서 시작"
 
-#: src/sync.rs:160
+#: src/sync.rs:163
 msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
@@ -191,102 +191,110 @@ msgstr[0] ""
 "{folder} 폴더에 이미 항목 {n}개가 있으며, 동기화하면 Proton Drive와 병합됩니"
 "다."
 
-#: ui/src/bridge.rs:237
+#: ui/src/bridge.rs:260
 msgid "Starting…"
 msgstr "시작하는 중…"
 
-#: ui/src/bridge.rs:288
+#: ui/src/bridge.rs:317
 msgid "Confirm the code {code} in your browser"
 msgstr "브라우저에서 다음 코드를 확인하십시오: {code}"
 
-#: ui/src/bridge.rs:302
+#: ui/src/bridge.rs:331
 msgid "Sign-in failed: {reason}"
 msgstr "로그인 실패: {reason}"
 
-#: ui/src/bridge.rs:314
+#: ui/src/bridge.rs:344
 msgid "Signed out"
 msgstr "로그아웃됨"
 
-#: ui/src/bridge.rs:317
+#: ui/src/bridge.rs:347
 msgid "Sign-out failed: {reason}"
 msgstr "로그아웃 실패: {reason}"
 
-#: ui/src/bridge.rs:382
-msgid "{note}. Restart the sync daemon to use it."
-msgstr "{note}. 사용하려면 동기화 데몬을 다시 시작하십시오."
+#: ui/src/bridge.rs:355
+msgid "Removed {account}. Its files were left where they are."
+msgstr "{account}을(를) 제거했습니다. 파일은 원래 위치에 그대로 남아 있습니다."
 
-#: ui/src/bridge.rs:385
+#: ui/src/bridge.rs:362
+msgid "Cannot remove the account: {reason}"
+msgstr "계정을 제거할 수 없습니다: {reason}"
+
+#: ui/src/bridge.rs:481
 msgid "Cannot change the folder: {reason}"
 msgstr "폴더를 변경할 수 없습니다: {reason}"
 
-#: ui/src/bridge.rs:392
+#: ui/src/bridge.rs:488
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr "아직 동기화 폴더가 없습니다. 다음을 실행하십시오: kpdrive setup"
 
-#: ui/src/bridge.rs:396
+#: ui/src/bridge.rs:492
 msgid "Cannot create the ignore file: {reason}"
 msgstr "무시 파일을 만들 수 없습니다: {reason}"
 
-#: ui/src/bridge.rs:434
+#: ui/src/bridge.rs:537
 msgid "Checking the account…"
 msgstr "계정 확인 중…"
 
-#: ui/src/bridge.rs:440
+#: ui/src/bridge.rs:543
 msgid "Opening the browser…"
 msgstr "브라우저 여는 중…"
 
-#: ui/src/bridge.rs:446
+#: ui/src/bridge.rs:550
 msgid "Signing out…"
 msgstr "로그아웃하는 중…"
 
-#: ui/src/bridge.rs:472
+#: ui/src/bridge.rs:557
+msgid "Removing the account…"
+msgstr "계정 제거 중…"
+
+#: ui/src/bridge.rs:583
 msgid "Cannot read the log: {reason}"
 msgstr "로그를 읽을 수 없습니다: {reason}"
 
-#: ui/src/bridge.rs:482 ui/src/bridge.rs:510 ui/src/bridge.rs:524
-#: ui/src/bridge.rs:539 ui/src/bridge.rs:573 ui/src/bridge.rs:614
-#: ui/src/bridge.rs:627 ui/src/bridge.rs:645
+#: ui/src/bridge.rs:591 ui/src/bridge.rs:618 ui/src/bridge.rs:632
+#: ui/src/bridge.rs:647 ui/src/bridge.rs:681 ui/src/bridge.rs:723
+#: ui/src/bridge.rs:736 ui/src/bridge.rs:754
 msgid "Cannot save the setting: {reason}"
 msgstr "설정을 저장할 수 없습니다: {reason}"
 
-#: ui/src/bridge.rs:490
+#: ui/src/bridge.rs:599
 msgid "Proton Photos will be downloaded with the next sync"
 msgstr "다음 동기화에서 Proton Photos를 내려받습니다"
 
-#: ui/src/bridge.rs:491
+#: ui/src/bridge.rs:600
 msgid "Proton Photos will be left alone"
 msgstr "Proton Photos는 동기화하지 않습니다"
 
-#: ui/src/bridge.rs:516
+#: ui/src/bridge.rs:624
 msgid "Photos put in that folder will be uploaded to Proton Photos"
 msgstr "해당 폴더에 넣은 사진은 Proton Photos에 업로드됩니다"
 
-#: ui/src/bridge.rs:517
+#: ui/src/bridge.rs:625
 msgid "No longer uploading photos"
 msgstr "더 이상 사진을 업로드하지 않습니다"
 
-#: ui/src/bridge.rs:607
+#: ui/src/bridge.rs:717
 msgid "Photos will be downloaded into that folder from the next pass"
 msgstr "다음 동기화부터 사진을 해당 폴더로 내려받습니다"
 
-#: ui/src/bridge.rs:632
+#: ui/src/bridge.rs:741
 msgid "Storing everything from now on"
 msgstr "이제부터 모든 항목을 기록합니다"
 
-#: ui/src/bridge.rs:633
+#: ui/src/bridge.rs:742
 msgid "Storing warnings and errors from now on"
 msgstr "이제부터 경고와 오류를 기록합니다"
 
-#: ui/src/bridge.rs:634
+#: ui/src/bridge.rs:743
 msgid "Storing errors from now on"
 msgstr "이제부터 오류만 기록합니다"
 
-#: ui/src/bridge.rs:650
+#: ui/src/bridge.rs:759
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] "{days}일이 지난 로그 파일 {n}개를 삭제했습니다"
 
-#: ui/src/bridge.rs:651
+#: ui/src/bridge.rs:760
 msgid "Cannot prune the log: {reason}"
 msgstr "로그를 정리할 수 없습니다: {reason}"
 
@@ -306,131 +314,167 @@ msgstr "사진을 업로드할 폴더 선택"
 msgid "The folder is not empty"
 msgstr "폴더가 비어 있지 않습니다"
 
-#: ui/qml/main.qml:104
+#: ui/qml/main.qml:80
+msgid "Remove {account}?"
+msgstr "{account}을(를) 제거하시겠습니까?"
+
+#: ui/qml/main.qml:81
+msgid ""
+"kpdrive signs this account out and forgets what it synced. The files in "
+"{folder} stay where they are."
+msgstr ""
+"kpdrive는 이 계정에서 로그아웃하고 동기화한 내용을 잊습니다. {folder}의 파일"
+"은 그대로 남습니다."
+
+#: ui/qml/main.qml:82
+msgid "its folder"
+msgstr "계정 폴더"
+
+#: ui/qml/main.qml:86
+msgid "Remove account"
+msgstr "계정 제거"
+
+#: ui/qml/main.qml:94
+msgid "Cancel"
+msgstr "취소"
+
+#: ui/qml/main.qml:130
 msgid "Opened {what}"
 msgstr "다음을 열었습니다: {what}"
 
-#: ui/qml/main.qml:106
+#: ui/qml/main.qml:132
 msgid "Could not open {what} ({url})"
 msgstr "다음을 열 수 없습니다: {what} ({url})"
 
-#: ui/qml/main.qml:186
+#: ui/qml/main.qml:223 ui/qml/main.qml:225
+msgid "Add account"
+msgstr "계정 추가"
+
+#: ui/qml/main.qml:237
 msgid "Account & activity"
 msgstr "계정 및 활동"
 
-#: ui/qml/main.qml:187
+#: ui/qml/main.qml:238
 msgid "Settings"
 msgstr "설정"
 
-#: ui/qml/main.qml:188 ui/qml/main.qml:633
+#: ui/qml/main.qml:239 ui/qml/main.qml:701
 msgid "Logs"
 msgstr "로그"
 
-#: ui/qml/main.qml:189
+#: ui/qml/main.qml:240
 msgid "About"
 msgstr "정보"
 
-#: ui/qml/main.qml:269
+#: ui/qml/main.qml:320
 msgid "Not signed in"
 msgstr "로그인되지 않음"
 
-#: ui/qml/main.qml:276
+#: ui/qml/main.qml:327
 msgid "Signed in to Proton Drive"
 msgstr "Proton Drive에 로그인됨"
 
-#: ui/qml/main.qml:277
+#: ui/qml/main.qml:329
+msgid "Signed out. Sign in again to resume syncing this account."
+msgstr "로그아웃되었습니다. 이 계정의 동기화를 재개하려면 다시 로그인하십시오."
+
+#: ui/qml/main.qml:330
 msgid "Sign in to sync this computer with Proton Drive."
 msgstr "이 컴퓨터를 Proton Drive와 동기화하려면 로그인하십시오."
 
-#: ui/qml/main.qml:294
+#: ui/qml/main.qml:347
 msgid "Storage:"
 msgstr "저장 공간:"
 
-#: ui/qml/main.qml:323
+#: ui/qml/main.qml:376
 msgid "{used} of {total} used"
 msgstr "{total} 중 {used} 사용"
 
-#: ui/qml/main.qml:331
+#: ui/qml/main.qml:384 ui/qml/main.qml:489
 msgid "Account:"
 msgstr "계정:"
 
-#: ui/qml/main.qml:334
+#: ui/qml/main.qml:387
 msgid "Sign in"
 msgstr "로그인"
 
 #. TRANSLATORS: button that reloads the account details from Proton
-#: ui/qml/main.qml:341
+#: ui/qml/main.qml:394
 msgid "Refresh"
 msgstr "새로 고침"
 
-#: ui/qml/main.qml:350
+#: ui/qml/main.qml:401
+msgid "Remove account…"
+msgstr "계정 제거…"
+
+#: ui/qml/main.qml:410
 msgid "On the web:"
 msgstr "웹:"
 
-#: ui/qml/main.qml:353
+#: ui/qml/main.qml:413
 msgid "Drive on the web"
 msgstr "웹 Drive"
 
-#: ui/qml/main.qml:358
+#: ui/qml/main.qml:418
 msgid "Proton account"
 msgstr "Proton 계정"
 
-#: ui/qml/main.qml:366
+#: ui/qml/main.qml:426
 msgid "Activity"
 msgstr "활동"
 
-#: ui/qml/main.qml:373
+#: ui/qml/main.qml:433
 msgid "Sync:"
 msgstr "동기화:"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Resume"
 msgstr "재개"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Pause"
 msgstr "일시 중지"
 
-#: ui/qml/main.qml:429
+#: ui/qml/main.qml:497
 msgid "Files"
 msgstr "파일"
 
-#: ui/qml/main.qml:433
+#: ui/qml/main.qml:501
 msgid "Sync folder:"
 msgstr "동기화 폴더:"
 
-#: ui/qml/main.qml:437
+#: ui/qml/main.qml:505
 msgid "nowhere yet"
 msgstr "아직 없음"
 
 #. TRANSLATORS: button that opens a folder picker to sync somewhere else
-#: ui/qml/main.qml:443 ui/qml/main.qml:490 ui/qml/main.qml:533
+#: ui/qml/main.qml:511 ui/qml/main.qml:558 ui/qml/main.qml:601
 msgid "Change…"
 msgstr "변경…"
 
-#: ui/qml/main.qml:450
+#: ui/qml/main.qml:518
 msgid "Ignored paths:"
 msgstr "무시할 경로:"
 
 #. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves
 #. alone
-#: ui/qml/main.qml:452
+#: ui/qml/main.qml:520
 msgid "Ignore file…"
 msgstr "무시 파일…"
 
-#: ui/qml/main.qml:459
+#: ui/qml/main.qml:527
 msgid "Photos"
 msgstr "사진"
 
-#: ui/qml/main.qml:463
+#: ui/qml/main.qml:531
 msgid "Download:"
 msgstr "내려받기:"
 
-#: ui/qml/main.qml:467
+#: ui/qml/main.qml:535
 msgid "Also download Proton Photos"
 msgstr "Proton Photos도 함께 내려받기"
 
-#: ui/qml/main.qml:473
+#: ui/qml/main.qml:541
 msgid ""
 "Your timeline is copied here every half hour. Nothing in Proton Photos is "
 "changed or deleted by it."
@@ -438,23 +482,23 @@ msgstr ""
 "타임라인이 30분마다 이곳에 복사됩니다. 이 작업으로 Proton Photos의 내용이 변"
 "경되거나 삭제되지 않습니다."
 
-#: ui/qml/main.qml:481
+#: ui/qml/main.qml:549
 msgid "Download folder:"
 msgstr "내려받을 폴더:"
 
-#: ui/qml/main.qml:485
+#: ui/qml/main.qml:553
 msgid "your Pictures folder"
 msgstr "사진 폴더"
 
-#: ui/qml/main.qml:497
+#: ui/qml/main.qml:565
 msgid "Upload:"
 msgstr "업로드:"
 
-#: ui/qml/main.qml:501
+#: ui/qml/main.qml:569
 msgid "Upload photos from a folder"
 msgstr "폴더에서 사진 업로드"
 
-#: ui/qml/main.qml:515
+#: ui/qml/main.qml:583
 msgid ""
 "Photos and videos put in this folder go up to Proton Photos within a minute, "
 "then leave the folder. Anything that cannot be uploaded stays."
@@ -462,31 +506,31 @@ msgstr ""
 "이 폴더에 넣은 사진과 동영상은 1분 안에 Proton Photos에 업로드된 후 폴더에서 "
 "제거됩니다. 업로드할 수 없는 항목은 그대로 남습니다."
 
-#: ui/qml/main.qml:523
+#: ui/qml/main.qml:591
 msgid "Upload folder:"
 msgstr "업로드 폴더:"
 
-#: ui/qml/main.qml:540
+#: ui/qml/main.qml:608
 msgid "After upload:"
 msgstr "업로드 후:"
 
-#: ui/qml/main.qml:542
+#: ui/qml/main.qml:610
 msgid "Delete instead of moving to the trash"
 msgstr "휴지통으로 옮기지 않고 삭제"
 
-#: ui/qml/main.qml:549
+#: ui/qml/main.qml:617
 msgid "Network"
 msgstr "네트워크"
 
-#: ui/qml/main.qml:553 ui/qml/main.qml:598
+#: ui/qml/main.qml:621 ui/qml/main.qml:666
 msgid "Pause while on:"
 msgstr "일시 중지할 조건:"
 
-#: ui/qml/main.qml:573
+#: ui/qml/main.qml:641
 msgid "{network} (connected)"
 msgstr "{network} (연결됨)"
 
-#: ui/qml/main.qml:584
+#: ui/qml/main.qml:652
 msgid ""
 "Syncing pauses while any ticked network is connected, such as a phone's "
 "hotspot. A sync already under way finishes first."
@@ -494,31 +538,31 @@ msgstr ""
 "휴대폰 핫스팟처럼 선택한 네트워크 중 하나에 연결되어 있는 동안에는 동기화가 "
 "일시 중지됩니다. 이미 진행 중인 동기화는 먼저 완료됩니다."
 
-#: ui/qml/main.qml:585
+#: ui/qml/main.qml:653
 msgid "NetworkManager lists no networks to choose from."
 msgstr "NetworkManager에 선택할 수 있는 네트워크가 없습니다."
 
-#: ui/qml/main.qml:594
+#: ui/qml/main.qml:662
 msgid "Power"
 msgstr "전원"
 
-#: ui/qml/main.qml:604
+#: ui/qml/main.qml:672
 msgid "AC power"
 msgstr "AC 전원"
 
-#: ui/qml/main.qml:605
+#: ui/qml/main.qml:673
 msgid "Battery"
 msgstr "배터리"
 
-#: ui/qml/main.qml:606
+#: ui/qml/main.qml:674
 msgid "Low battery"
 msgstr "배터리 부족"
 
-#: ui/qml/main.qml:614
+#: ui/qml/main.qml:682
 msgid "{power} (now)"
 msgstr "{power} (현재)"
 
-#: ui/qml/main.qml:624
+#: ui/qml/main.qml:692
 msgid ""
 "Low battery is the level set in the system's power management settings. A "
 "sync already under way finishes first."
@@ -526,98 +570,101 @@ msgstr ""
 "배터리 부족 수준은 시스템 전원 관리 설정에서 지정한 값입니다. 이미 진행 중인 "
 "동기화는 먼저 완료됩니다."
 
-#: ui/qml/main.qml:637
+#: ui/qml/main.qml:705
 msgid "Keep logs for:"
 msgstr "로그 보관 기간:"
 
 #. TRANSLATORS: after the number in "Keep logs for: [30] days"
-#: ui/qml/main.qml:646
+#: ui/qml/main.qml:714
 msgid "days"
 msgstr "일"
 
 #. TRANSLATORS: label before a dropdown choosing which log levels are written
 #. to disk
-#: ui/qml/main.qml:651
+#: ui/qml/main.qml:719
 msgid "Store:"
 msgstr "기록 수준:"
 
 #. TRANSLATORS: dropdown choice, store warnings and errors only
-#: ui/qml/main.qml:656
+#: ui/qml/main.qml:724
 msgid "Warnings and errors"
 msgstr "경고와 오류"
 
 #. TRANSLATORS: dropdown choice, store every log line
-#: ui/qml/main.qml:658
+#: ui/qml/main.qml:726
 msgid "Everything"
 msgstr "모든 항목"
 
 #. TRANSLATORS: dropdown choice, store errors only
-#: ui/qml/main.qml:660
+#: ui/qml/main.qml:728
 msgid "Errors only"
 msgstr "오류만"
 
-#: ui/qml/main.qml:681
+#: ui/qml/main.qml:749
 msgid "Search the log"
 msgstr "로그 검색"
 
-#: ui/qml/main.qml:686
+#: ui/qml/main.qml:754
 msgid "{n} line"
 msgid_plural "{n} lines"
 msgstr[0] "{n}줄"
 
 #. TRANSLATORS: right-click menu item, copies the selected log text
-#: ui/qml/main.qml:736
+#: ui/qml/main.qml:804
 msgid "Copy"
 msgstr "복사"
 
 #. TRANSLATORS: right-click menu item, selects the whole log view
-#: ui/qml/main.qml:742
+#: ui/qml/main.qml:810
 msgid "Select all"
 msgstr "모두 선택"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "No lines match"
 msgstr "일치하는 줄 없음"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "Nothing logged yet"
 msgstr "아직 기록된 내용이 없습니다"
 
-#: ui/qml/main.qml:761
+#: ui/qml/main.qml:829
 msgid "No line since the sync daemon started contains “{term}”."
 msgstr "동기화 데몬이 시작된 이후 “{term}” 문자열이 포함된 줄이 없습니다."
 
-#: ui/qml/main.qml:762
+#: ui/qml/main.qml:830
 msgid "This shows what has happened since the sync daemon started."
 msgstr "동기화 데몬이 시작된 이후에 일어난 일을 표시합니다."
 
-#: ui/qml/main.qml:794
+#: ui/qml/main.qml:862
 msgid "Proton Drive sync client for KDE Plasma"
 msgstr "KDE Plasma용 Proton Drive 동기화 클라이언트"
 
-#: ui/qml/main.qml:802
+#: ui/qml/main.qml:870
 msgid "Version:"
 msgstr "버전:"
 
-#: ui/qml/main.qml:807
+#: ui/qml/main.qml:875
 msgid "Licence:"
 msgstr "라이선스:"
 
-#: ui/qml/main.qml:811
+#: ui/qml/main.qml:879
 msgid "Read the licence"
 msgstr "라이선스 보기"
 
-#: ui/qml/main.qml:818
+#: ui/qml/main.qml:886
 msgid "Project:"
 msgstr "프로젝트:"
 
-#: ui/qml/main.qml:821
+#: ui/qml/main.qml:889
 msgid "Source code"
 msgstr "소스 코드"
 
-#: ui/qml/main.qml:826
+#: ui/qml/main.qml:894
 msgid "Report a bug"
 msgstr "버그 보고"
+
+#~ msgid "{note}. Restart the sync daemon to use it."
+#~ msgstr "{note}. 사용하려면 동기화 데몬을 다시 시작하십시오."
 
 #~ msgid "Syncing to"
 #~ msgstr "동기화 위치"

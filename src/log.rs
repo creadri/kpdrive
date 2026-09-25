@@ -18,10 +18,33 @@ use std::path::PathBuf;
 use crate::drive::civil_utc;
 
 pub fn dir() -> PathBuf {
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(std::env::var_os("HOME").expect("HOME")).join(".local/share"));
-    base.join("kpdrive/logs")
+    crate::config::data_dir().join("logs")
+}
+
+tokio::task_local! {
+    /// The account the running task works for. Every line it logs, including
+    /// those from deep in the sync, names it.
+    static ACCOUNT: String;
+}
+
+/// Runs `work` as `username`'s: what it logs carries the name.
+pub async fn for_account<F: std::future::Future>(username: &str, work: F) -> F::Output {
+    ACCOUNT.scope(username.to_owned(), work).await
+}
+
+/// The account the running task works for, if it works for one.
+pub fn account() -> Option<String> {
+    ACCOUNT.try_with(|a| a.clone()).ok()
+}
+
+/// `message`, tagged with the account when there is one. The log file always
+/// carries the tag; the terminal only needs it once there is more than one
+/// account to tell apart.
+fn tagged(message: &str, always: bool) -> String {
+    match account() {
+        Some(a) if always || crate::config::load().accounts.len() > 1 => format!("[{a}] {message}"),
+        _ => message.to_owned(),
+    }
 }
 
 fn now() -> i64 {
@@ -72,7 +95,7 @@ pub fn write(level: &str, message: &str) {
     }
     let secs = now();
     let mut line = String::new();
-    let _ = write!(line, "{} {level} {}", stamp(secs), message.replace('\n', " "));
+    let _ = write!(line, "{} {level} {}", stamp(secs), tagged(message, true).replace('\n', " "));
     line.push('\n');
     let path = dir().join(format!("{}.log", day(secs)));
     let appended = fs::create_dir_all(dir()).and_then(|_| {
@@ -86,18 +109,18 @@ pub fn write(level: &str, message: &str) {
 
 /// Logs and prints: the CLI shows activity, the log keeps it.
 pub fn info(message: &str) {
-    println!("{message}");
+    println!("{}", tagged(message, false));
     write("INFO", message);
 }
 
 /// Logs and prints to stderr, for the things worth noticing.
 pub fn warn(message: &str) {
-    eprintln!("{message}");
+    eprintln!("{}", tagged(message, false));
     write("WARN", message);
 }
 
 pub fn error(message: &str) {
-    eprintln!("{message}");
+    eprintln!("{}", tagged(message, false));
     write("ERROR", message);
 }
 

@@ -43,6 +43,9 @@ pub struct State {
     pub volume_id: Option<String>,
     /// link id → what we last wrote locally for it.
     pub nodes: BTreeMap<String, Entry>,
+    /// The file this state is kept in, which is the account's.
+    #[serde(skip)]
+    pub file: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
@@ -189,7 +192,8 @@ pub fn move_aside(root: &Path) -> Result<String> {
 /// valid. Across filesystems a rename fails, and rather than copying gigabytes
 /// this forgets what it knew and lets the next pass fetch into the new place,
 /// leaving the old folder untouched for the user to delete.
-pub fn set_folder(state: &mut State, new_root: PathBuf, occupied: Occupied) -> Result<String> {
+pub fn set_folder(account: &crate::account::Account, state: &mut State, new_root: PathBuf, occupied: Occupied) -> Result<String> {
+    account.check_folder(&new_root)?;
     // Asked for and answered before anything else: the branches below decide
     // what to do with the old folder, and they read an emptied destination
     // differently from an occupied one.
@@ -198,9 +202,7 @@ pub fn set_folder(state: &mut State, new_root: PathBuf, occupied: Occupied) -> R
         aside = Some(move_aside(&new_root)?);
     }
     let old = std::mem::replace(&mut state.root, new_root.clone());
-    let mut config = crate::config::load();
-    config.sync_folder = Some(new_root.clone());
-    crate::config::save(&config)?;
+    account.update(|a| a.sync_folder = Some(new_root.clone()))?;
 
     if old == new_root || old.as_os_str().is_empty() {
         if aside.is_some() {
@@ -244,23 +246,32 @@ pub fn set_folder(state: &mut State, new_root: PathBuf, occupied: Occupied) -> R
     Ok(note)
 }
 
-pub fn state_path() -> PathBuf {
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| Path::new(&std::env::var_os("HOME").expect("HOME")).join(".local/share"));
-    base.join("kpdrive/state.json")
+pub fn state_path(account: &crate::account::Account) -> PathBuf {
+    account.dir().join("state.json")
 }
 
-pub fn load_state() -> Result<Option<State>> {
-    match fs::read(state_path()) {
-        Ok(bytes) => Ok(Some(serde_json::from_slice(&bytes).context("state.json is corrupt")?)),
+/// The account's sync state, `None` before its first sync.
+pub fn load_state(account: &crate::account::Account) -> Result<Option<State>> {
+    let file = state_path(account);
+    match fs::read(&file) {
+        Ok(bytes) => {
+            let mut state: State = serde_json::from_slice(&bytes).with_context(|| format!("{} is corrupt", file.display()))?;
+            state.file = file;
+            Ok(Some(state))
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e).context("read state.json"),
+        Err(e) => Err(e).with_context(|| format!("read {}", file.display())),
     }
 }
 
+/// The account's sync state, or an empty one that will be saved in its place.
+pub fn open_state(account: &crate::account::Account) -> Result<State> {
+    Ok(load_state(account)?.unwrap_or_else(|| State { file: state_path(account), ..Default::default() }))
+}
+
 pub fn save_state(state: &State) -> Result<()> {
-    let path = state_path();
+    let path = &state.file;
+    anyhow::ensure!(!path.as_os_str().is_empty(), "sync state for {} has nowhere to be saved", state.root.display());
     fs::create_dir_all(path.parent().expect("state path has a parent"))?;
     let tmp = path.with_extension("json.tmp");
     fs::write(&tmp, serde_json::to_vec_pretty(state)?)?;

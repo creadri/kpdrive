@@ -16,6 +16,7 @@ Simple KDE Proton Drive sync Client designed to have a simple solution.
 - **.protonignore** with same syntax as .gitignore to ignore files to upload. .protonignore is still pushed though.
 - **Localization** support
 - **Conditional Sync Pause** currently based either on power management or network
+- **Multiple accounts**, each with its own folder, photos and ingestion settings, run by one daemon under one tray icon
 
 ## Design decisions
 
@@ -75,7 +76,8 @@ daemon is running. Details:
 ### kpdrive CLI / daemon
 
 ```
-kpdrive login                 # browser sign-in, session stored in KWallet
+kpdrive login                 # browser sign-in, session stored in KWallet; adds an account
+kpdrive accounts              # who is signed in, and where each account syncs
 kpdrive status
 kpdrive ls [path]
 kpdrive get <remote> [local]
@@ -89,8 +91,16 @@ kpdrive unshare <path>
 kpdrive setup [--root DIR]    # local folder, ignore file, Places entry, autostart, launcher
 kpdrive sync [--root DIR] [--watch] [--force]   # two-way Drive <-> local; --watch = daemon with tray
 kpdrive logs [--search TERM] [--lines N] [--retention DAYS]
-kpdrive logout
+kpdrive logout [--remove]     # sign out; --remove also forgets the account (its files stay)
 ```
+
+With more than one account, pick one with `--account NAME` (`-a`, the start of
+a username is enough). Commands given a path inside a sync folder (`share`,
+`unshare`, `rm`, Dolphin's menu) work out the account from it; `status`,
+`accounts`, `pause`, `resume` and `logs` cover every account, and `sync`
+without `--account` syncs them all. A new account syncs to `~/ProtonDrive` if
+nobody uses it and it is empty, otherwise to `~/ProtonDrive-<username>`;
+`kpdrive setup --account NAME --root DIR` moves it.
 
 ### Configuration
 
@@ -99,16 +109,23 @@ re-reads it every pass, so a change takes effect without a restart (the sync
 folder is the exception: a running daemon keeps the one it started with).
 Missing keys take the default, so the file only needs what you change.
 
-- *sync_folder* : path of the folder to sync ProtonDrive, by default `~/ProtonDrive`
 - *log_level* : least severe line kept in the log, `INFO`, `WARN` or `ERROR`. `WARN` by default; the CLI prints its activity whatever this says
 - *log_retention_days* : Days of logs, `30` by default
-- *photos_sync* : boolean, true if the daemon downloads photos as well, every half hour. `false` by default
-- *photos_sync_folder* : path of the folder photos are copied into, by default `~/Pictures/ProtonDrive`. May not be inside *sync_folder*
-- *photos_ingestion_folder* : path of a folder whose photos are uploaded into Proton Photos and then removed from it. Unset (off) by default. May not overlap *sync_folder* or *photos_sync_folder*
-- *photos_ingestion_perm_rm* : boolean, true if an ingested photo is deleted outright on successful upload, otherwise moved to trash. `false` by default
 - *sync_paused* : boolean, true while paused by hand (`kpdrive pause`, the tray or the window): no file sync, photo download or ingestion. `false` by default
 - *pause_on_networks* : NetworkManager connection names, as the network applet shows them, that pause syncing while connected, such as a phone's hotspot. Checked at least every thirty seconds; a sync already under way finishes first. Empty by default
 - *pause_on_power* : power sources that pause syncing while in use, any of `"ac"`, `"battery"` and `"low_battery"`, as Plasma's power management tells them apart (low means the level set in System Settings; without PowerDevil, the kernel's battery level against 20%). `"battery"` covers a low battery too. `["low_battery"]` by default
+
+- *accounts* : one entry per account, in the order they were added; the window and `kpdrive login` add them. Each has:
+  - *username* : the Proton username
+  - *sync_folder* : path of the folder to sync Proton Drive with. `~/ProtonDrive` for the first account
+  - *photos_sync* : boolean, true if the daemon downloads photos as well, every half hour. `false` by default
+  - *photos_sync_folder* : path of the folder photos are copied into, by default `~/Pictures/ProtonDrive`. May not be inside *sync_folder*
+  - *photos_ingestion_folder* : path of a folder whose photos are uploaded into Proton Photos and then removed from it. Unset (off) by default. May not overlap *sync_folder* or *photos_sync_folder*
+  - *photos_ingestion_perm_rm* : boolean, true if an ingested photo is deleted outright on successful upload, otherwise moved to trash. `false` by default
+
+No two accounts may share or nest any of these folders. A configuration from
+before accounts (these keys at the top level) is moved into the first account
+the first time a newer kpdrive runs.
 
 `<sync_folder>/.protonignore` lists paths sync leaves alone, in `.gitignore`
 syntax; the window's **Ignore file…** opens it.
@@ -119,7 +136,8 @@ syntax; the window's **Ignore file…** opens it.
 
 ### Sync State
 
-Sync state lives in `~/.local/share/kpdrive/state.json`. Rules:
+Sync state lives in `~/.local/share/kpdrive/accounts/<username>/state.json`,
+one directory per account. Rules:
 
 - Edited on one side only: copied to the other side.
 - Edited on **both** sides: both versions are kept. The remote version takes the
@@ -138,7 +156,7 @@ Set `KPDRIVE_DEBUG=1` for event-page diagnostics.
 Photos are a separate volume with a flat, capture-time-ordered timeline, so
 `photos` is its own command and writes to `<photos_sync_folder>/YYYY/MM/`,
 `~/Pictures/ProtonDrive` by default (what has been downloaded is recorded in
-`photos.json`). It only downloads. The destination must be outside the
+the account's `photos.json`). It only downloads. The destination must be outside the
 file sync folder, or the file sync would upload the whole library back into
 Drive; kpdrive refuses that rather than letting it happen.
 

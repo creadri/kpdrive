@@ -72,6 +72,32 @@ Kirigami.ApplicationWindow {
         ]
     }
 
+    // Removing an account cannot be undone from here, so it is asked first,
+    // saying what stays behind.
+    KirigamiDialogs.PromptDialog {
+        id: removePrompt
+
+        title: backend.i18n("Remove {account}?").replace("{account}", backend.currentAccount)
+        subtitle: backend.i18n("kpdrive signs this account out and forgets what it synced. The files in {folder} stay where they are.")
+                  .replace("{folder}", backend.syncFolder.length > 0 ? backend.syncFolder : backend.i18n("its folder"))
+        standardButtons: Controls.Dialog.NoButton
+        customFooterActions: [
+            Kirigami.Action {
+                text: backend.i18n("Remove account")
+                icon.name: "edit-delete-remove"
+                onTriggered: {
+                    backend.removeAccount();
+                    removePrompt.close();
+                }
+            },
+            Kirigami.Action {
+                text: backend.i18n("Cancel")
+                icon.name: "dialog-cancel"
+                onTriggered: removePrompt.close()
+            }
+        ]
+    }
+
     Backend {
         id: backend
 
@@ -175,6 +201,31 @@ Kirigami.ApplicationWindow {
                     anchors.margins: Kirigami.Units.smallSpacing
                     spacing: Kirigami.Units.smallSpacing
 
+                    // Which account the pages are about. Hidden until there
+                    // is one; adding one is the sign-in, whichever account
+                    // the browser signs into.
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: backend.accounts.length > 0
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Controls.ComboBox {
+                            id: accountBox
+                            Layout.fillWidth: true
+                            model: backend.accounts
+                            currentIndex: backend.accounts.indexOf(backend.currentAccount)
+                            onActivated: index => backend.selectAccount(backend.accounts[index])
+                        }
+                        Controls.ToolButton {
+                            icon.name: "list-add-user"
+                            enabled: !backend.busy
+                            onClicked: backend.login()
+                            Controls.ToolTip.text: backend.i18n("Add account")
+                            Controls.ToolTip.visible: hovered
+                            Accessible.name: backend.i18n("Add account")
+                        }
+                    }
+
                     ListView {
                         id: sidebar
                         Layout.fillWidth: true
@@ -266,7 +317,7 @@ Kirigami.ApplicationWindow {
 
                                     Kirigami.Heading {
                                         level: 2
-                                        text: backend.loggedIn ? backend.username : backend.i18n("Not signed in")
+                                        text: backend.loggedIn || backend.currentAccount.length > 0 ? backend.username : backend.i18n("Not signed in")
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
                                     }
@@ -274,7 +325,9 @@ Kirigami.ApplicationWindow {
                                     Controls.Label {
                                         text: backend.loggedIn
                                               ? backend.i18n("Signed in to Proton Drive")
-                                              : backend.i18n("Sign in to sync this computer with Proton Drive.")
+                                              : backend.currentAccount.length > 0
+                                                ? backend.i18n("Signed out. Sign in again to resume syncing this account.")
+                                                : backend.i18n("Sign in to sync this computer with Proton Drive.")
                                         opacity: 0.7
                                         wrapMode: Text.WordWrap
                                         Layout.fillWidth: true
@@ -343,6 +396,13 @@ Kirigami.ApplicationWindow {
                                         visible: backend.loggedIn
                                         enabled: !backend.busy
                                         onClicked: backend.refresh()
+                                    }
+                                    Controls.Button {
+                                        text: backend.i18n("Remove account…")
+                                        icon.name: "list-remove-user"
+                                        visible: backend.currentAccount.length > 0
+                                        enabled: !backend.busy
+                                        onClicked: removePrompt.open()
                                     }
                                 }
 
@@ -423,6 +483,14 @@ Kirigami.ApplicationWindow {
 
                         Kirigami.FormLayout {
                             width: settingsScroll.availableWidth
+
+                            // With several accounts, say whose folders these are.
+                            Controls.Label {
+                                Kirigami.FormData.label: backend.i18n("Account:")
+                                visible: backend.accounts.length > 1
+                                text: backend.currentAccount
+                                font.bold: true
+                            }
 
                             Kirigami.Separator {
                                 Kirigami.FormData.isSection: true

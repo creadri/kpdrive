@@ -9,8 +9,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kpdrive 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-24 14:30+0200\n"
-"PO-Revision-Date: 2026-09-24 14:34+0200\n"
+"POT-Creation-Date: 2026-09-25 20:29+0200\n"
+"PO-Revision-Date: 2026-09-25 20:32+0200\n"
 "Last-Translator: machine translation, needs review by a speaker\n"
 "Language-Team: hu\n"
 "Language: hu\n"
@@ -19,105 +19,105 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: src/daemon.rs:112
+#: src/daemon.rs:67 src/daemon.rs:174
 msgid "Signed out. Sign in from the account window."
 msgstr "Kijelentkezve. Jelentkezzen be a fiók ablakából."
 
-#: src/daemon.rs:114 src/daemon.rs:401
+#: src/daemon.rs:69 src/daemon.rs:535
 msgid "Syncing…"
 msgstr "Szinkronizálás…"
 
-#: src/daemon.rs:116 src/daemon.rs:404
+#: src/daemon.rs:71 src/daemon.rs:538
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] "{n} elem szinkronban"
 msgstr[1] "{n} elem szinkronban"
 
-#: src/daemon.rs:126 ui/qml/main.qml:409
+#: src/daemon.rs:199 src/daemon.rs:201 ui/qml/main.qml:469
 msgid "Open folder"
 msgstr "Mappa megnyitása"
 
-#: src/daemon.rs:136
+#: src/daemon.rs:211
 msgid "Account and logs…"
 msgstr "Fiók és naplók…"
 
-#: src/daemon.rs:143 ui/qml/main.qml:396
+#: src/daemon.rs:218 ui/qml/main.qml:456
 msgid "Sync now"
 msgstr "Szinkronizálás most"
 
-#: src/daemon.rs:155
+#: src/daemon.rs:230
 msgid "Pause sync"
 msgstr "Szinkronizálás szüneteltetése"
 
-#: src/daemon.rs:168
+#: src/daemon.rs:243
 msgid "Quit"
 msgstr "Kilépés"
 
 #. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no
 #. route"
-#: src/daemon.rs:328
+#: src/daemon.rs:430
 msgid "{reason}; retrying"
 msgstr "{reason}; újrapróbálkozás"
 
-#: src/daemon.rs:339
+#: src/daemon.rs:441
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr "A Proton Drive ismét elérhető, {duration} után"
 
-#: src/daemon.rs:350
+#: src/daemon.rs:452
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] "{n} másodperc"
 msgstr[1] "{n} másodperc"
 
-#: src/daemon.rs:351
+#: src/daemon.rs:453
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "{n} perc"
 msgstr[1] "{n} perc"
 
-#: src/daemon.rs:352
+#: src/daemon.rs:454
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] "{n} óra"
 msgstr[1] "{n} óra"
 
-#: src/daemon.rs:382
+#: src/daemon.rs:502
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
 msgstr ""
 "A szinkronizálási szolgáltatás nem fut. Indítsa el ezzel: kpdrive sync --"
 "watch"
 
-#: src/daemon.rs:385
+#: src/daemon.rs:505
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
 msgstr ""
 "Fut egy szinkronizálási szolgáltatás, de túl régi ahhoz, hogy jelezze, mit "
 "csinál. Indítsa újra."
 
-#: src/daemon.rs:391
+#: src/daemon.rs:516 src/daemon.rs:525
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr "Kijelentkezve. A szinkronizálás a bejelentkezés után folytatódik."
 
-#: src/daemon.rs:395
+#: src/daemon.rs:529
 msgid "{reason}. Still trying."
 msgstr "{reason}. A próbálkozás folytatódik."
 
-#: src/daemon.rs:396
+#: src/daemon.rs:530
 msgid "Last sync failed: {reason}"
 msgstr "A legutóbbi szinkronizálás sikertelen: {reason}"
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:410
+#: src/daemon.rs:544
 msgid "just now"
 msgstr "éppen most"
 
-#: src/daemon.rs:412
+#: src/daemon.rs:546
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "{n} perce"
 msgstr[1] "{n} perce"
 
-#: src/daemon.rs:415
+#: src/daemon.rs:549
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "{n} órája"
@@ -125,37 +125,37 @@ msgstr[1] "{n} órája"
 
 #. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes
 #. ago"
-#: src/daemon.rs:419
+#: src/daemon.rs:553
 msgid "{items}, checked {ago}"
 msgstr "{items}, ellenőrizve {ago}"
 
-#: src/daemon.rs:637
+#: src/daemon.rs:924
 msgid "Signed in again. Syncing resumed."
 msgstr "Ismét bejelentkezve. A szinkronizálás folytatódik."
 
-#: src/daemon.rs:712
+#: src/daemon.rs:938
 msgid "Signed out. Sign in from the account window to resume syncing."
 msgstr ""
 "Kijelentkezve. Jelentkezzen be a fiók ablakából a szinkronizálás "
 "folytatásához."
 
-#: src/daemon.rs:745
+#: src/daemon.rs:1050
 msgid "Sync resumed"
 msgstr "Szinkronizálás folytatva"
 
-#: src/daemon.rs:762
+#: src/daemon.rs:1067
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] "{n} fénykép letöltve"
 msgstr[1] "{n} fénykép letöltve"
 
-#: src/daemon.rs:783
+#: src/daemon.rs:1086
 msgid "{n} photo uploaded to Proton Photos"
 msgid_plural "{n} photos uploaded to Proton Photos"
 msgstr[0] "{n} fénykép feltöltve a Proton Photos szolgáltatásba"
 msgstr[1] "{n} fénykép feltöltve a Proton Photos szolgáltatásba"
 
-#: src/i18n.rs:155 ui/qml/main.qml:334
+#: src/i18n.rs:155 ui/qml/main.qml:387
 msgid "Sign out"
 msgstr "Kijelentkezés"
 
@@ -185,15 +185,15 @@ msgstr "Szüneteltetve, amíg az akkumulátor töltöttsége alacsony"
 msgid "Paused while connected to {network}"
 msgstr "Szüneteltetve, amíg a(z) {network} hálózathoz csatlakozik"
 
-#: src/sync.rs:121
+#: src/sync.rs:124
 msgid "Sync into it and keep what is already there"
 msgstr "Szinkronizálás bele, a meglévő tartalom megtartásával"
 
-#: src/sync.rs:122
+#: src/sync.rs:125
 msgid "Move it aside and start from an empty folder"
 msgstr "Félretétele és indulás üres mappából"
 
-#: src/sync.rs:160
+#: src/sync.rs:163
 msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
@@ -205,104 +205,112 @@ msgstr[1] ""
 "A(z) {folder} mappa már tartalmaz {n} elemet, amelyeket a szinkronizálás "
 "egyesít a Proton Drive tartalmával."
 
-#: ui/src/bridge.rs:237
+#: ui/src/bridge.rs:260
 msgid "Starting…"
 msgstr "Indítás…"
 
-#: ui/src/bridge.rs:288
+#: ui/src/bridge.rs:317
 msgid "Confirm the code {code} in your browser"
 msgstr "Erősítse meg a(z) {code} kódot a böngészőjében"
 
-#: ui/src/bridge.rs:302
+#: ui/src/bridge.rs:331
 msgid "Sign-in failed: {reason}"
 msgstr "A bejelentkezés sikertelen: {reason}"
 
-#: ui/src/bridge.rs:314
+#: ui/src/bridge.rs:344
 msgid "Signed out"
 msgstr "Kijelentkezve"
 
-#: ui/src/bridge.rs:317
+#: ui/src/bridge.rs:347
 msgid "Sign-out failed: {reason}"
 msgstr "A kijelentkezés sikertelen: {reason}"
 
-#: ui/src/bridge.rs:382
-msgid "{note}. Restart the sync daemon to use it."
-msgstr "{note}. A használatához indítsa újra a szinkronizálási szolgáltatást."
+#: ui/src/bridge.rs:355
+msgid "Removed {account}. Its files were left where they are."
+msgstr "{account} eltávolítva. A fájljai a helyükön maradtak."
 
-#: ui/src/bridge.rs:385
+#: ui/src/bridge.rs:362
+msgid "Cannot remove the account: {reason}"
+msgstr "A fiók nem távolítható el: {reason}"
+
+#: ui/src/bridge.rs:481
 msgid "Cannot change the folder: {reason}"
 msgstr "A mappa nem módosítható: {reason}"
 
-#: ui/src/bridge.rs:392
+#: ui/src/bridge.rs:488
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr "Még nincs szinkronizálási mappa. Futtassa: kpdrive setup"
 
-#: ui/src/bridge.rs:396
+#: ui/src/bridge.rs:492
 msgid "Cannot create the ignore file: {reason}"
 msgstr "A mellőzési fájl nem hozható létre: {reason}"
 
-#: ui/src/bridge.rs:434
+#: ui/src/bridge.rs:537
 msgid "Checking the account…"
 msgstr "A fiók ellenőrzése…"
 
-#: ui/src/bridge.rs:440
+#: ui/src/bridge.rs:543
 msgid "Opening the browser…"
 msgstr "A böngésző megnyitása…"
 
-#: ui/src/bridge.rs:446
+#: ui/src/bridge.rs:550
 msgid "Signing out…"
 msgstr "Kijelentkezés…"
 
-#: ui/src/bridge.rs:472
+#: ui/src/bridge.rs:557
+msgid "Removing the account…"
+msgstr "A fiók eltávolítása…"
+
+#: ui/src/bridge.rs:583
 msgid "Cannot read the log: {reason}"
 msgstr "A napló nem olvasható: {reason}"
 
-#: ui/src/bridge.rs:482 ui/src/bridge.rs:510 ui/src/bridge.rs:524
-#: ui/src/bridge.rs:539 ui/src/bridge.rs:573 ui/src/bridge.rs:614
-#: ui/src/bridge.rs:627 ui/src/bridge.rs:645
+#: ui/src/bridge.rs:591 ui/src/bridge.rs:618 ui/src/bridge.rs:632
+#: ui/src/bridge.rs:647 ui/src/bridge.rs:681 ui/src/bridge.rs:723
+#: ui/src/bridge.rs:736 ui/src/bridge.rs:754
 msgid "Cannot save the setting: {reason}"
 msgstr "A beállítás nem menthető: {reason}"
 
-#: ui/src/bridge.rs:490
+#: ui/src/bridge.rs:599
 msgid "Proton Photos will be downloaded with the next sync"
 msgstr "A Proton Photos tartalma a következő szinkronizáláskor letöltődik"
 
-#: ui/src/bridge.rs:491
+#: ui/src/bridge.rs:600
 msgid "Proton Photos will be left alone"
 msgstr "A Proton Photos érintetlen marad"
 
-#: ui/src/bridge.rs:516
+#: ui/src/bridge.rs:624
 msgid "Photos put in that folder will be uploaded to Proton Photos"
 msgstr ""
 "Az abba a mappába tett fényképek feltöltődnek a Proton Photos szolgáltatásba"
 
-#: ui/src/bridge.rs:517
+#: ui/src/bridge.rs:625
 msgid "No longer uploading photos"
 msgstr "A fényképek feltöltése leállt"
 
-#: ui/src/bridge.rs:607
+#: ui/src/bridge.rs:717
 msgid "Photos will be downloaded into that folder from the next pass"
 msgstr "A fényképek a következő körtől abba a mappába töltődnek le"
 
-#: ui/src/bridge.rs:632
+#: ui/src/bridge.rs:741
 msgid "Storing everything from now on"
 msgstr "Mostantól minden tárolva lesz"
 
-#: ui/src/bridge.rs:633
+#: ui/src/bridge.rs:742
 msgid "Storing warnings and errors from now on"
 msgstr "Mostantól a figyelmeztetések és a hibák lesznek tárolva"
 
-#: ui/src/bridge.rs:634
+#: ui/src/bridge.rs:743
 msgid "Storing errors from now on"
 msgstr "Mostantól csak a hibák lesznek tárolva"
 
-#: ui/src/bridge.rs:650
+#: ui/src/bridge.rs:759
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] "{days} napnál régebbi {n} naplófájl eltávolítva"
 msgstr[1] "{days} napnál régebbi {n} naplófájl eltávolítva"
 
-#: ui/src/bridge.rs:651
+#: ui/src/bridge.rs:760
 msgid "Cannot prune the log: {reason}"
 msgstr "A napló nem tisztítható: {reason}"
 
@@ -322,133 +330,170 @@ msgstr "Válassza ki a mappát, ahonnan a fényképek feltöltődnek"
 msgid "The folder is not empty"
 msgstr "A mappa nem üres"
 
-#: ui/qml/main.qml:104
+#: ui/qml/main.qml:80
+msgid "Remove {account}?"
+msgstr "Eltávolítja ezt a fiókot: {account}?"
+
+#: ui/qml/main.qml:81
+msgid ""
+"kpdrive signs this account out and forgets what it synced. The files in "
+"{folder} stay where they are."
+msgstr ""
+"A kpdrive kijelentkezteti ezt a fiókot, és elfelejti, mit szinkronizált. A "
+"fájlok a helyükön maradnak itt: {folder}."
+
+#: ui/qml/main.qml:82
+msgid "its folder"
+msgstr "a fiók mappája"
+
+#: ui/qml/main.qml:86
+msgid "Remove account"
+msgstr "Fiók eltávolítása"
+
+#: ui/qml/main.qml:94
+msgid "Cancel"
+msgstr "Mégse"
+
+#: ui/qml/main.qml:130
 msgid "Opened {what}"
 msgstr "{what} megnyitva"
 
-#: ui/qml/main.qml:106
+#: ui/qml/main.qml:132
 msgid "Could not open {what} ({url})"
 msgstr "{what} nem nyitható meg ({url})"
 
-#: ui/qml/main.qml:186
+#: ui/qml/main.qml:223 ui/qml/main.qml:225
+msgid "Add account"
+msgstr "Fiók hozzáadása"
+
+#: ui/qml/main.qml:237
 msgid "Account & activity"
 msgstr "Fiók és tevékenység"
 
-#: ui/qml/main.qml:187
+#: ui/qml/main.qml:238
 msgid "Settings"
 msgstr "Beállítások"
 
-#: ui/qml/main.qml:188 ui/qml/main.qml:633
+#: ui/qml/main.qml:239 ui/qml/main.qml:701
 msgid "Logs"
 msgstr "Naplók"
 
-#: ui/qml/main.qml:189
+#: ui/qml/main.qml:240
 msgid "About"
 msgstr "Névjegy"
 
-#: ui/qml/main.qml:269
+#: ui/qml/main.qml:320
 msgid "Not signed in"
 msgstr "Nincs bejelentkezve"
 
-#: ui/qml/main.qml:276
+#: ui/qml/main.qml:327
 msgid "Signed in to Proton Drive"
 msgstr "Bejelentkezve a Proton Drive szolgáltatásba"
 
-#: ui/qml/main.qml:277
+#: ui/qml/main.qml:329
+msgid "Signed out. Sign in again to resume syncing this account."
+msgstr ""
+"Kijelentkezve. Jelentkezzen be újra a fiók szinkronizálásának folytatásához."
+
+#: ui/qml/main.qml:330
 msgid "Sign in to sync this computer with Proton Drive."
 msgstr ""
 "Jelentkezzen be, hogy szinkronizálja ezt a számítógépet a Proton Drive "
 "szolgáltatással."
 
-#: ui/qml/main.qml:294
+#: ui/qml/main.qml:347
 msgid "Storage:"
 msgstr "Tárhely:"
 
-#: ui/qml/main.qml:323
+#: ui/qml/main.qml:376
 msgid "{used} of {total} used"
 msgstr "{used} / {total} felhasználva"
 
-#: ui/qml/main.qml:331
+#: ui/qml/main.qml:384 ui/qml/main.qml:489
 msgid "Account:"
 msgstr "Fiók:"
 
-#: ui/qml/main.qml:334
+#: ui/qml/main.qml:387
 msgid "Sign in"
 msgstr "Bejelentkezés"
 
 #. TRANSLATORS: button that reloads the account details from Proton
-#: ui/qml/main.qml:341
+#: ui/qml/main.qml:394
 msgid "Refresh"
 msgstr "Frissítés"
 
-#: ui/qml/main.qml:350
+#: ui/qml/main.qml:401
+msgid "Remove account…"
+msgstr "Fiók eltávolítása…"
+
+#: ui/qml/main.qml:410
 msgid "On the web:"
 msgstr "A weben:"
 
-#: ui/qml/main.qml:353
+#: ui/qml/main.qml:413
 msgid "Drive on the web"
 msgstr "A Drive a weben"
 
-#: ui/qml/main.qml:358
+#: ui/qml/main.qml:418
 msgid "Proton account"
 msgstr "Proton fiók"
 
-#: ui/qml/main.qml:366
+#: ui/qml/main.qml:426
 msgid "Activity"
 msgstr "Tevékenység"
 
-#: ui/qml/main.qml:373
+#: ui/qml/main.qml:433
 msgid "Sync:"
 msgstr "Szinkronizálás:"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Resume"
 msgstr "Folytatás"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Pause"
 msgstr "Szüneteltetés"
 
-#: ui/qml/main.qml:429
+#: ui/qml/main.qml:497
 msgid "Files"
 msgstr "Fájlok"
 
-#: ui/qml/main.qml:433
+#: ui/qml/main.qml:501
 msgid "Sync folder:"
 msgstr "Szinkronizált mappa:"
 
-#: ui/qml/main.qml:437
+#: ui/qml/main.qml:505
 msgid "nowhere yet"
 msgstr "még sehová"
 
 #. TRANSLATORS: button that opens a folder picker to sync somewhere else
-#: ui/qml/main.qml:443 ui/qml/main.qml:490 ui/qml/main.qml:533
+#: ui/qml/main.qml:511 ui/qml/main.qml:558 ui/qml/main.qml:601
 msgid "Change…"
 msgstr "Módosítás…"
 
-#: ui/qml/main.qml:450
+#: ui/qml/main.qml:518
 msgid "Ignored paths:"
 msgstr "Mellőzött útvonalak:"
 
 #. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves
 #. alone
-#: ui/qml/main.qml:452
+#: ui/qml/main.qml:520
 msgid "Ignore file…"
 msgstr "Mellőzési fájl…"
 
-#: ui/qml/main.qml:459
+#: ui/qml/main.qml:527
 msgid "Photos"
 msgstr "Fényképek"
 
-#: ui/qml/main.qml:463
+#: ui/qml/main.qml:531
 msgid "Download:"
 msgstr "Letöltés:"
 
-#: ui/qml/main.qml:467
+#: ui/qml/main.qml:535
 msgid "Also download Proton Photos"
 msgstr "A Proton Photos letöltése is"
 
-#: ui/qml/main.qml:473
+#: ui/qml/main.qml:541
 msgid ""
 "Your timeline is copied here every half hour. Nothing in Proton Photos is "
 "changed or deleted by it."
@@ -456,23 +501,23 @@ msgstr ""
 "Az idővonala félóránként ide másolódik. Ez semmit sem módosít és nem töröl a "
 "Proton Photos szolgáltatásban."
 
-#: ui/qml/main.qml:481
+#: ui/qml/main.qml:549
 msgid "Download folder:"
 msgstr "Letöltési mappa:"
 
-#: ui/qml/main.qml:485
+#: ui/qml/main.qml:553
 msgid "your Pictures folder"
 msgstr "a Képek mappája"
 
-#: ui/qml/main.qml:497
+#: ui/qml/main.qml:565
 msgid "Upload:"
 msgstr "Feltöltés:"
 
-#: ui/qml/main.qml:501
+#: ui/qml/main.qml:569
 msgid "Upload photos from a folder"
 msgstr "Fényképek feltöltése egy mappából"
 
-#: ui/qml/main.qml:515
+#: ui/qml/main.qml:583
 msgid ""
 "Photos and videos put in this folder go up to Proton Photos within a minute, "
 "then leave the folder. Anything that cannot be uploaded stays."
@@ -481,31 +526,31 @@ msgstr ""
 "Proton Photos szolgáltatásba, majd kikerülnek a mappából. Ami nem tölthető "
 "fel, az a mappában marad."
 
-#: ui/qml/main.qml:523
+#: ui/qml/main.qml:591
 msgid "Upload folder:"
 msgstr "Feltöltési mappa:"
 
-#: ui/qml/main.qml:540
+#: ui/qml/main.qml:608
 msgid "After upload:"
 msgstr "Feltöltés után:"
 
-#: ui/qml/main.qml:542
+#: ui/qml/main.qml:610
 msgid "Delete instead of moving to the trash"
 msgstr "Törlés a Kukába helyezés helyett"
 
-#: ui/qml/main.qml:549
+#: ui/qml/main.qml:617
 msgid "Network"
 msgstr "Hálózat"
 
-#: ui/qml/main.qml:553 ui/qml/main.qml:598
+#: ui/qml/main.qml:621 ui/qml/main.qml:666
 msgid "Pause while on:"
 msgstr "Szüneteltetés ekkor:"
 
-#: ui/qml/main.qml:573
+#: ui/qml/main.qml:641
 msgid "{network} (connected)"
 msgstr "{network} (csatlakoztatva)"
 
-#: ui/qml/main.qml:584
+#: ui/qml/main.qml:652
 msgid ""
 "Syncing pauses while any ticked network is connected, such as a phone's "
 "hotspot. A sync already under way finishes first."
@@ -514,31 +559,31 @@ msgstr ""
 "van, például egy telefon hotspotja. A már folyamatban lévő szinkronizálás "
 "előbb befejeződik."
 
-#: ui/qml/main.qml:585
+#: ui/qml/main.qml:653
 msgid "NetworkManager lists no networks to choose from."
 msgstr "A NetworkManager nem sorol fel választható hálózatot."
 
-#: ui/qml/main.qml:594
+#: ui/qml/main.qml:662
 msgid "Power"
 msgstr "Energiaellátás"
 
-#: ui/qml/main.qml:604
+#: ui/qml/main.qml:672
 msgid "AC power"
 msgstr "Hálózati tápellátás"
 
-#: ui/qml/main.qml:605
+#: ui/qml/main.qml:673
 msgid "Battery"
 msgstr "Akkumulátor"
 
-#: ui/qml/main.qml:606
+#: ui/qml/main.qml:674
 msgid "Low battery"
 msgstr "Alacsony töltöttség"
 
-#: ui/qml/main.qml:614
+#: ui/qml/main.qml:682
 msgid "{power} (now)"
 msgstr "{power} (most)"
 
-#: ui/qml/main.qml:624
+#: ui/qml/main.qml:692
 msgid ""
 "Low battery is the level set in the system's power management settings. A "
 "sync already under way finishes first."
@@ -546,102 +591,106 @@ msgstr ""
 "Az alacsony töltöttség a rendszer energiakezelési beállításaiban megadott "
 "szint. A már folyamatban lévő szinkronizálás előbb befejeződik."
 
-#: ui/qml/main.qml:637
+#: ui/qml/main.qml:705
 msgid "Keep logs for:"
 msgstr "Naplók megőrzése:"
 
 #. TRANSLATORS: after the number in "Keep logs for: [30] days"
-#: ui/qml/main.qml:646
+#: ui/qml/main.qml:714
 msgid "days"
 msgstr "napig"
 
 #. TRANSLATORS: label before a dropdown choosing which log levels are written
 #. to disk
-#: ui/qml/main.qml:651
+#: ui/qml/main.qml:719
 msgid "Store:"
 msgstr "Tárolás:"
 
 #. TRANSLATORS: dropdown choice, store warnings and errors only
-#: ui/qml/main.qml:656
+#: ui/qml/main.qml:724
 msgid "Warnings and errors"
 msgstr "Figyelmeztetések és hibák"
 
 #. TRANSLATORS: dropdown choice, store every log line
-#: ui/qml/main.qml:658
+#: ui/qml/main.qml:726
 msgid "Everything"
 msgstr "Minden"
 
 #. TRANSLATORS: dropdown choice, store errors only
-#: ui/qml/main.qml:660
+#: ui/qml/main.qml:728
 msgid "Errors only"
 msgstr "Csak hibák"
 
-#: ui/qml/main.qml:681
+#: ui/qml/main.qml:749
 msgid "Search the log"
 msgstr "Keresés a naplóban"
 
-#: ui/qml/main.qml:686
+#: ui/qml/main.qml:754
 msgid "{n} line"
 msgid_plural "{n} lines"
 msgstr[0] "{n} sor"
 msgstr[1] "{n} sor"
 
 #. TRANSLATORS: right-click menu item, copies the selected log text
-#: ui/qml/main.qml:736
+#: ui/qml/main.qml:804
 msgid "Copy"
 msgstr "Másolás"
 
 #. TRANSLATORS: right-click menu item, selects the whole log view
-#: ui/qml/main.qml:742
+#: ui/qml/main.qml:810
 msgid "Select all"
 msgstr "Az összes kijelölése"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "No lines match"
 msgstr "Nincs egyező sor"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "Nothing logged yet"
 msgstr "Még nincs naplóbejegyzés"
 
-#: ui/qml/main.qml:761
+#: ui/qml/main.qml:829
 msgid "No line since the sync daemon started contains “{term}”."
 msgstr ""
 "A szinkronizálási szolgáltatás indítása óta egyetlen sor sem tartalmazza "
 "ezt: „{term}”."
 
-#: ui/qml/main.qml:762
+#: ui/qml/main.qml:830
 msgid "This shows what has happened since the sync daemon started."
 msgstr ""
 "Itt látható, hogy mi történt a szinkronizálási szolgáltatás indítása óta."
 
-#: ui/qml/main.qml:794
+#: ui/qml/main.qml:862
 msgid "Proton Drive sync client for KDE Plasma"
 msgstr "Proton Drive szinkronizáló kliens KDE Plasmához"
 
-#: ui/qml/main.qml:802
+#: ui/qml/main.qml:870
 msgid "Version:"
 msgstr "Verzió:"
 
-#: ui/qml/main.qml:807
+#: ui/qml/main.qml:875
 msgid "Licence:"
 msgstr "Licenc:"
 
-#: ui/qml/main.qml:811
+#: ui/qml/main.qml:879
 msgid "Read the licence"
 msgstr "A licenc elolvasása"
 
-#: ui/qml/main.qml:818
+#: ui/qml/main.qml:886
 msgid "Project:"
 msgstr "Projekt:"
 
-#: ui/qml/main.qml:821
+#: ui/qml/main.qml:889
 msgid "Source code"
 msgstr "Forráskód"
 
-#: ui/qml/main.qml:826
+#: ui/qml/main.qml:894
 msgid "Report a bug"
 msgstr "Hiba bejelentése"
+
+#~ msgid "{note}. Restart the sync daemon to use it."
+#~ msgstr ""
+#~ "{note}. A használatához indítsa újra a szinkronizálási szolgáltatást."
 
 #~ msgid "Syncing to"
 #~ msgstr "Szinkronizálás ide:"

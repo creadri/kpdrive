@@ -9,8 +9,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kpdrive 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-24 14:30+0200\n"
-"PO-Revision-Date: 2026-09-24 14:34+0200\n"
+"POT-Creation-Date: 2026-09-25 20:29+0200\n"
+"PO-Revision-Date: 2026-09-25 20:32+0200\n"
 "Last-Translator: machine translation, needs review by a speaker\n"
 "Language-Team: fi\n"
 "Language: fi\n"
@@ -19,105 +19,105 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: src/daemon.rs:112
+#: src/daemon.rs:67 src/daemon.rs:174
 msgid "Signed out. Sign in from the account window."
 msgstr "Kirjauduttu ulos. Kirjaudu sisään tili-ikkunasta."
 
-#: src/daemon.rs:114 src/daemon.rs:401
+#: src/daemon.rs:69 src/daemon.rs:535
 msgid "Syncing…"
 msgstr "Synkronoidaan…"
 
-#: src/daemon.rs:116 src/daemon.rs:404
+#: src/daemon.rs:71 src/daemon.rs:538
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] "{n} kohde synkronoitu"
 msgstr[1] "{n} kohdetta synkronoitu"
 
-#: src/daemon.rs:126 ui/qml/main.qml:409
+#: src/daemon.rs:199 src/daemon.rs:201 ui/qml/main.qml:469
 msgid "Open folder"
 msgstr "Avaa kansio"
 
-#: src/daemon.rs:136
+#: src/daemon.rs:211
 msgid "Account and logs…"
 msgstr "Tili ja loki…"
 
-#: src/daemon.rs:143 ui/qml/main.qml:396
+#: src/daemon.rs:218 ui/qml/main.qml:456
 msgid "Sync now"
 msgstr "Synkronoi nyt"
 
-#: src/daemon.rs:155
+#: src/daemon.rs:230
 msgid "Pause sync"
 msgstr "Keskeytä synkronointi"
 
-#: src/daemon.rs:168
+#: src/daemon.rs:243
 msgid "Quit"
 msgstr "Lopeta"
 
 #. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no
 #. route"
-#: src/daemon.rs:328
+#: src/daemon.rs:430
 msgid "{reason}; retrying"
 msgstr "{reason}; yritetään uudelleen"
 
-#: src/daemon.rs:339
+#: src/daemon.rs:441
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr "Proton Drive on jälleen tavoitettavissa. Katkoksen kesto: {duration}"
 
-#: src/daemon.rs:350
+#: src/daemon.rs:452
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] "{n} sekunti"
 msgstr[1] "{n} sekuntia"
 
-#: src/daemon.rs:351
+#: src/daemon.rs:453
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "{n} minuutti"
 msgstr[1] "{n} minuuttia"
 
-#: src/daemon.rs:352
+#: src/daemon.rs:454
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] "{n} tunti"
 msgstr[1] "{n} tuntia"
 
-#: src/daemon.rs:382
+#: src/daemon.rs:502
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
 msgstr ""
 "Synkronointipalvelu ei ole käynnissä. Käynnistä se komennolla: kpdrive sync "
 "--watch"
 
-#: src/daemon.rs:385
+#: src/daemon.rs:505
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
 msgstr ""
 "Synkronointipalvelu on käynnissä, mutta se on liian vanha kertomaan, mitä se "
 "tekee. Käynnistä se uudelleen."
 
-#: src/daemon.rs:391
+#: src/daemon.rs:516 src/daemon.rs:525
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr "Kirjauduttu ulos. Synkronointi jatkuu, kun kirjaudut sisään."
 
-#: src/daemon.rs:395
+#: src/daemon.rs:529
 msgid "{reason}. Still trying."
 msgstr "{reason}. Yritetään edelleen."
 
-#: src/daemon.rs:396
+#: src/daemon.rs:530
 msgid "Last sync failed: {reason}"
 msgstr "Viimeisin synkronointi epäonnistui: {reason}"
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:410
+#: src/daemon.rs:544
 msgid "just now"
 msgstr "juuri nyt"
 
-#: src/daemon.rs:412
+#: src/daemon.rs:546
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "{n} minuutti sitten"
 msgstr[1] "{n} minuuttia sitten"
 
-#: src/daemon.rs:415
+#: src/daemon.rs:549
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "{n} tunti sitten"
@@ -125,36 +125,36 @@ msgstr[1] "{n} tuntia sitten"
 
 #. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes
 #. ago"
-#: src/daemon.rs:419
+#: src/daemon.rs:553
 msgid "{items}, checked {ago}"
 msgstr "{items}, tarkistettu {ago}"
 
-#: src/daemon.rs:637
+#: src/daemon.rs:924
 msgid "Signed in again. Syncing resumed."
 msgstr "Kirjauduttu uudelleen sisään. Synkronointi jatkuu."
 
-#: src/daemon.rs:712
+#: src/daemon.rs:938
 msgid "Signed out. Sign in from the account window to resume syncing."
 msgstr ""
 "Kirjauduttu ulos. Kirjaudu sisään tili-ikkunasta, niin synkronointi jatkuu."
 
-#: src/daemon.rs:745
+#: src/daemon.rs:1050
 msgid "Sync resumed"
 msgstr "Synkronointi jatkuu"
 
-#: src/daemon.rs:762
+#: src/daemon.rs:1067
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] "{n} valokuva ladattu"
 msgstr[1] "{n} valokuvaa ladattu"
 
-#: src/daemon.rs:783
+#: src/daemon.rs:1086
 msgid "{n} photo uploaded to Proton Photos"
 msgid_plural "{n} photos uploaded to Proton Photos"
 msgstr[0] "{n} valokuva lähetetty Proton Photos -palveluun"
 msgstr[1] "{n} valokuvaa lähetetty Proton Photos -palveluun"
 
-#: src/i18n.rs:155 ui/qml/main.qml:334
+#: src/i18n.rs:155 ui/qml/main.qml:387
 msgid "Sign out"
 msgstr "Kirjaudu ulos"
 
@@ -184,15 +184,15 @@ msgstr "Keskeytetty, kun akun varaus on vähissä"
 msgid "Paused while connected to {network}"
 msgstr "Keskeytetty, kun yhdistetty verkkoon {network}"
 
-#: src/sync.rs:121
+#: src/sync.rs:124
 msgid "Sync into it and keep what is already there"
 msgstr "Synkronoi siihen ja säilytä nykyinen sisältö"
 
-#: src/sync.rs:122
+#: src/sync.rs:125
 msgid "Move it aside and start from an empty folder"
 msgstr "Siirrä se sivuun ja aloita tyhjästä kansiosta"
 
-#: src/sync.rs:160
+#: src/sync.rs:163
 msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
@@ -204,105 +204,112 @@ msgstr[1] ""
 "{folder} sisältää jo {n} kohdetta, jotka yhdistetään synkronoinnissa Proton "
 "Drive -palveluun."
 
-#: ui/src/bridge.rs:237
+#: ui/src/bridge.rs:260
 msgid "Starting…"
 msgstr "Käynnistetään…"
 
-#: ui/src/bridge.rs:288
+#: ui/src/bridge.rs:317
 msgid "Confirm the code {code} in your browser"
 msgstr "Vahvista koodi {code} selaimessa"
 
-#: ui/src/bridge.rs:302
+#: ui/src/bridge.rs:331
 msgid "Sign-in failed: {reason}"
 msgstr "Sisäänkirjautuminen epäonnistui: {reason}"
 
-#: ui/src/bridge.rs:314
+#: ui/src/bridge.rs:344
 msgid "Signed out"
 msgstr "Kirjauduttu ulos"
 
-#: ui/src/bridge.rs:317
+#: ui/src/bridge.rs:347
 msgid "Sign-out failed: {reason}"
 msgstr "Uloskirjautuminen epäonnistui: {reason}"
 
-#: ui/src/bridge.rs:382
-msgid "{note}. Restart the sync daemon to use it."
-msgstr ""
-"{note}. Käynnistä synkronointipalvelu uudelleen, jotta muutos tulee voimaan."
+#: ui/src/bridge.rs:355
+msgid "Removed {account}. Its files were left where they are."
+msgstr "{account} poistettiin. Sen tiedostot jätettiin paikoilleen."
 
-#: ui/src/bridge.rs:385
+#: ui/src/bridge.rs:362
+msgid "Cannot remove the account: {reason}"
+msgstr "Tiliä ei voi poistaa: {reason}"
+
+#: ui/src/bridge.rs:481
 msgid "Cannot change the folder: {reason}"
 msgstr "Kansiota ei voi vaihtaa: {reason}"
 
-#: ui/src/bridge.rs:392
+#: ui/src/bridge.rs:488
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr "Synkronointikansiota ei ole vielä. Suorita komento: kpdrive setup"
 
-#: ui/src/bridge.rs:396
+#: ui/src/bridge.rs:492
 msgid "Cannot create the ignore file: {reason}"
 msgstr "Ohitustiedostoa ei voi luoda: {reason}"
 
-#: ui/src/bridge.rs:434
+#: ui/src/bridge.rs:537
 msgid "Checking the account…"
 msgstr "Tarkistetaan tiliä…"
 
-#: ui/src/bridge.rs:440
+#: ui/src/bridge.rs:543
 msgid "Opening the browser…"
 msgstr "Avataan selainta…"
 
-#: ui/src/bridge.rs:446
+#: ui/src/bridge.rs:550
 msgid "Signing out…"
 msgstr "Kirjaudutaan ulos…"
 
-#: ui/src/bridge.rs:472
+#: ui/src/bridge.rs:557
+msgid "Removing the account…"
+msgstr "Poistetaan tiliä…"
+
+#: ui/src/bridge.rs:583
 msgid "Cannot read the log: {reason}"
 msgstr "Lokia ei voi lukea: {reason}"
 
-#: ui/src/bridge.rs:482 ui/src/bridge.rs:510 ui/src/bridge.rs:524
-#: ui/src/bridge.rs:539 ui/src/bridge.rs:573 ui/src/bridge.rs:614
-#: ui/src/bridge.rs:627 ui/src/bridge.rs:645
+#: ui/src/bridge.rs:591 ui/src/bridge.rs:618 ui/src/bridge.rs:632
+#: ui/src/bridge.rs:647 ui/src/bridge.rs:681 ui/src/bridge.rs:723
+#: ui/src/bridge.rs:736 ui/src/bridge.rs:754
 msgid "Cannot save the setting: {reason}"
 msgstr "Asetusta ei voi tallentaa: {reason}"
 
-#: ui/src/bridge.rs:490
+#: ui/src/bridge.rs:599
 msgid "Proton Photos will be downloaded with the next sync"
 msgstr "Proton Photos ladataan seuraavan synkronoinnin yhteydessä"
 
-#: ui/src/bridge.rs:491
+#: ui/src/bridge.rs:600
 msgid "Proton Photos will be left alone"
 msgstr "Proton Photos jätetään rauhaan"
 
-#: ui/src/bridge.rs:516
+#: ui/src/bridge.rs:624
 msgid "Photos put in that folder will be uploaded to Proton Photos"
 msgstr "Kansioon laitetut valokuvat lähetetään Proton Photos -palveluun"
 
-#: ui/src/bridge.rs:517
+#: ui/src/bridge.rs:625
 msgid "No longer uploading photos"
 msgstr "Valokuvia ei enää lähetetä"
 
-#: ui/src/bridge.rs:607
+#: ui/src/bridge.rs:717
 msgid "Photos will be downloaded into that folder from the next pass"
 msgstr "Valokuvat ladataan kansioon seuraavasta kierroksesta alkaen"
 
-#: ui/src/bridge.rs:632
+#: ui/src/bridge.rs:741
 msgid "Storing everything from now on"
 msgstr "Tästä lähtien tallennetaan kaikki"
 
-#: ui/src/bridge.rs:633
+#: ui/src/bridge.rs:742
 msgid "Storing warnings and errors from now on"
 msgstr "Tästä lähtien tallennetaan varoitukset ja virheet"
 
-#: ui/src/bridge.rs:634
+#: ui/src/bridge.rs:743
 msgid "Storing errors from now on"
 msgstr "Tästä lähtien tallennetaan virheet"
 
-#: ui/src/bridge.rs:650
+#: ui/src/bridge.rs:759
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] "poistettiin {n} lokitiedosto, joka oli yli {days} päivää vanha"
 msgstr[1] ""
 "poistettiin {n} lokitiedostoa, jotka olivat yli {days} päivää vanhoja"
 
-#: ui/src/bridge.rs:651
+#: ui/src/bridge.rs:760
 msgid "Cannot prune the log: {reason}"
 msgstr "Lokia ei voi siivota: {reason}"
 
@@ -322,133 +329,171 @@ msgstr "Valitse kansio, josta valokuvat lähetetään"
 msgid "The folder is not empty"
 msgstr "Kansio ei ole tyhjä"
 
-#: ui/qml/main.qml:104
+#: ui/qml/main.qml:80
+msgid "Remove {account}?"
+msgstr "Poistetaanko {account}?"
+
+#: ui/qml/main.qml:81
+msgid ""
+"kpdrive signs this account out and forgets what it synced. The files in "
+"{folder} stay where they are."
+msgstr ""
+"kpdrive kirjaa tämän tilin ulos ja unohtaa, mitä se on synkronoinut. "
+"Tiedostot jäävät paikoilleen ({folder})."
+
+#: ui/qml/main.qml:82
+msgid "its folder"
+msgstr "tilin kansio"
+
+#: ui/qml/main.qml:86
+msgid "Remove account"
+msgstr "Poista tili"
+
+#: ui/qml/main.qml:94
+msgid "Cancel"
+msgstr "Peruuta"
+
+#: ui/qml/main.qml:130
 msgid "Opened {what}"
 msgstr "Avattiin {what}"
 
-#: ui/qml/main.qml:106
+#: ui/qml/main.qml:132
 msgid "Could not open {what} ({url})"
 msgstr "Kohdetta {what} ei voitu avata ({url})"
 
-#: ui/qml/main.qml:186
+#: ui/qml/main.qml:223 ui/qml/main.qml:225
+msgid "Add account"
+msgstr "Lisää tili"
+
+#: ui/qml/main.qml:237
 msgid "Account & activity"
 msgstr "Tili ja toiminta"
 
-#: ui/qml/main.qml:187
+#: ui/qml/main.qml:238
 msgid "Settings"
 msgstr "Asetukset"
 
-#: ui/qml/main.qml:188 ui/qml/main.qml:633
+#: ui/qml/main.qml:239 ui/qml/main.qml:701
 msgid "Logs"
 msgstr "Loki"
 
-#: ui/qml/main.qml:189
+#: ui/qml/main.qml:240
 msgid "About"
 msgstr "Tietoja"
 
-#: ui/qml/main.qml:269
+#: ui/qml/main.qml:320
 msgid "Not signed in"
 msgstr "Ei kirjautunut sisään"
 
-#: ui/qml/main.qml:276
+#: ui/qml/main.qml:327
 msgid "Signed in to Proton Drive"
 msgstr "Kirjauduttu sisään Proton Drive -palveluun"
 
-#: ui/qml/main.qml:277
+#: ui/qml/main.qml:329
+msgid "Signed out. Sign in again to resume syncing this account."
+msgstr ""
+"Kirjauduttu ulos. Kirjaudu uudelleen sisään, niin tämän tilin synkronointi "
+"jatkuu."
+
+#: ui/qml/main.qml:330
 msgid "Sign in to sync this computer with Proton Drive."
 msgstr ""
 "Kirjaudu sisään, niin tämä tietokone synkronoidaan Proton Drive -palvelun "
 "kanssa."
 
-#: ui/qml/main.qml:294
+#: ui/qml/main.qml:347
 msgid "Storage:"
 msgstr "Tallennustila:"
 
-#: ui/qml/main.qml:323
+#: ui/qml/main.qml:376
 msgid "{used} of {total} used"
 msgstr "Käytössä {used} / {total}"
 
-#: ui/qml/main.qml:331
+#: ui/qml/main.qml:384 ui/qml/main.qml:489
 msgid "Account:"
 msgstr "Tili:"
 
-#: ui/qml/main.qml:334
+#: ui/qml/main.qml:387
 msgid "Sign in"
 msgstr "Kirjaudu sisään"
 
 #. TRANSLATORS: button that reloads the account details from Proton
-#: ui/qml/main.qml:341
+#: ui/qml/main.qml:394
 msgid "Refresh"
 msgstr "Päivitä"
 
-#: ui/qml/main.qml:350
+#: ui/qml/main.qml:401
+msgid "Remove account…"
+msgstr "Poista tili…"
+
+#: ui/qml/main.qml:410
 msgid "On the web:"
 msgstr "Verkossa:"
 
-#: ui/qml/main.qml:353
+#: ui/qml/main.qml:413
 msgid "Drive on the web"
 msgstr "Drive verkossa"
 
-#: ui/qml/main.qml:358
+#: ui/qml/main.qml:418
 msgid "Proton account"
 msgstr "Proton-tili"
 
-#: ui/qml/main.qml:366
+#: ui/qml/main.qml:426
 msgid "Activity"
 msgstr "Toiminta"
 
-#: ui/qml/main.qml:373
+#: ui/qml/main.qml:433
 msgid "Sync:"
 msgstr "Synkronointi:"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Resume"
 msgstr "Jatka"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Pause"
 msgstr "Keskeytä"
 
-#: ui/qml/main.qml:429
+#: ui/qml/main.qml:497
 msgid "Files"
 msgstr "Tiedostot"
 
-#: ui/qml/main.qml:433
+#: ui/qml/main.qml:501
 msgid "Sync folder:"
 msgstr "Synkronointikansio:"
 
-#: ui/qml/main.qml:437
+#: ui/qml/main.qml:505
 msgid "nowhere yet"
 msgstr "ei vielä valittu"
 
 #. TRANSLATORS: button that opens a folder picker to sync somewhere else
-#: ui/qml/main.qml:443 ui/qml/main.qml:490 ui/qml/main.qml:533
+#: ui/qml/main.qml:511 ui/qml/main.qml:558 ui/qml/main.qml:601
 msgid "Change…"
 msgstr "Vaihda…"
 
-#: ui/qml/main.qml:450
+#: ui/qml/main.qml:518
 msgid "Ignored paths:"
 msgstr "Ohitetut polut:"
 
 #. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves
 #. alone
-#: ui/qml/main.qml:452
+#: ui/qml/main.qml:520
 msgid "Ignore file…"
 msgstr "Ohitustiedosto…"
 
-#: ui/qml/main.qml:459
+#: ui/qml/main.qml:527
 msgid "Photos"
 msgstr "Valokuvat"
 
-#: ui/qml/main.qml:463
+#: ui/qml/main.qml:531
 msgid "Download:"
 msgstr "Lataus:"
 
-#: ui/qml/main.qml:467
+#: ui/qml/main.qml:535
 msgid "Also download Proton Photos"
 msgstr "Lataa myös Proton Photos"
 
-#: ui/qml/main.qml:473
+#: ui/qml/main.qml:541
 msgid ""
 "Your timeline is copied here every half hour. Nothing in Proton Photos is "
 "changed or deleted by it."
@@ -456,23 +501,23 @@ msgstr ""
 "Aikajanasi kopioidaan tänne puolen tunnin välein. Mitään Proton Photos "
 "-palvelussa ei muuteta eikä poisteta."
 
-#: ui/qml/main.qml:481
+#: ui/qml/main.qml:549
 msgid "Download folder:"
 msgstr "Latauskansio:"
 
-#: ui/qml/main.qml:485
+#: ui/qml/main.qml:553
 msgid "your Pictures folder"
 msgstr "Kuvat-kansiosi"
 
-#: ui/qml/main.qml:497
+#: ui/qml/main.qml:565
 msgid "Upload:"
 msgstr "Lähetys:"
 
-#: ui/qml/main.qml:501
+#: ui/qml/main.qml:569
 msgid "Upload photos from a folder"
 msgstr "Lähetä valokuvia kansiosta"
 
-#: ui/qml/main.qml:515
+#: ui/qml/main.qml:583
 msgid ""
 "Photos and videos put in this folder go up to Proton Photos within a minute, "
 "then leave the folder. Anything that cannot be uploaded stays."
@@ -481,31 +526,31 @@ msgstr ""
 "-palveluun minuutin kuluessa, minkä jälkeen ne poistuvat kansiosta. Se, mitä "
 "ei voi lähettää, jää kansioon."
 
-#: ui/qml/main.qml:523
+#: ui/qml/main.qml:591
 msgid "Upload folder:"
 msgstr "Lähetyskansio:"
 
-#: ui/qml/main.qml:540
+#: ui/qml/main.qml:608
 msgid "After upload:"
 msgstr "Lähetyksen jälkeen:"
 
-#: ui/qml/main.qml:542
+#: ui/qml/main.qml:610
 msgid "Delete instead of moving to the trash"
 msgstr "Poista siirtämättä roskakoriin"
 
-#: ui/qml/main.qml:549
+#: ui/qml/main.qml:617
 msgid "Network"
 msgstr "Verkko"
 
-#: ui/qml/main.qml:553 ui/qml/main.qml:598
+#: ui/qml/main.qml:621 ui/qml/main.qml:666
 msgid "Pause while on:"
 msgstr "Keskeytä, kun käytössä:"
 
-#: ui/qml/main.qml:573
+#: ui/qml/main.qml:641
 msgid "{network} (connected)"
 msgstr "{network} (yhdistetty)"
 
-#: ui/qml/main.qml:584
+#: ui/qml/main.qml:652
 msgid ""
 "Syncing pauses while any ticked network is connected, such as a phone's "
 "hotspot. A sync already under way finishes first."
@@ -514,31 +559,31 @@ msgstr ""
 "kuten puhelimen yhteyspiste. Jo käynnissä oleva synkronointi viedään ensin "
 "loppuun."
 
-#: ui/qml/main.qml:585
+#: ui/qml/main.qml:653
 msgid "NetworkManager lists no networks to choose from."
 msgstr "NetworkManager ei luettele valittavia verkkoja."
 
-#: ui/qml/main.qml:594
+#: ui/qml/main.qml:662
 msgid "Power"
 msgstr "Virta"
 
-#: ui/qml/main.qml:604
+#: ui/qml/main.qml:672
 msgid "AC power"
 msgstr "Verkkovirta"
 
-#: ui/qml/main.qml:605
+#: ui/qml/main.qml:673
 msgid "Battery"
 msgstr "Akku"
 
-#: ui/qml/main.qml:606
+#: ui/qml/main.qml:674
 msgid "Low battery"
 msgstr "Akku vähissä"
 
-#: ui/qml/main.qml:614
+#: ui/qml/main.qml:682
 msgid "{power} (now)"
 msgstr "{power} (nyt)"
 
-#: ui/qml/main.qml:624
+#: ui/qml/main.qml:692
 msgid ""
 "Low battery is the level set in the system's power management settings. A "
 "sync already under way finishes first."
@@ -546,102 +591,107 @@ msgstr ""
 "Akku vähissä tarkoittaa järjestelmän virranhallinta-asetuksissa määritettyä "
 "tasoa. Jo käynnissä oleva synkronointi viedään ensin loppuun."
 
-#: ui/qml/main.qml:637
+#: ui/qml/main.qml:705
 msgid "Keep logs for:"
 msgstr "Lokin säilytys:"
 
 #. TRANSLATORS: after the number in "Keep logs for: [30] days"
-#: ui/qml/main.qml:646
+#: ui/qml/main.qml:714
 msgid "days"
 msgstr "päivää"
 
 #. TRANSLATORS: label before a dropdown choosing which log levels are written
 #. to disk
-#: ui/qml/main.qml:651
+#: ui/qml/main.qml:719
 msgid "Store:"
 msgstr "Tallenna:"
 
 #. TRANSLATORS: dropdown choice, store warnings and errors only
-#: ui/qml/main.qml:656
+#: ui/qml/main.qml:724
 msgid "Warnings and errors"
 msgstr "Varoitukset ja virheet"
 
 #. TRANSLATORS: dropdown choice, store every log line
-#: ui/qml/main.qml:658
+#: ui/qml/main.qml:726
 msgid "Everything"
 msgstr "Kaikki"
 
 #. TRANSLATORS: dropdown choice, store errors only
-#: ui/qml/main.qml:660
+#: ui/qml/main.qml:728
 msgid "Errors only"
 msgstr "Vain virheet"
 
-#: ui/qml/main.qml:681
+#: ui/qml/main.qml:749
 msgid "Search the log"
 msgstr "Etsi lokista"
 
-#: ui/qml/main.qml:686
+#: ui/qml/main.qml:754
 msgid "{n} line"
 msgid_plural "{n} lines"
 msgstr[0] "{n} rivi"
 msgstr[1] "{n} riviä"
 
 #. TRANSLATORS: right-click menu item, copies the selected log text
-#: ui/qml/main.qml:736
+#: ui/qml/main.qml:804
 msgid "Copy"
 msgstr "Kopioi"
 
 #. TRANSLATORS: right-click menu item, selects the whole log view
-#: ui/qml/main.qml:742
+#: ui/qml/main.qml:810
 msgid "Select all"
 msgstr "Valitse kaikki"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "No lines match"
 msgstr "Ei osumia"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "Nothing logged yet"
 msgstr "Ei vielä lokimerkintöjä"
 
-#: ui/qml/main.qml:761
+#: ui/qml/main.qml:829
 msgid "No line since the sync daemon started contains “{term}”."
 msgstr ""
 "Yksikään rivi ei sisällä hakusanaa ”{term}” synkronointipalvelun "
 "käynnistyksen jälkeen."
 
-#: ui/qml/main.qml:762
+#: ui/qml/main.qml:830
 msgid "This shows what has happened since the sync daemon started."
 msgstr ""
 "Tässä näkyy, mitä synkronointipalvelun käynnistyksen jälkeen on tapahtunut."
 
-#: ui/qml/main.qml:794
+#: ui/qml/main.qml:862
 msgid "Proton Drive sync client for KDE Plasma"
 msgstr "Proton Drive -synkronointiasiakas KDE Plasmalle"
 
-#: ui/qml/main.qml:802
+#: ui/qml/main.qml:870
 msgid "Version:"
 msgstr "Versio:"
 
-#: ui/qml/main.qml:807
+#: ui/qml/main.qml:875
 msgid "Licence:"
 msgstr "Lisenssi:"
 
-#: ui/qml/main.qml:811
+#: ui/qml/main.qml:879
 msgid "Read the licence"
 msgstr "Lue lisenssi"
 
-#: ui/qml/main.qml:818
+#: ui/qml/main.qml:886
 msgid "Project:"
 msgstr "Projekti:"
 
-#: ui/qml/main.qml:821
+#: ui/qml/main.qml:889
 msgid "Source code"
 msgstr "Lähdekoodi"
 
-#: ui/qml/main.qml:826
+#: ui/qml/main.qml:894
 msgid "Report a bug"
 msgstr "Ilmoita virheestä"
+
+#~ msgid "{note}. Restart the sync daemon to use it."
+#~ msgstr ""
+#~ "{note}. Käynnistä synkronointipalvelu uudelleen, jotta muutos tulee "
+#~ "voimaan."
 
 #~ msgid "Syncing to"
 #~ msgstr "Synkronointikansio"

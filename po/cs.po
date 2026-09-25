@@ -9,8 +9,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kpdrive 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-24 14:30+0200\n"
-"PO-Revision-Date: 2026-09-24 14:34+0200\n"
+"POT-Creation-Date: 2026-09-25 20:29+0200\n"
+"PO-Revision-Date: 2026-09-25 20:32+0200\n"
 "Last-Translator: machine translation, needs review by a speaker\n"
 "Language-Team: cs\n"
 "Language: cs\n"
@@ -19,108 +19,108 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
 
-#: src/daemon.rs:112
+#: src/daemon.rs:67 src/daemon.rs:174
 msgid "Signed out. Sign in from the account window."
 msgstr "Odhlášeno. Přihlaste se v okně účtu."
 
-#: src/daemon.rs:114 src/daemon.rs:401
+#: src/daemon.rs:69 src/daemon.rs:535
 msgid "Syncing…"
 msgstr "Synchronizuje se…"
 
-#: src/daemon.rs:116 src/daemon.rs:404
+#: src/daemon.rs:71 src/daemon.rs:538
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] "{n} položka synchronizována"
 msgstr[1] "{n} položky synchronizovány"
 msgstr[2] "{n} položek synchronizováno"
 
-#: src/daemon.rs:126 ui/qml/main.qml:409
+#: src/daemon.rs:199 src/daemon.rs:201 ui/qml/main.qml:469
 msgid "Open folder"
 msgstr "Otevřít složku"
 
-#: src/daemon.rs:136
+#: src/daemon.rs:211
 msgid "Account and logs…"
 msgstr "Účet a záznamy…"
 
-#: src/daemon.rs:143 ui/qml/main.qml:396
+#: src/daemon.rs:218 ui/qml/main.qml:456
 msgid "Sync now"
 msgstr "Synchronizovat nyní"
 
-#: src/daemon.rs:155
+#: src/daemon.rs:230
 msgid "Pause sync"
 msgstr "Pozastavit synchronizaci"
 
-#: src/daemon.rs:168
+#: src/daemon.rs:243
 msgid "Quit"
 msgstr "Ukončit"
 
 #. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no
 #. route"
-#: src/daemon.rs:328
+#: src/daemon.rs:430
 msgid "{reason}; retrying"
 msgstr "{reason}; zkouší se znovu"
 
-#: src/daemon.rs:339
+#: src/daemon.rs:441
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr "Proton Drive je opět dostupný ({duration})"
 
-#: src/daemon.rs:350
+#: src/daemon.rs:452
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] "{n} sekunda"
 msgstr[1] "{n} sekundy"
 msgstr[2] "{n} sekund"
 
-#: src/daemon.rs:351
+#: src/daemon.rs:453
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "{n} minuta"
 msgstr[1] "{n} minuty"
 msgstr[2] "{n} minut"
 
-#: src/daemon.rs:352
+#: src/daemon.rs:454
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] "{n} hodina"
 msgstr[1] "{n} hodiny"
 msgstr[2] "{n} hodin"
 
-#: src/daemon.rs:382
+#: src/daemon.rs:502
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
 msgstr "Služba synchronizace neběží. Spusťte ji příkazem: kpdrive sync --watch"
 
-#: src/daemon.rs:385
+#: src/daemon.rs:505
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
 msgstr ""
 "Služba synchronizace běží, ale je příliš stará na to, aby sdělila, co dělá. "
 "Restartujte ji."
 
-#: src/daemon.rs:391
+#: src/daemon.rs:516 src/daemon.rs:525
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr "Odhlášeno. Synchronizace bude pokračovat po přihlášení."
 
-#: src/daemon.rs:395
+#: src/daemon.rs:529
 msgid "{reason}. Still trying."
 msgstr "{reason}. Pokusy pokračují."
 
-#: src/daemon.rs:396
+#: src/daemon.rs:530
 msgid "Last sync failed: {reason}"
 msgstr "Poslední synchronizace selhala: {reason}"
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:410
+#: src/daemon.rs:544
 msgid "just now"
 msgstr "právě teď"
 
-#: src/daemon.rs:412
+#: src/daemon.rs:546
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "před {n} minutou"
 msgstr[1] "před {n} minutami"
 msgstr[2] "před {n} minutami"
 
-#: src/daemon.rs:415
+#: src/daemon.rs:549
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "před {n} hodinou"
@@ -129,37 +129,37 @@ msgstr[2] "před {n} hodinami"
 
 #. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes
 #. ago"
-#: src/daemon.rs:419
+#: src/daemon.rs:553
 msgid "{items}, checked {ago}"
 msgstr "{items}, zkontrolováno {ago}"
 
-#: src/daemon.rs:637
+#: src/daemon.rs:924
 msgid "Signed in again. Syncing resumed."
 msgstr "Znovu přihlášeno. Synchronizace pokračuje."
 
-#: src/daemon.rs:712
+#: src/daemon.rs:938
 msgid "Signed out. Sign in from the account window to resume syncing."
 msgstr "Odhlášeno. Přihlaste se v okně účtu, aby synchronizace pokračovala."
 
-#: src/daemon.rs:745
+#: src/daemon.rs:1050
 msgid "Sync resumed"
 msgstr "Synchronizace obnovena"
 
-#: src/daemon.rs:762
+#: src/daemon.rs:1067
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] "Stažena {n} fotografie"
 msgstr[1] "Staženy {n} fotografie"
 msgstr[2] "Staženo {n} fotografií"
 
-#: src/daemon.rs:783
+#: src/daemon.rs:1086
 msgid "{n} photo uploaded to Proton Photos"
 msgid_plural "{n} photos uploaded to Proton Photos"
 msgstr[0] "Nahrána {n} fotografie do Proton Photos"
 msgstr[1] "Nahrány {n} fotografie do Proton Photos"
 msgstr[2] "Nahráno {n} fotografií do Proton Photos"
 
-#: src/i18n.rs:155 ui/qml/main.qml:334
+#: src/i18n.rs:155 ui/qml/main.qml:387
 msgid "Sign out"
 msgstr "Odhlásit se"
 
@@ -190,15 +190,15 @@ msgstr "Pozastaveno při slabé baterii"
 msgid "Paused while connected to {network}"
 msgstr "Pozastaveno při připojení k {network}"
 
-#: src/sync.rs:121
+#: src/sync.rs:124
 msgid "Sync into it and keep what is already there"
 msgstr "Synchronizovat do ní a zachovat, co v ní už je"
 
-#: src/sync.rs:122
+#: src/sync.rs:125
 msgid "Move it aside and start from an empty folder"
 msgstr "Přesunout ji stranou a začít s prázdnou složkou"
 
-#: src/sync.rs:160
+#: src/sync.rs:163
 msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
@@ -213,104 +213,112 @@ msgstr[2] ""
 "Složka {folder} už obsahuje {n} položek. Synchronizace její obsah sloučí s "
 "Proton Drive."
 
-#: ui/src/bridge.rs:237
+#: ui/src/bridge.rs:260
 msgid "Starting…"
 msgstr "Spouští se…"
 
-#: ui/src/bridge.rs:288
+#: ui/src/bridge.rs:317
 msgid "Confirm the code {code} in your browser"
 msgstr "Potvrďte kód {code} v prohlížeči"
 
-#: ui/src/bridge.rs:302
+#: ui/src/bridge.rs:331
 msgid "Sign-in failed: {reason}"
 msgstr "Přihlášení selhalo: {reason}"
 
-#: ui/src/bridge.rs:314
+#: ui/src/bridge.rs:344
 msgid "Signed out"
 msgstr "Odhlášeno"
 
-#: ui/src/bridge.rs:317
+#: ui/src/bridge.rs:347
 msgid "Sign-out failed: {reason}"
 msgstr "Odhlášení selhalo: {reason}"
 
-#: ui/src/bridge.rs:382
-msgid "{note}. Restart the sync daemon to use it."
-msgstr "{note}. Restartujte službu synchronizace, aby se změna projevila."
+#: ui/src/bridge.rs:355
+msgid "Removed {account}. Its files were left where they are."
+msgstr "Účet {account} byl odebrán. Jeho soubory zůstaly na svém místě."
 
-#: ui/src/bridge.rs:385
+#: ui/src/bridge.rs:362
+msgid "Cannot remove the account: {reason}"
+msgstr "Účet nelze odebrat: {reason}"
+
+#: ui/src/bridge.rs:481
 msgid "Cannot change the folder: {reason}"
 msgstr "Nelze změnit složku: {reason}"
 
-#: ui/src/bridge.rs:392
+#: ui/src/bridge.rs:488
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr "Složka pro synchronizaci zatím není nastavena. Spusťte: kpdrive setup"
 
-#: ui/src/bridge.rs:396
+#: ui/src/bridge.rs:492
 msgid "Cannot create the ignore file: {reason}"
 msgstr "Nelze vytvořit soubor ignorovaných cest: {reason}"
 
-#: ui/src/bridge.rs:434
+#: ui/src/bridge.rs:537
 msgid "Checking the account…"
 msgstr "Kontroluje se účet…"
 
-#: ui/src/bridge.rs:440
+#: ui/src/bridge.rs:543
 msgid "Opening the browser…"
 msgstr "Otevírá se prohlížeč…"
 
-#: ui/src/bridge.rs:446
+#: ui/src/bridge.rs:550
 msgid "Signing out…"
 msgstr "Odhlašování…"
 
-#: ui/src/bridge.rs:472
+#: ui/src/bridge.rs:557
+msgid "Removing the account…"
+msgstr "Odebírá se účet…"
+
+#: ui/src/bridge.rs:583
 msgid "Cannot read the log: {reason}"
 msgstr "Nelze přečíst záznam: {reason}"
 
-#: ui/src/bridge.rs:482 ui/src/bridge.rs:510 ui/src/bridge.rs:524
-#: ui/src/bridge.rs:539 ui/src/bridge.rs:573 ui/src/bridge.rs:614
-#: ui/src/bridge.rs:627 ui/src/bridge.rs:645
+#: ui/src/bridge.rs:591 ui/src/bridge.rs:618 ui/src/bridge.rs:632
+#: ui/src/bridge.rs:647 ui/src/bridge.rs:681 ui/src/bridge.rs:723
+#: ui/src/bridge.rs:736 ui/src/bridge.rs:754
 msgid "Cannot save the setting: {reason}"
 msgstr "Nelze uložit nastavení: {reason}"
 
-#: ui/src/bridge.rs:490
+#: ui/src/bridge.rs:599
 msgid "Proton Photos will be downloaded with the next sync"
 msgstr "Proton Photos budou staženy při příští synchronizaci"
 
-#: ui/src/bridge.rs:491
+#: ui/src/bridge.rs:600
 msgid "Proton Photos will be left alone"
 msgstr "Proton Photos budou ponechány beze změny"
 
-#: ui/src/bridge.rs:516
+#: ui/src/bridge.rs:624
 msgid "Photos put in that folder will be uploaded to Proton Photos"
 msgstr "Fotografie vložené do této složky budou nahrány do Proton Photos"
 
-#: ui/src/bridge.rs:517
+#: ui/src/bridge.rs:625
 msgid "No longer uploading photos"
 msgstr "Fotografie se již nenahrávají"
 
-#: ui/src/bridge.rs:607
+#: ui/src/bridge.rs:717
 msgid "Photos will be downloaded into that folder from the next pass"
 msgstr "Fotografie se budou do této složky stahovat od příštího průchodu"
 
-#: ui/src/bridge.rs:632
+#: ui/src/bridge.rs:741
 msgid "Storing everything from now on"
 msgstr "Od teď se ukládá vše"
 
-#: ui/src/bridge.rs:633
+#: ui/src/bridge.rs:742
 msgid "Storing warnings and errors from now on"
 msgstr "Od teď se ukládají varování a chyby"
 
-#: ui/src/bridge.rs:634
+#: ui/src/bridge.rs:743
 msgid "Storing errors from now on"
 msgstr "Od teď se ukládají pouze chyby"
 
-#: ui/src/bridge.rs:650
+#: ui/src/bridge.rs:759
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] "odstraněn {n} soubor záznamu starší než {days} dní"
 msgstr[1] "odstraněny {n} soubory záznamu starší než {days} dní"
 msgstr[2] "odstraněno {n} souborů záznamu starších než {days} dní"
 
-#: ui/src/bridge.rs:651
+#: ui/src/bridge.rs:760
 msgid "Cannot prune the log: {reason}"
 msgstr "Nelze pročistit záznam: {reason}"
 
@@ -330,131 +338,168 @@ msgstr "Vyberte složku, ze které se mají nahrávat fotografie"
 msgid "The folder is not empty"
 msgstr "Složka není prázdná"
 
-#: ui/qml/main.qml:104
+#: ui/qml/main.qml:80
+msgid "Remove {account}?"
+msgstr "Odebrat {account}?"
+
+#: ui/qml/main.qml:81
+msgid ""
+"kpdrive signs this account out and forgets what it synced. The files in "
+"{folder} stay where they are."
+msgstr ""
+"kpdrive tento účet odhlásí a zapomene, co synchronizoval. Soubory v {folder} "
+"zůstanou na svém místě."
+
+#: ui/qml/main.qml:82
+msgid "its folder"
+msgstr "jeho složce"
+
+#: ui/qml/main.qml:86
+msgid "Remove account"
+msgstr "Odebrat účet"
+
+#: ui/qml/main.qml:94
+msgid "Cancel"
+msgstr "Zrušit"
+
+#: ui/qml/main.qml:130
 msgid "Opened {what}"
 msgstr "Otevřeno: {what}"
 
-#: ui/qml/main.qml:106
+#: ui/qml/main.qml:132
 msgid "Could not open {what} ({url})"
 msgstr "Nelze otevřít: {what} ({url})"
 
-#: ui/qml/main.qml:186
+#: ui/qml/main.qml:223 ui/qml/main.qml:225
+msgid "Add account"
+msgstr "Přidat účet"
+
+#: ui/qml/main.qml:237
 msgid "Account & activity"
 msgstr "Účet a aktivita"
 
-#: ui/qml/main.qml:187
+#: ui/qml/main.qml:238
 msgid "Settings"
 msgstr "Nastavení"
 
-#: ui/qml/main.qml:188 ui/qml/main.qml:633
+#: ui/qml/main.qml:239 ui/qml/main.qml:701
 msgid "Logs"
 msgstr "Záznamy"
 
-#: ui/qml/main.qml:189
+#: ui/qml/main.qml:240
 msgid "About"
 msgstr "O aplikaci"
 
-#: ui/qml/main.qml:269
+#: ui/qml/main.qml:320
 msgid "Not signed in"
 msgstr "Nepřihlášeno"
 
-#: ui/qml/main.qml:276
+#: ui/qml/main.qml:327
 msgid "Signed in to Proton Drive"
 msgstr "Přihlášeno k Proton Drive"
 
-#: ui/qml/main.qml:277
+#: ui/qml/main.qml:329
+msgid "Signed out. Sign in again to resume syncing this account."
+msgstr ""
+"Odhlášeno. Přihlaste se znovu, aby synchronizace tohoto účtu pokračovala."
+
+#: ui/qml/main.qml:330
 msgid "Sign in to sync this computer with Proton Drive."
 msgstr "Přihlaste se, chcete-li tento počítač synchronizovat s Proton Drive."
 
-#: ui/qml/main.qml:294
+#: ui/qml/main.qml:347
 msgid "Storage:"
 msgstr "Úložiště:"
 
-#: ui/qml/main.qml:323
+#: ui/qml/main.qml:376
 msgid "{used} of {total} used"
 msgstr "Využito {used} z {total}"
 
-#: ui/qml/main.qml:331
+#: ui/qml/main.qml:384 ui/qml/main.qml:489
 msgid "Account:"
 msgstr "Účet:"
 
-#: ui/qml/main.qml:334
+#: ui/qml/main.qml:387
 msgid "Sign in"
 msgstr "Přihlásit se"
 
 #. TRANSLATORS: button that reloads the account details from Proton
-#: ui/qml/main.qml:341
+#: ui/qml/main.qml:394
 msgid "Refresh"
 msgstr "Obnovit"
 
-#: ui/qml/main.qml:350
+#: ui/qml/main.qml:401
+msgid "Remove account…"
+msgstr "Odebrat účet…"
+
+#: ui/qml/main.qml:410
 msgid "On the web:"
 msgstr "Na webu:"
 
-#: ui/qml/main.qml:353
+#: ui/qml/main.qml:413
 msgid "Drive on the web"
 msgstr "Drive na webu"
 
-#: ui/qml/main.qml:358
+#: ui/qml/main.qml:418
 msgid "Proton account"
 msgstr "Účet Proton"
 
-#: ui/qml/main.qml:366
+#: ui/qml/main.qml:426
 msgid "Activity"
 msgstr "Aktivita"
 
-#: ui/qml/main.qml:373
+#: ui/qml/main.qml:433
 msgid "Sync:"
 msgstr "Synchronizace:"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Resume"
 msgstr "Pokračovat"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Pause"
 msgstr "Pozastavit"
 
-#: ui/qml/main.qml:429
+#: ui/qml/main.qml:497
 msgid "Files"
 msgstr "Soubory"
 
-#: ui/qml/main.qml:433
+#: ui/qml/main.qml:501
 msgid "Sync folder:"
 msgstr "Složka pro synchronizaci:"
 
-#: ui/qml/main.qml:437
+#: ui/qml/main.qml:505
 msgid "nowhere yet"
 msgstr "zatím žádná"
 
 #. TRANSLATORS: button that opens a folder picker to sync somewhere else
-#: ui/qml/main.qml:443 ui/qml/main.qml:490 ui/qml/main.qml:533
+#: ui/qml/main.qml:511 ui/qml/main.qml:558 ui/qml/main.qml:601
 msgid "Change…"
 msgstr "Změnit…"
 
-#: ui/qml/main.qml:450
+#: ui/qml/main.qml:518
 msgid "Ignored paths:"
 msgstr "Ignorované cesty:"
 
 #. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves
 #. alone
-#: ui/qml/main.qml:452
+#: ui/qml/main.qml:520
 msgid "Ignore file…"
 msgstr "Soubor ignorovaných cest…"
 
-#: ui/qml/main.qml:459
+#: ui/qml/main.qml:527
 msgid "Photos"
 msgstr "Fotografie"
 
-#: ui/qml/main.qml:463
+#: ui/qml/main.qml:531
 msgid "Download:"
 msgstr "Stahování:"
 
-#: ui/qml/main.qml:467
+#: ui/qml/main.qml:535
 msgid "Also download Proton Photos"
 msgstr "Stahovat také Proton Photos"
 
-#: ui/qml/main.qml:473
+#: ui/qml/main.qml:541
 msgid ""
 "Your timeline is copied here every half hour. Nothing in Proton Photos is "
 "changed or deleted by it."
@@ -462,23 +507,23 @@ msgstr ""
 "Vaše časová osa se sem kopíruje každou půlhodinu. V Proton Photos se tím nic "
 "nemění ani nemaže."
 
-#: ui/qml/main.qml:481
+#: ui/qml/main.qml:549
 msgid "Download folder:"
 msgstr "Složka pro stahování:"
 
-#: ui/qml/main.qml:485
+#: ui/qml/main.qml:553
 msgid "your Pictures folder"
 msgstr "složka Obrázky"
 
-#: ui/qml/main.qml:497
+#: ui/qml/main.qml:565
 msgid "Upload:"
 msgstr "Nahrávání:"
 
-#: ui/qml/main.qml:501
+#: ui/qml/main.qml:569
 msgid "Upload photos from a folder"
 msgstr "Nahrávat fotografie ze složky"
 
-#: ui/qml/main.qml:515
+#: ui/qml/main.qml:583
 msgid ""
 "Photos and videos put in this folder go up to Proton Photos within a minute, "
 "then leave the folder. Anything that cannot be uploaded stays."
@@ -486,31 +531,31 @@ msgstr ""
 "Fotografie a videa vložené do této složky se do minuty nahrají do Proton "
 "Photos a poté ze složky zmizí. Co nelze nahrát, zůstane."
 
-#: ui/qml/main.qml:523
+#: ui/qml/main.qml:591
 msgid "Upload folder:"
 msgstr "Složka pro nahrávání:"
 
-#: ui/qml/main.qml:540
+#: ui/qml/main.qml:608
 msgid "After upload:"
 msgstr "Po nahrání:"
 
-#: ui/qml/main.qml:542
+#: ui/qml/main.qml:610
 msgid "Delete instead of moving to the trash"
 msgstr "Smazat místo přesunutí do koše"
 
-#: ui/qml/main.qml:549
+#: ui/qml/main.qml:617
 msgid "Network"
 msgstr "Síť"
 
-#: ui/qml/main.qml:553 ui/qml/main.qml:598
+#: ui/qml/main.qml:621 ui/qml/main.qml:666
 msgid "Pause while on:"
 msgstr "Pozastavit při:"
 
-#: ui/qml/main.qml:573
+#: ui/qml/main.qml:641
 msgid "{network} (connected)"
 msgstr "{network} (připojeno)"
 
-#: ui/qml/main.qml:584
+#: ui/qml/main.qml:652
 msgid ""
 "Syncing pauses while any ticked network is connected, such as a phone's "
 "hotspot. A sync already under way finishes first."
@@ -518,31 +563,31 @@ msgstr ""
 "Synchronizace se pozastaví, dokud je připojena kterákoli zaškrtnutá síť, "
 "například hotspot telefonu. Již probíhající synchronizace se nejprve dokončí."
 
-#: ui/qml/main.qml:585
+#: ui/qml/main.qml:653
 msgid "NetworkManager lists no networks to choose from."
 msgstr "NetworkManager nenabízí žádné sítě k výběru."
 
-#: ui/qml/main.qml:594
+#: ui/qml/main.qml:662
 msgid "Power"
 msgstr "Napájení"
 
-#: ui/qml/main.qml:604
+#: ui/qml/main.qml:672
 msgid "AC power"
 msgstr "Napájení ze sítě"
 
-#: ui/qml/main.qml:605
+#: ui/qml/main.qml:673
 msgid "Battery"
 msgstr "Baterie"
 
-#: ui/qml/main.qml:606
+#: ui/qml/main.qml:674
 msgid "Low battery"
 msgstr "Slabá baterie"
 
-#: ui/qml/main.qml:614
+#: ui/qml/main.qml:682
 msgid "{power} (now)"
 msgstr "{power} (nyní)"
 
-#: ui/qml/main.qml:624
+#: ui/qml/main.qml:692
 msgid ""
 "Low battery is the level set in the system's power management settings. A "
 "sync already under way finishes first."
@@ -550,41 +595,41 @@ msgstr ""
 "Slabá baterie je úroveň nastavená v systémovém nastavení správy napájení. "
 "Již probíhající synchronizace se nejprve dokončí."
 
-#: ui/qml/main.qml:637
+#: ui/qml/main.qml:705
 msgid "Keep logs for:"
 msgstr "Uchovávat záznamy po dobu:"
 
 #. TRANSLATORS: after the number in "Keep logs for: [30] days"
-#: ui/qml/main.qml:646
+#: ui/qml/main.qml:714
 msgid "days"
 msgstr "dní"
 
 #. TRANSLATORS: label before a dropdown choosing which log levels are written
 #. to disk
-#: ui/qml/main.qml:651
+#: ui/qml/main.qml:719
 msgid "Store:"
 msgstr "Ukládat:"
 
 #. TRANSLATORS: dropdown choice, store warnings and errors only
-#: ui/qml/main.qml:656
+#: ui/qml/main.qml:724
 msgid "Warnings and errors"
 msgstr "Varování a chyby"
 
 #. TRANSLATORS: dropdown choice, store every log line
-#: ui/qml/main.qml:658
+#: ui/qml/main.qml:726
 msgid "Everything"
 msgstr "Vše"
 
 #. TRANSLATORS: dropdown choice, store errors only
-#: ui/qml/main.qml:660
+#: ui/qml/main.qml:728
 msgid "Errors only"
 msgstr "Pouze chyby"
 
-#: ui/qml/main.qml:681
+#: ui/qml/main.qml:749
 msgid "Search the log"
 msgstr "Hledat v záznamu"
 
-#: ui/qml/main.qml:686
+#: ui/qml/main.qml:754
 msgid "{n} line"
 msgid_plural "{n} lines"
 msgstr[0] "{n} řádek"
@@ -592,58 +637,61 @@ msgstr[1] "{n} řádky"
 msgstr[2] "{n} řádků"
 
 #. TRANSLATORS: right-click menu item, copies the selected log text
-#: ui/qml/main.qml:736
+#: ui/qml/main.qml:804
 msgid "Copy"
 msgstr "Kopírovat"
 
 #. TRANSLATORS: right-click menu item, selects the whole log view
-#: ui/qml/main.qml:742
+#: ui/qml/main.qml:810
 msgid "Select all"
 msgstr "Vybrat vše"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "No lines match"
 msgstr "Žádné odpovídající řádky"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "Nothing logged yet"
 msgstr "Zatím nic nezaznamenáno"
 
-#: ui/qml/main.qml:761
+#: ui/qml/main.qml:829
 msgid "No line since the sync daemon started contains “{term}”."
 msgstr "Žádný řádek od spuštění služby synchronizace neobsahuje „{term}“."
 
-#: ui/qml/main.qml:762
+#: ui/qml/main.qml:830
 msgid "This shows what has happened since the sync daemon started."
 msgstr "Zobrazuje, co se stalo od spuštění služby synchronizace."
 
-#: ui/qml/main.qml:794
+#: ui/qml/main.qml:862
 msgid "Proton Drive sync client for KDE Plasma"
 msgstr "Klient synchronizace Proton Drive pro KDE Plasma"
 
-#: ui/qml/main.qml:802
+#: ui/qml/main.qml:870
 msgid "Version:"
 msgstr "Verze:"
 
-#: ui/qml/main.qml:807
+#: ui/qml/main.qml:875
 msgid "Licence:"
 msgstr "Licence:"
 
-#: ui/qml/main.qml:811
+#: ui/qml/main.qml:879
 msgid "Read the licence"
 msgstr "Přečíst licenci"
 
-#: ui/qml/main.qml:818
+#: ui/qml/main.qml:886
 msgid "Project:"
 msgstr "Projekt:"
 
-#: ui/qml/main.qml:821
+#: ui/qml/main.qml:889
 msgid "Source code"
 msgstr "Zdrojový kód"
 
-#: ui/qml/main.qml:826
+#: ui/qml/main.qml:894
 msgid "Report a bug"
 msgstr "Nahlásit chybu"
+
+#~ msgid "{note}. Restart the sync daemon to use it."
+#~ msgstr "{note}. Restartujte službu synchronizace, aby se změna projevila."
 
 #~ msgid "Syncing to"
 #~ msgstr "Složka pro synchronizaci"

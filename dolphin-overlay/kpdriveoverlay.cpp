@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Dolphin overlay icons for the kpdrive sync and photos folders. Asks the running daemon
+// Dolphin overlay icons for every kpdrive sync and photos folder. Asks the running daemon
 // over its Unix socket; see src/daemon.rs for the protocol.
 #include <KOverlayIconPlugin>
 #include <QElapsedTimer>
+#include <algorithm>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QLocalSocket>
 #include <QStandardPaths>
 #include <QUrl>
@@ -23,15 +26,16 @@ public:
             return {};
         }
         const QString path = url.toLocalFile();
-        if (m_root.isEmpty()) {
-            m_root = ask(QStringLiteral("ROOT"));
-            // An older daemon answers ERR: no photos folder then.
-            m_photos = ask(QStringLiteral("PHOTOS"));
-            if (m_photos == QLatin1String("ERR")) {
-                m_photos.clear();
-            }
+        // Accounts come and go while Dolphin stays open, so the list is
+        // asked for again now and then.
+        if (!m_asked.isValid() || m_asked.elapsed() > 30000) {
+            // Restarted first: a daemon that cannot be reached clears it again.
+            m_asked.restart();
+            m_folders = folders();
         }
-        if (!under(path, m_root) && !under(path, m_photos)) {
+        if (!std::any_of(m_folders.cbegin(), m_folders.cend(), [&](const QString &dir) {
+                return under(path, dir);
+            })) {
             return {};
         }
         const QString reply = ask(QStringLiteral("STATUS ") + path);
@@ -45,6 +49,31 @@ public:
     }
 
 private:
+    // Every folder of every account. A daemon from before accounts answers
+    // ERR, and is asked for its one sync folder and photos folder instead.
+    QStringList folders()
+    {
+        QStringList out;
+        const QString reply = ask(QStringLiteral("FOLDERS"));
+        if (reply.startsWith(QLatin1Char('['))) {
+            const QJsonArray list = QJsonDocument::fromJson(reply.toUtf8()).array();
+            for (const auto &dir : list) {
+                out << dir.toString();
+            }
+            return out;
+        }
+        if (reply != QLatin1String("ERR")) {
+            return out;
+        }
+        out << ask(QStringLiteral("ROOT"));
+        const QString photos = ask(QStringLiteral("PHOTOS"));
+        if (photos != QLatin1String("ERR")) {
+            out << photos;
+        }
+        out.removeAll(QString());
+        return out;
+    }
+
     static bool under(const QString &path, const QString &dir)
     {
         return !dir.isEmpty() && (path == dir || path.startsWith(dir + QLatin1Char('/')));
@@ -61,7 +90,7 @@ private:
             m_sock.connectToServer(QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation) + QStringLiteral("/kpdrive.sock"));
             if (!m_sock.waitForConnected(20)) {
                 m_backoff.restart();
-                m_root.clear();
+                m_asked.invalidate();
                 return {};
             }
         }
@@ -77,8 +106,8 @@ private:
 
     QLocalSocket m_sock;
     QElapsedTimer m_backoff;
-    QString m_root;
-    QString m_photos;
+    QElapsedTimer m_asked;
+    QStringList m_folders;
 };
 
 #include "kpdriveoverlay.moc"

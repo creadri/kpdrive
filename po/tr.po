@@ -9,8 +9,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kpdrive 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-24 14:30+0200\n"
-"PO-Revision-Date: 2026-09-24 14:34+0200\n"
+"POT-Creation-Date: 2026-09-25 20:29+0200\n"
+"PO-Revision-Date: 2026-09-25 20:32+0200\n"
 "Last-Translator: machine translation, needs review by a speaker\n"
 "Language-Team: tr\n"
 "Language: tr\n"
@@ -19,103 +19,103 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: src/daemon.rs:112
+#: src/daemon.rs:67 src/daemon.rs:174
 msgid "Signed out. Sign in from the account window."
 msgstr "Oturum kapatıldı. Hesap penceresinden oturum açın."
 
-#: src/daemon.rs:114 src/daemon.rs:401
+#: src/daemon.rs:69 src/daemon.rs:535
 msgid "Syncing…"
 msgstr "Eşitleniyor…"
 
-#: src/daemon.rs:116 src/daemon.rs:404
+#: src/daemon.rs:71 src/daemon.rs:538
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] "{n} öge eşitlemede"
 msgstr[1] "{n} öge eşitlemede"
 
-#: src/daemon.rs:126 ui/qml/main.qml:409
+#: src/daemon.rs:199 src/daemon.rs:201 ui/qml/main.qml:469
 msgid "Open folder"
 msgstr "Klasörü aç"
 
-#: src/daemon.rs:136
+#: src/daemon.rs:211
 msgid "Account and logs…"
 msgstr "Hesap ve günlükler…"
 
-#: src/daemon.rs:143 ui/qml/main.qml:396
+#: src/daemon.rs:218 ui/qml/main.qml:456
 msgid "Sync now"
 msgstr "Şimdi eşitle"
 
-#: src/daemon.rs:155
+#: src/daemon.rs:230
 msgid "Pause sync"
 msgstr "Eşitlemeyi duraklat"
 
-#: src/daemon.rs:168
+#: src/daemon.rs:243
 msgid "Quit"
 msgstr "Çık"
 
 #. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no
 #. route"
-#: src/daemon.rs:328
+#: src/daemon.rs:430
 msgid "{reason}; retrying"
 msgstr "{reason}; yeniden deneniyor"
 
-#: src/daemon.rs:339
+#: src/daemon.rs:441
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr "{duration} sonra Proton Drive yeniden erişilebilir"
 
-#: src/daemon.rs:350
+#: src/daemon.rs:452
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] "{n} saniye"
 msgstr[1] "{n} saniye"
 
-#: src/daemon.rs:351
+#: src/daemon.rs:453
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "{n} dakika"
 msgstr[1] "{n} dakika"
 
-#: src/daemon.rs:352
+#: src/daemon.rs:454
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] "{n} saat"
 msgstr[1] "{n} saat"
 
-#: src/daemon.rs:382
+#: src/daemon.rs:502
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
 msgstr "Eşitleme hizmeti çalışmıyor. Şununla başlatın: kpdrive sync --watch"
 
-#: src/daemon.rs:385
+#: src/daemon.rs:505
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
 msgstr ""
 "Bir eşitleme hizmeti çalışıyor; ancak ne yaptığını bildiremeyecek kadar "
 "eski. Yeniden başlatın."
 
-#: src/daemon.rs:391
+#: src/daemon.rs:516 src/daemon.rs:525
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr "Oturum kapatıldı. Oturum açtığınızda eşitleme sürdürülür."
 
-#: src/daemon.rs:395
+#: src/daemon.rs:529
 msgid "{reason}. Still trying."
 msgstr "{reason}. Denemeye devam ediliyor."
 
-#: src/daemon.rs:396
+#: src/daemon.rs:530
 msgid "Last sync failed: {reason}"
 msgstr "Son eşitleme başarısız oldu: {reason}"
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:410
+#: src/daemon.rs:544
 msgid "just now"
 msgstr "az önce"
 
-#: src/daemon.rs:412
+#: src/daemon.rs:546
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "{n} dakika önce"
 msgstr[1] "{n} dakika önce"
 
-#: src/daemon.rs:415
+#: src/daemon.rs:549
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "{n} saat önce"
@@ -123,36 +123,36 @@ msgstr[1] "{n} saat önce"
 
 #. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes
 #. ago"
-#: src/daemon.rs:419
+#: src/daemon.rs:553
 msgid "{items}, checked {ago}"
 msgstr "{items}, {ago} denetlendi"
 
-#: src/daemon.rs:637
+#: src/daemon.rs:924
 msgid "Signed in again. Syncing resumed."
 msgstr "Yeniden oturum açıldı. Eşitleme sürdürüldü."
 
-#: src/daemon.rs:712
+#: src/daemon.rs:938
 msgid "Signed out. Sign in from the account window to resume syncing."
 msgstr ""
 "Oturum kapatıldı. Eşitlemeyi sürdürmek için hesap penceresinden oturum açın."
 
-#: src/daemon.rs:745
+#: src/daemon.rs:1050
 msgid "Sync resumed"
 msgstr "Eşitleme sürdürüldü"
 
-#: src/daemon.rs:762
+#: src/daemon.rs:1067
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] "{n} fotoğraf indirildi"
 msgstr[1] "{n} fotoğraf indirildi"
 
-#: src/daemon.rs:783
+#: src/daemon.rs:1086
 msgid "{n} photo uploaded to Proton Photos"
 msgid_plural "{n} photos uploaded to Proton Photos"
 msgstr[0] "{n} fotoğraf Proton Photos'a yüklendi"
 msgstr[1] "{n} fotoğraf Proton Photos'a yüklendi"
 
-#: src/i18n.rs:155 ui/qml/main.qml:334
+#: src/i18n.rs:155 ui/qml/main.qml:387
 msgid "Sign out"
 msgstr "Oturumu kapat"
 
@@ -182,15 +182,15 @@ msgstr "Pil düşükken duraklatıldı"
 msgid "Paused while connected to {network}"
 msgstr "{network} ağına bağlıyken duraklatıldı"
 
-#: src/sync.rs:121
+#: src/sync.rs:124
 msgid "Sync into it and keep what is already there"
 msgstr "İçine eşitle ve orada olanları koru"
 
-#: src/sync.rs:122
+#: src/sync.rs:125
 msgid "Move it aside and start from an empty folder"
 msgstr "Kenara taşı ve boş bir klasörle başla"
 
-#: src/sync.rs:160
+#: src/sync.rs:163
 msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
@@ -202,103 +202,111 @@ msgstr[1] ""
 "{folder} klasöründe halihazırda {n} öge var; eşitleme bunları Proton Drive "
 "ile birleştirecek."
 
-#: ui/src/bridge.rs:237
+#: ui/src/bridge.rs:260
 msgid "Starting…"
 msgstr "Başlatılıyor…"
 
-#: ui/src/bridge.rs:288
+#: ui/src/bridge.rs:317
 msgid "Confirm the code {code} in your browser"
 msgstr "Tarayıcınızda {code} kodunu onaylayın"
 
-#: ui/src/bridge.rs:302
+#: ui/src/bridge.rs:331
 msgid "Sign-in failed: {reason}"
 msgstr "Oturum açma başarısız oldu: {reason}"
 
-#: ui/src/bridge.rs:314
+#: ui/src/bridge.rs:344
 msgid "Signed out"
 msgstr "Oturum kapatıldı"
 
-#: ui/src/bridge.rs:317
+#: ui/src/bridge.rs:347
 msgid "Sign-out failed: {reason}"
 msgstr "Oturum kapatma başarısız oldu: {reason}"
 
-#: ui/src/bridge.rs:382
-msgid "{note}. Restart the sync daemon to use it."
-msgstr "{note}. Kullanmak için eşitleme hizmetini yeniden başlatın."
+#: ui/src/bridge.rs:355
+msgid "Removed {account}. Its files were left where they are."
+msgstr "{account} kaldırıldı. Dosyaları oldukları yerde bırakıldı."
 
-#: ui/src/bridge.rs:385
+#: ui/src/bridge.rs:362
+msgid "Cannot remove the account: {reason}"
+msgstr "Hesap kaldırılamıyor: {reason}"
+
+#: ui/src/bridge.rs:481
 msgid "Cannot change the folder: {reason}"
 msgstr "Klasör değiştirilemiyor: {reason}"
 
-#: ui/src/bridge.rs:392
+#: ui/src/bridge.rs:488
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr "Henüz eşitleme klasörü yok. Şunu çalıştırın: kpdrive setup"
 
-#: ui/src/bridge.rs:396
+#: ui/src/bridge.rs:492
 msgid "Cannot create the ignore file: {reason}"
 msgstr "Yok sayma dosyası oluşturulamıyor: {reason}"
 
-#: ui/src/bridge.rs:434
+#: ui/src/bridge.rs:537
 msgid "Checking the account…"
 msgstr "Hesap denetleniyor…"
 
-#: ui/src/bridge.rs:440
+#: ui/src/bridge.rs:543
 msgid "Opening the browser…"
 msgstr "Tarayıcı açılıyor…"
 
-#: ui/src/bridge.rs:446
+#: ui/src/bridge.rs:550
 msgid "Signing out…"
 msgstr "Oturum kapatılıyor…"
 
-#: ui/src/bridge.rs:472
+#: ui/src/bridge.rs:557
+msgid "Removing the account…"
+msgstr "Hesap kaldırılıyor…"
+
+#: ui/src/bridge.rs:583
 msgid "Cannot read the log: {reason}"
 msgstr "Günlük okunamıyor: {reason}"
 
-#: ui/src/bridge.rs:482 ui/src/bridge.rs:510 ui/src/bridge.rs:524
-#: ui/src/bridge.rs:539 ui/src/bridge.rs:573 ui/src/bridge.rs:614
-#: ui/src/bridge.rs:627 ui/src/bridge.rs:645
+#: ui/src/bridge.rs:591 ui/src/bridge.rs:618 ui/src/bridge.rs:632
+#: ui/src/bridge.rs:647 ui/src/bridge.rs:681 ui/src/bridge.rs:723
+#: ui/src/bridge.rs:736 ui/src/bridge.rs:754
 msgid "Cannot save the setting: {reason}"
 msgstr "Ayar kaydedilemiyor: {reason}"
 
-#: ui/src/bridge.rs:490
+#: ui/src/bridge.rs:599
 msgid "Proton Photos will be downloaded with the next sync"
 msgstr "Proton Photos, sonraki eşitlemeyle indirilecek"
 
-#: ui/src/bridge.rs:491
+#: ui/src/bridge.rs:600
 msgid "Proton Photos will be left alone"
 msgstr "Proton Photos'a dokunulmayacak"
 
-#: ui/src/bridge.rs:516
+#: ui/src/bridge.rs:624
 msgid "Photos put in that folder will be uploaded to Proton Photos"
 msgstr "O klasöre konan fotoğraflar Proton Photos'a yüklenecek"
 
-#: ui/src/bridge.rs:517
+#: ui/src/bridge.rs:625
 msgid "No longer uploading photos"
 msgstr "Artık fotoğraf yüklenmiyor"
 
-#: ui/src/bridge.rs:607
+#: ui/src/bridge.rs:717
 msgid "Photos will be downloaded into that folder from the next pass"
 msgstr "Fotoğraflar, sonraki eşitlemeden itibaren o klasöre indirilecek"
 
-#: ui/src/bridge.rs:632
+#: ui/src/bridge.rs:741
 msgid "Storing everything from now on"
 msgstr "Bundan sonra her şey saklanacak"
 
-#: ui/src/bridge.rs:633
+#: ui/src/bridge.rs:742
 msgid "Storing warnings and errors from now on"
 msgstr "Bundan sonra uyarılar ve hatalar saklanacak"
 
-#: ui/src/bridge.rs:634
+#: ui/src/bridge.rs:743
 msgid "Storing errors from now on"
 msgstr "Bundan sonra yalnızca hatalar saklanacak"
 
-#: ui/src/bridge.rs:650
+#: ui/src/bridge.rs:759
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] "{days} günden eski {n} günlük dosyası kaldırıldı"
 msgstr[1] "{days} günden eski {n} günlük dosyası kaldırıldı"
 
-#: ui/src/bridge.rs:651
+#: ui/src/bridge.rs:760
 msgid "Cannot prune the log: {reason}"
 msgstr "Günlük temizlenemiyor: {reason}"
 
@@ -318,131 +326,168 @@ msgstr "Fotoğrafların yükleneceği klasörü seçin"
 msgid "The folder is not empty"
 msgstr "Klasör boş değil"
 
-#: ui/qml/main.qml:104
+#: ui/qml/main.qml:80
+msgid "Remove {account}?"
+msgstr "{account} kaldırılsın mı?"
+
+#: ui/qml/main.qml:81
+msgid ""
+"kpdrive signs this account out and forgets what it synced. The files in "
+"{folder} stay where they are."
+msgstr ""
+"kpdrive bu hesabın oturumunu kapatır ve eşitlediklerini unutur. {folder} "
+"içindeki dosyalar oldukları yerde kalır."
+
+#: ui/qml/main.qml:82
+msgid "its folder"
+msgstr "hesabın klasörü"
+
+#: ui/qml/main.qml:86
+msgid "Remove account"
+msgstr "Hesabı kaldır"
+
+#: ui/qml/main.qml:94
+msgid "Cancel"
+msgstr "İptal"
+
+#: ui/qml/main.qml:130
 msgid "Opened {what}"
 msgstr "{what} açıldı"
 
-#: ui/qml/main.qml:106
+#: ui/qml/main.qml:132
 msgid "Could not open {what} ({url})"
 msgstr "{what} açılamadı ({url})"
 
-#: ui/qml/main.qml:186
+#: ui/qml/main.qml:223 ui/qml/main.qml:225
+msgid "Add account"
+msgstr "Hesap ekle"
+
+#: ui/qml/main.qml:237
 msgid "Account & activity"
 msgstr "Hesap ve etkinlik"
 
-#: ui/qml/main.qml:187
+#: ui/qml/main.qml:238
 msgid "Settings"
 msgstr "Ayarlar"
 
-#: ui/qml/main.qml:188 ui/qml/main.qml:633
+#: ui/qml/main.qml:239 ui/qml/main.qml:701
 msgid "Logs"
 msgstr "Günlükler"
 
-#: ui/qml/main.qml:189
+#: ui/qml/main.qml:240
 msgid "About"
 msgstr "Hakkında"
 
-#: ui/qml/main.qml:269
+#: ui/qml/main.qml:320
 msgid "Not signed in"
 msgstr "Oturum açılmadı"
 
-#: ui/qml/main.qml:276
+#: ui/qml/main.qml:327
 msgid "Signed in to Proton Drive"
 msgstr "Proton Drive'da oturum açıldı"
 
-#: ui/qml/main.qml:277
+#: ui/qml/main.qml:329
+msgid "Signed out. Sign in again to resume syncing this account."
+msgstr ""
+"Oturum kapatıldı. Bu hesabı eşitlemeyi sürdürmek için yeniden oturum açın."
+
+#: ui/qml/main.qml:330
 msgid "Sign in to sync this computer with Proton Drive."
 msgstr "Bu bilgisayarı Proton Drive ile eşitlemek için oturum açın."
 
-#: ui/qml/main.qml:294
+#: ui/qml/main.qml:347
 msgid "Storage:"
 msgstr "Depolama:"
 
-#: ui/qml/main.qml:323
+#: ui/qml/main.qml:376
 msgid "{used} of {total} used"
 msgstr "{used} / {total} kullanıldı"
 
-#: ui/qml/main.qml:331
+#: ui/qml/main.qml:384 ui/qml/main.qml:489
 msgid "Account:"
 msgstr "Hesap:"
 
-#: ui/qml/main.qml:334
+#: ui/qml/main.qml:387
 msgid "Sign in"
 msgstr "Oturum aç"
 
 #. TRANSLATORS: button that reloads the account details from Proton
-#: ui/qml/main.qml:341
+#: ui/qml/main.qml:394
 msgid "Refresh"
 msgstr "Yenile"
 
-#: ui/qml/main.qml:350
+#: ui/qml/main.qml:401
+msgid "Remove account…"
+msgstr "Hesabı kaldır…"
+
+#: ui/qml/main.qml:410
 msgid "On the web:"
 msgstr "Web'de:"
 
-#: ui/qml/main.qml:353
+#: ui/qml/main.qml:413
 msgid "Drive on the web"
 msgstr "Web'de Drive"
 
-#: ui/qml/main.qml:358
+#: ui/qml/main.qml:418
 msgid "Proton account"
 msgstr "Proton hesabı"
 
-#: ui/qml/main.qml:366
+#: ui/qml/main.qml:426
 msgid "Activity"
 msgstr "Etkinlik"
 
-#: ui/qml/main.qml:373
+#: ui/qml/main.qml:433
 msgid "Sync:"
 msgstr "Eşitleme:"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Resume"
 msgstr "Sürdür"
 
-#: ui/qml/main.qml:404
+#: ui/qml/main.qml:464
 msgid "Pause"
 msgstr "Duraklat"
 
-#: ui/qml/main.qml:429
+#: ui/qml/main.qml:497
 msgid "Files"
 msgstr "Dosyalar"
 
-#: ui/qml/main.qml:433
+#: ui/qml/main.qml:501
 msgid "Sync folder:"
 msgstr "Eşitleme klasörü:"
 
-#: ui/qml/main.qml:437
+#: ui/qml/main.qml:505
 msgid "nowhere yet"
 msgstr "henüz hiçbir yere"
 
 #. TRANSLATORS: button that opens a folder picker to sync somewhere else
-#: ui/qml/main.qml:443 ui/qml/main.qml:490 ui/qml/main.qml:533
+#: ui/qml/main.qml:511 ui/qml/main.qml:558 ui/qml/main.qml:601
 msgid "Change…"
 msgstr "Değiştir…"
 
-#: ui/qml/main.qml:450
+#: ui/qml/main.qml:518
 msgid "Ignored paths:"
 msgstr "Yok sayılan yollar:"
 
 #. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves
 #. alone
-#: ui/qml/main.qml:452
+#: ui/qml/main.qml:520
 msgid "Ignore file…"
 msgstr "Yok sayma dosyası…"
 
-#: ui/qml/main.qml:459
+#: ui/qml/main.qml:527
 msgid "Photos"
 msgstr "Fotoğraflar"
 
-#: ui/qml/main.qml:463
+#: ui/qml/main.qml:531
 msgid "Download:"
 msgstr "İndirme:"
 
-#: ui/qml/main.qml:467
+#: ui/qml/main.qml:535
 msgid "Also download Proton Photos"
 msgstr "Proton Photos'u da indir"
 
-#: ui/qml/main.qml:473
+#: ui/qml/main.qml:541
 msgid ""
 "Your timeline is copied here every half hour. Nothing in Proton Photos is "
 "changed or deleted by it."
@@ -450,23 +495,23 @@ msgstr ""
 "Zaman tüneliniz her yarım saatte bir buraya kopyalanır. Bu işlem Proton "
 "Photos'taki hiçbir şeyi değiştirmez veya silmez."
 
-#: ui/qml/main.qml:481
+#: ui/qml/main.qml:549
 msgid "Download folder:"
 msgstr "İndirme klasörü:"
 
-#: ui/qml/main.qml:485
+#: ui/qml/main.qml:553
 msgid "your Pictures folder"
 msgstr "Resimler klasörünüz"
 
-#: ui/qml/main.qml:497
+#: ui/qml/main.qml:565
 msgid "Upload:"
 msgstr "Yükleme:"
 
-#: ui/qml/main.qml:501
+#: ui/qml/main.qml:569
 msgid "Upload photos from a folder"
 msgstr "Bir klasörden fotoğraf yükle"
 
-#: ui/qml/main.qml:515
+#: ui/qml/main.qml:583
 msgid ""
 "Photos and videos put in this folder go up to Proton Photos within a minute, "
 "then leave the folder. Anything that cannot be uploaded stays."
@@ -474,31 +519,31 @@ msgstr ""
 "Bu klasöre konan fotoğraflar ve videolar bir dakika içinde Proton Photos'a "
 "yüklenir, ardından klasörden kaldırılır. Yüklenemeyen her şey yerinde kalır."
 
-#: ui/qml/main.qml:523
+#: ui/qml/main.qml:591
 msgid "Upload folder:"
 msgstr "Yükleme klasörü:"
 
-#: ui/qml/main.qml:540
+#: ui/qml/main.qml:608
 msgid "After upload:"
 msgstr "Yüklemeden sonra:"
 
-#: ui/qml/main.qml:542
+#: ui/qml/main.qml:610
 msgid "Delete instead of moving to the trash"
 msgstr "Çöp kutusuna taşımak yerine sil"
 
-#: ui/qml/main.qml:549
+#: ui/qml/main.qml:617
 msgid "Network"
 msgstr "Ağ"
 
-#: ui/qml/main.qml:553 ui/qml/main.qml:598
+#: ui/qml/main.qml:621 ui/qml/main.qml:666
 msgid "Pause while on:"
 msgstr "Şu durumda duraklat:"
 
-#: ui/qml/main.qml:573
+#: ui/qml/main.qml:641
 msgid "{network} (connected)"
 msgstr "{network} (bağlı)"
 
-#: ui/qml/main.qml:584
+#: ui/qml/main.qml:652
 msgid ""
 "Syncing pauses while any ticked network is connected, such as a phone's "
 "hotspot. A sync already under way finishes first."
@@ -507,31 +552,31 @@ msgstr ""
 "bağlıyken eşitleme duraklar. Zaten sürmekte olan bir eşitleme önce "
 "tamamlanır."
 
-#: ui/qml/main.qml:585
+#: ui/qml/main.qml:653
 msgid "NetworkManager lists no networks to choose from."
 msgstr "NetworkManager, seçilebilecek hiçbir ağ listelemiyor."
 
-#: ui/qml/main.qml:594
+#: ui/qml/main.qml:662
 msgid "Power"
 msgstr "Güç"
 
-#: ui/qml/main.qml:604
+#: ui/qml/main.qml:672
 msgid "AC power"
 msgstr "AC güç"
 
-#: ui/qml/main.qml:605
+#: ui/qml/main.qml:673
 msgid "Battery"
 msgstr "Pil"
 
-#: ui/qml/main.qml:606
+#: ui/qml/main.qml:674
 msgid "Low battery"
 msgstr "Düşük pil"
 
-#: ui/qml/main.qml:614
+#: ui/qml/main.qml:682
 msgid "{power} (now)"
 msgstr "{power} (şu anda)"
 
-#: ui/qml/main.qml:624
+#: ui/qml/main.qml:692
 msgid ""
 "Low battery is the level set in the system's power management settings. A "
 "sync already under way finishes first."
@@ -539,100 +584,103 @@ msgstr ""
 "Düşük pil, sistemin güç yönetimi ayarlarında belirlenen düzeydir. Zaten "
 "sürmekte olan bir eşitleme önce tamamlanır."
 
-#: ui/qml/main.qml:637
+#: ui/qml/main.qml:705
 msgid "Keep logs for:"
 msgstr "Günlük saklama süresi:"
 
 #. TRANSLATORS: after the number in "Keep logs for: [30] days"
-#: ui/qml/main.qml:646
+#: ui/qml/main.qml:714
 msgid "days"
 msgstr "gün"
 
 #. TRANSLATORS: label before a dropdown choosing which log levels are written
 #. to disk
-#: ui/qml/main.qml:651
+#: ui/qml/main.qml:719
 msgid "Store:"
 msgstr "Kaydedilecekler:"
 
 #. TRANSLATORS: dropdown choice, store warnings and errors only
-#: ui/qml/main.qml:656
+#: ui/qml/main.qml:724
 msgid "Warnings and errors"
 msgstr "Uyarılar ve hatalar"
 
 #. TRANSLATORS: dropdown choice, store every log line
-#: ui/qml/main.qml:658
+#: ui/qml/main.qml:726
 msgid "Everything"
 msgstr "Her şey"
 
 #. TRANSLATORS: dropdown choice, store errors only
-#: ui/qml/main.qml:660
+#: ui/qml/main.qml:728
 msgid "Errors only"
 msgstr "Yalnızca hatalar"
 
-#: ui/qml/main.qml:681
+#: ui/qml/main.qml:749
 msgid "Search the log"
 msgstr "Günlükte ara"
 
-#: ui/qml/main.qml:686
+#: ui/qml/main.qml:754
 msgid "{n} line"
 msgid_plural "{n} lines"
 msgstr[0] "{n} satır"
 msgstr[1] "{n} satır"
 
 #. TRANSLATORS: right-click menu item, copies the selected log text
-#: ui/qml/main.qml:736
+#: ui/qml/main.qml:804
 msgid "Copy"
 msgstr "Kopyala"
 
 #. TRANSLATORS: right-click menu item, selects the whole log view
-#: ui/qml/main.qml:742
+#: ui/qml/main.qml:810
 msgid "Select all"
 msgstr "Tümünü seç"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "No lines match"
 msgstr "Eşleşen satır yok"
 
-#: ui/qml/main.qml:759
+#: ui/qml/main.qml:827
 msgid "Nothing logged yet"
 msgstr "Henüz günlüğe bir şey yazılmadı"
 
-#: ui/qml/main.qml:761
+#: ui/qml/main.qml:829
 msgid "No line since the sync daemon started contains “{term}”."
 msgstr ""
 "Eşitleme hizmeti başladığından beri hiçbir satır şunu içermiyor: “{term}”."
 
-#: ui/qml/main.qml:762
+#: ui/qml/main.qml:830
 msgid "This shows what has happened since the sync daemon started."
 msgstr "Burada, eşitleme hizmeti başladığından beri neler olduğu gösterilir."
 
-#: ui/qml/main.qml:794
+#: ui/qml/main.qml:862
 msgid "Proton Drive sync client for KDE Plasma"
 msgstr "KDE Plasma için Proton Drive eşitleme istemcisi"
 
-#: ui/qml/main.qml:802
+#: ui/qml/main.qml:870
 msgid "Version:"
 msgstr "Sürüm:"
 
-#: ui/qml/main.qml:807
+#: ui/qml/main.qml:875
 msgid "Licence:"
 msgstr "Lisans:"
 
-#: ui/qml/main.qml:811
+#: ui/qml/main.qml:879
 msgid "Read the licence"
 msgstr "Lisansı oku"
 
-#: ui/qml/main.qml:818
+#: ui/qml/main.qml:886
 msgid "Project:"
 msgstr "Proje:"
 
-#: ui/qml/main.qml:821
+#: ui/qml/main.qml:889
 msgid "Source code"
 msgstr "Kaynak kodu"
 
-#: ui/qml/main.qml:826
+#: ui/qml/main.qml:894
 msgid "Report a bug"
 msgstr "Hata bildir"
+
+#~ msgid "{note}. Restart the sync daemon to use it."
+#~ msgstr "{note}. Kullanmak için eşitleme hizmetini yeniden başlatın."
 
 #~ msgid "Syncing to"
 #~ msgstr "Şuraya eşitleniyor:"

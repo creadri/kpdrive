@@ -23,8 +23,9 @@ fn href(path: &Path) -> String {
     out
 }
 
-/// Adds a "Proton Drive" entry to Dolphin's Places unless one already points at `root`.
-pub fn places_entry(root: &Path) -> Result<bool> {
+/// Adds an entry called `title` to Dolphin's Places unless one already points
+/// at `root`.
+pub fn places_entry(root: &Path, title: &str) -> Result<bool> {
     let file = xdg("XDG_DATA_HOME", ".local/share")?.join("user-places.xbel");
     // A profile where Dolphin has never saved a place has no file yet; start
     // one rather than failing the whole setup over it.
@@ -40,8 +41,9 @@ pub fn places_entry(root: &Path) -> Result<bool> {
         return Ok(false);
     }
     let id = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
+    let title = title.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
     let entry = format!(
-        " <bookmark href=\"{href}\">\n  <title>Proton Drive</title>\n  <info>\n   <metadata owner=\"http://freedesktop.org\">\n    <bookmark:icon name=\"folder-cloud\"/>\n   </metadata>\n   <metadata owner=\"http://www.kde.org\">\n    <ID>{id}/0</ID>\n   </metadata>\n  </info>\n </bookmark>\n</xbel>"
+        " <bookmark href=\"{href}\">\n  <title>{title}</title>\n  <info>\n   <metadata owner=\"http://freedesktop.org\">\n    <bookmark:icon name=\"folder-cloud\"/>\n   </metadata>\n   <metadata owner=\"http://www.kde.org\">\n    <ID>{id}/0</ID>\n   </metadata>\n  </info>\n </bookmark>\n</xbel>"
     );
     let updated = xml.replacen("</xbel>", &entry, 1);
     if updated == xml {
