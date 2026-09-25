@@ -124,6 +124,10 @@ cargo test --release --workspace --offline --locked
 %{_datadir}/kio/servicemenus/kpdrive-share.desktop
 
 %changelog
+* Fri Sep 25 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.5.1-1
+- Reap the programs the daemon starts to avoid zombies
+- update screenshots & readme
+
 * Thu Sep 24 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.5.0-1
 - Updated translations to match new UI design
 - Trash the local copy of a photo deleted in Proton

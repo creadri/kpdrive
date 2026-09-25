@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 - 2026-09-25
+
+- Reap the programs the daemon starts to avoid zombies
+- update screenshots & readme
+
 ## 0.5.0 - 2026-09-24
 
 - Updated translations to match new UI design
