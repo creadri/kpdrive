@@ -161,13 +161,13 @@ async fn main() -> Result<()> {
 async fn login() -> Result<()> {
     let username = account::login(|url, code| {
         println!("Sign in in your browser. Confirm this code there: {code}\n{url}");
-        if std::process::Command::new("xdg-open").arg(url).spawn().is_err() {
+        if daemon::spawn_detached(std::process::Command::new("xdg-open").arg(url)).is_err() {
             eprintln!("could not run xdg-open; open the URL above manually");
         }
         // Fire-and-forget: kdialog would block on OK, and the browser is what matters.
-        let _ = std::process::Command::new("kdialog")
-            .args(["--title", "kpdrive", "--passivepopup", &format!("Confirm code {code} in your browser"), "30"])
-            .spawn();
+        let _ = daemon::spawn_detached(
+            std::process::Command::new("kdialog").args(["--title", "kpdrive", "--passivepopup", &format!("Confirm code {code} in your browser"), "30"]),
+        );
     })
     .await?;
     println!("logged in as {username}");

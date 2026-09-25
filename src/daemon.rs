@@ -127,7 +127,7 @@ impl ksni::Tray for Tray {
                 icon_name: "folder-open".into(),
                 activate: Box::new(|t: &mut Self| {
                     let root = t.snap.read().expect("snapshot lock").root.clone();
-                    let _ = std::process::Command::new("xdg-open").arg(root).spawn();
+                    let _ = spawn_detached(std::process::Command::new("xdg-open").arg(root));
                 }),
                 ..Default::default()
             }
@@ -189,7 +189,7 @@ fn open_window() {
     if running(&exe) {
         return;
     }
-    if let Err(e) = std::process::Command::new(&exe).spawn() {
+    if let Err(e) = spawn_detached(&mut std::process::Command::new(&exe)) {
         crate::log::error(&format!("cannot start {}: {e}", exe.display()));
     }
 }
@@ -206,7 +206,25 @@ fn running(exe: &Path) -> bool {
     entries.flatten().any(|e| {
         e.file_name().to_string_lossy().bytes().all(|b| b.is_ascii_digit())
             && std::fs::read_to_string(e.path().join("comm")).map(|c| c.trim() == short).unwrap_or(false)
+            && !std::fs::read_to_string(e.path().join("stat")).is_ok_and(|s| zombie(&s))
     })
+}
+
+/// Whether a `/proc/<pid>/stat` line is a process that has exited and not
+/// been reaped. Such a process keeps its name in /proc but is not running.
+fn zombie(stat: &str) -> bool {
+    // `pid (comm) state …`; comm may itself contain spaces and parentheses.
+    stat.rsplit_once(')').is_some_and(|(_, rest)| rest.trim_start().starts_with('Z'))
+}
+
+/// Starts a program the daemon does not wait for, and reaps it once it exits.
+/// Dropping a `Child` does not: every notification and window would otherwise
+/// stay behind as a zombie for as long as the daemon runs.
+pub fn spawn_detached(cmd: &mut std::process::Command) -> std::io::Result<u32> {
+    let mut child = cmd.spawn()?;
+    let pid = child.id();
+    std::thread::spawn(move || child.wait());
+    Ok(pid)
 }
 
 pub fn socket_path() -> PathBuf {
@@ -464,9 +482,7 @@ pub fn poke() {
 }
 
 pub fn notify(body: &str) {
-    let _ = std::process::Command::new("notify-send")
-        .args(["-a", "kpdrive", "-i", "folder-cloud", "Proton Drive", body])
-        .spawn();
+    let _ = spawn_detached(std::process::Command::new("notify-send").args(["-a", "kpdrive", "-i", "folder-cloud", "Proton Drive", body]));
 }
 
 /// What the daemon is able to do at all, as distinct from how the last pass
@@ -831,6 +847,25 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zombies_are_not_running() {
+        assert!(zombie("188755 (kpdrive-ui) Z 188605 188755"));
+        assert!(!zombie("188755 (kpdrive-ui) S 188605 188755"));
+        assert!(!zombie("42 (odd) Z name) R 1 42"));
+        assert!(zombie("42 (odd) S name) Z 1 42"));
+    }
+
+    #[test]
+    fn detached_children_are_reaped() {
+        let pid = spawn_detached(&mut std::process::Command::new("true")).unwrap();
+        let stat = format!("/proc/{pid}/stat");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while std::fs::read_to_string(&stat).is_ok_and(|s| s.split_whitespace().nth(3) == Some(std::process::id().to_string()).as_deref()) {
+            assert!(std::time::Instant::now() < deadline, "child {pid} was never reaped");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
 
     #[test]
     fn an_outage_is_two_lines_however_long_it_lasts() {
