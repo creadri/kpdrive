@@ -124,6 +124,9 @@ cargo test --release --workspace --offline --locked
 %{_datadir}/kio/servicemenus/kpdrive-share.desktop
 
 %changelog
+* Fri Sep 25 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.6.0-1
+- Multi-account support
+
 * Fri Sep 25 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.5.1-1
 - Reap the programs the daemon starts to avoid zombies
 - update screenshots & readme

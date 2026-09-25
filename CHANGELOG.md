@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 - 2026-09-25
+
+- Multi-account support
+
 ## 0.5.1 - 2026-09-25
 
 - Reap the programs the daemon starts to avoid zombies

@@ -1,3 +1,9 @@
+kpdrive (0.6.0) unstable; urgency=medium
+
+  * Multi-account support
+
+ -- Adrien Nelis <github.com.daybed777@passmail.net>  Fri, 25 Sep 2026 14:00:00 +0200
+
 kpdrive (0.5.1) unstable; urgency=medium
 
   * Reap the programs the daemon starts to avoid zombies
