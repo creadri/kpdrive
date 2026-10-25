@@ -66,36 +66,107 @@ pub const PART_SUFFIX: &str = ".kpdrive-part";
 /// `**`, trailing-slash directory rules and `!` negation all behave as expected.
 pub const IGNORE_FILE: &str = ".protonignore";
 
-/// What the ignore file says. Absent or unreadable means nothing is ignored.
+/// Also honoured, at any depth, each applying to its own folder as git does.
+/// Only copies already on disk count: one that exists only remotely starts
+/// applying once it has been downloaded.
+pub const GIT_IGNORE_FILE: &str = ".gitignore";
+
+/// What the ignore files say. Absent or unreadable means nothing is ignored.
 pub struct Ignores {
     matcher: Gitignore,
+    /// Each `.gitignore` found, keyed by the folder holding it, relative to `root`.
+    git: HashMap<PathBuf, Gitignore>,
     root: PathBuf,
 }
 
 impl Ignores {
     pub fn load(root: &Path) -> Self {
-        let mut builder = GitignoreBuilder::new(root);
-        // A parse error names the offending line; the rest of the file still applies.
-        if let Some(e) = builder.add(root.join(IGNORE_FILE)) {
-            if worth_reporting(&e) {
-                crate::log::warn(&format!("{IGNORE_FILE}: {e}"));
+        let matcher = read_ignore_file(root, IGNORE_FILE);
+        let mut ignores = Self { matcher, git: HashMap::new(), root: root.to_owned() };
+        // Parents first, so a folder some outer file ignores is never entered,
+        // and the `.gitignore` files inside it never read, exactly as git does.
+        let mut queue = VecDeque::from([PathBuf::new()]);
+        while let Some(rel) = queue.pop_front() {
+            let dir = root.join(&rel);
+            if dir.join(GIT_IGNORE_FILE).is_file() {
+                ignores.git.insert(rel.clone(), read_ignore_file(&dir, GIT_IGNORE_FILE));
+            }
+            let Ok(items) = fs::read_dir(&dir) else { continue };
+            for item in items.filter_map(|e| e.ok()) {
+                // Symlinked folders are not synced, so their rules do not matter.
+                if !item.file_type().is_ok_and(|t| t.is_dir()) {
+                    continue;
+                }
+                let item_rel = rel.join(item.file_name());
+                if !ignores.is_ignored(&item_rel, true) {
+                    queue.push_back(item_rel);
+                }
             }
         }
-        let matcher = builder.build().unwrap_or_else(|e| {
-            crate::log::warn(&format!("{IGNORE_FILE} could not be read ({e}); ignoring nothing"));
-            Gitignore::empty()
-        });
-        Self { matcher, root: root.to_owned() }
+        ignores
     }
 
     /// Whether `rel` (relative to the sync folder) is excluded, either directly
     /// or because one of its parent folders is.
+    ///
+    /// `.protonignore` has the last word: when it matches, ignoring or with a
+    /// `!` exception, the `.gitignore` files are not asked. That way it can
+    /// keep syncing something a project's `.gitignore` leaves out of git.
     pub fn is_ignored(&self, rel: &Path, is_dir: bool) -> bool {
         if rel.as_os_str().is_empty() {
             return false;
         }
-        self.matcher.matched_path_or_any_parents(self.root.join(rel), is_dir).is_ignore()
+        let own = self.matcher.matched_path_or_any_parents(self.root.join(rel), is_dir);
+        if !own.is_none() {
+            return own.is_ignore();
+        }
+        if self.git.is_empty() {
+            return false;
+        }
+        // Outermost folder first: once a folder is ignored, nothing inside it
+        // can be brought back, which is also git's rule.
+        let mut prefix = PathBuf::new();
+        let mut parts = rel.components().peekable();
+        while let Some(part) = parts.next() {
+            prefix.push(part);
+            let last = parts.peek().is_none();
+            if self.git_verdict(&prefix, !last || is_dir) {
+                return true;
+            }
+        }
+        false
     }
+
+    /// What the `.gitignore` files say about `rel` itself: the nearest one
+    /// with a matching pattern decides.
+    fn git_verdict(&self, rel: &Path, is_dir: bool) -> bool {
+        let path = self.root.join(rel);
+        for dir in rel.ancestors().skip(1) {
+            if let Some(git) = self.git.get(dir) {
+                let m = git.matched(&path, is_dir);
+                if !m.is_none() {
+                    return m.is_ignore();
+                }
+            }
+        }
+        false
+    }
+}
+
+/// Builds the matcher for `dir/name`. A parse error names the offending line;
+/// the rest of the file still applies.
+fn read_ignore_file(dir: &Path, name: &str) -> Gitignore {
+    let file = dir.join(name);
+    let mut builder = GitignoreBuilder::new(dir);
+    if let Some(e) = builder.add(&file) {
+        if worth_reporting(&e) {
+            crate::log::warn(&format!("{}: {e}", file.display()));
+        }
+    }
+    builder.build().unwrap_or_else(|e| {
+        crate::log::warn(&format!("{} could not be read ({e}); ignoring nothing", file.display()));
+        Gitignore::empty()
+    })
 }
 
 /// Whether an ignore-file error is worth a log line. Having no ignore file is
@@ -1054,6 +1125,36 @@ mod tests {
         assert!(!ig.is_ignored(Path::new("sub/only-at-root.txt"), false), "leading slash anchors");
         assert!(!ig.is_ignored(Path::new("notes.txt"), false));
         assert!(!ig.is_ignored(Path::new(""), true), "the root is never ignored");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn gitignore_files_apply_to_their_own_folder() {
+        let dir = std::env::temp_dir().join(format!("kpdrive-gitignore-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("app/src")).unwrap();
+        fs::create_dir_all(dir.join("app/target/sub")).unwrap();
+        fs::create_dir_all(dir.join("other")).unwrap();
+        fs::write(dir.join(".gitignore"), "*.log\n").unwrap();
+        fs::write(dir.join("app/.gitignore"), "/target/\n.env\n*.o\n!important.log\n").unwrap();
+        fs::write(dir.join("app/src/.gitignore"), "!keep.o\n").unwrap();
+        // Inside an ignored folder, so never read.
+        fs::write(dir.join("app/target/.gitignore"), "!*\n").unwrap();
+        fs::write(dir.join(IGNORE_FILE), "!app/.env\n").unwrap();
+
+        let ig = Ignores::load(&dir);
+        assert!(ig.is_ignored(Path::new("a.log"), false), "the top .gitignore applies");
+        assert!(ig.is_ignored(Path::new("other/b.log"), false), "and below it");
+        assert!(!ig.is_ignored(Path::new("app/important.log"), false), "a nearer one overrides it");
+        assert!(ig.is_ignored(Path::new("app/target"), true));
+        assert!(ig.is_ignored(Path::new("app/target/sub/x"), false), "nothing comes back from an ignored folder");
+        assert!(!ig.is_ignored(Path::new("other/target"), true), "anchored to its own folder");
+        assert!(ig.is_ignored(Path::new("app/src/a.o"), false));
+        assert!(!ig.is_ignored(Path::new("app/src/keep.o"), false));
+        assert!(!ig.is_ignored(Path::new("other/a.o"), false), "rules stay in their folder");
+        assert!(!ig.is_ignored(Path::new("app/.env"), false), ".protonignore has the last word");
+        assert!(!ig.is_ignored(Path::new("app/.gitignore"), false), "the files themselves sync");
+        assert!(!ig.git.contains_key(Path::new("app/target")));
         fs::remove_dir_all(&dir).unwrap();
     }
 

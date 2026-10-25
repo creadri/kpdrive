@@ -14,6 +14,7 @@ Simple KDE Proton Drive sync Client designed to have a simple solution.
 - **Photos Sync** with some caviats
 - **KDE** and **Dolphin** integration
 - **.protonignore** with same syntax as .gitignore to ignore files to upload. .protonignore is still pushed though.
+  `.gitignore` files inside the sync folder are honoured too.
 - **Localization** support
 - **Conditional Sync Pause** currently based either on power management or network
 - **Multiple accounts**, each with its own folder, photos and ingestion settings, run by one daemon under one tray icon
@@ -128,7 +129,10 @@ before accounts (these keys at the top level) is moved into the first account
 the first time a newer kpdrive runs.
 
 `<sync_folder>/.protonignore` lists paths sync leaves alone, in `.gitignore`
-syntax; the window's **Ignore file…** opens it.
+syntax; the window's **Ignore file…** opens it. Any `.gitignore` in the sync
+folder also applies, to its own folder as in git, once it is on disk locally.
+`.protonignore` wins where both match, so `!.env` there keeps syncing a file a
+project's `.gitignore` leaves out.
 
 ### Logs
 

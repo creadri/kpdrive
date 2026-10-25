@@ -92,7 +92,10 @@ pub fn ignore_template(root: &Path) -> Result<bool> {
          #   !keep.tmp       an exception to an earlier pattern\n\
          #\n\
          # Ignored paths are neither uploaded nor downloaded, and are never\n\
-         # deleted by sync. This file itself does sync, like .gitignore does.\n",
+         # deleted by sync. This file itself does sync, like .gitignore does.\n\
+         #\n\
+         # .gitignore files in this folder apply too, each to its own folder.\n\
+         # A line here overrides them, so !.env keeps a git-ignored file syncing.\n",
     )?;
     Ok(true)
 }
