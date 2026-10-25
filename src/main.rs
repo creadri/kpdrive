@@ -136,6 +136,13 @@ enum Cmd {
         /// Local destination; defaults to the file's name in the current directory.
         local: Option<std::path::PathBuf>,
     },
+    /// Install the latest release from its packages for this distribution,
+    /// then restart the daemon into it.
+    Update {
+        /// Only say whether there is one.
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[tokio::main]
@@ -178,6 +185,7 @@ async fn main() -> Result<()> {
         Cmd::Rm { remote, force } => rm(who, &remote, force).await,
         Cmd::Share { remote, copy, password, expires_days } => share(who, &remote, copy, password.as_deref(), expires_days).await,
         Cmd::Unshare { remote } => unshare(who, &remote).await,
+        Cmd::Update { check } => update(check).await,
     }
 }
 
@@ -583,6 +591,34 @@ async fn sync(who: Option<&str>, root: Option<std::path::PathBuf>, watch: bool, 
     }
     if accounts.is_empty() {
         anyhow::bail!("not logged in, run `kpdrive login`");
+    }
+    Ok(())
+}
+
+async fn update(check_only: bool) -> Result<()> {
+    use kpdrive::update;
+    let Some(available) = update::check().await? else {
+        println!("kpdrive {} is the latest release", update::CURRENT);
+        return Ok(());
+    };
+    println!("kpdrive {} is available (this is {})", available.release.version, update::CURRENT);
+    println!("  {}", available.release.page);
+    let Some(plan) = &available.plan else {
+        println!("there is no package of it for this system; download it from the page above");
+        return Ok(());
+    };
+    for file in &plan.files {
+        println!("  {}", file.name);
+    }
+    if check_only {
+        return Ok(());
+    }
+    match update::install(&available).await? {
+        update::Outcome::Installed => {
+            println!("installed kpdrive {}", available.release.version);
+            daemon::restart();
+        }
+        update::Outcome::Declined => println!("not installed: the password prompt was dismissed"),
     }
     Ok(())
 }

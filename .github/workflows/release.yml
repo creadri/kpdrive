@@ -188,6 +188,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.version.outputs.tag }}
         run: |
+          # What the updater checks each download against before installing.
+          (cd dist && sha256sum -- * > SHA256SUMS)
           ls -la dist/
           # A tag like v0.2.0-rc1 is a pre-release; a plain v0.2.0 is not.
           prerelease=""

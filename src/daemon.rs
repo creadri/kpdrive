@@ -27,6 +27,11 @@ const PHOTOS_EVERY: std::time::Duration = std::time::Duration::from_secs(1800);
 /// limits can lose events.
 const SWEEP_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
 
+/// How often GitHub is asked for a newer release, and how soon to ask again
+/// when it could not be reached.
+const UPDATE_EVERY: std::time::Duration = std::time::Duration::from_secs(24 * 3600);
+const UPDATE_RETRY: std::time::Duration = std::time::Duration::from_secs(3600);
+
 /// What the tray, the socket and the window see of one account; refreshed
 /// after every pass.
 #[derive(Default)]
@@ -81,6 +86,10 @@ impl Snapshot {
 struct Board {
     accounts: Vec<(String, Snapshot)>,
     paused: Option<String>,
+    /// A newer release, once one has been seen.
+    update: Option<crate::update::Available>,
+    /// It is being downloaded or installed.
+    updating: bool,
 }
 
 impl Board {
@@ -105,6 +114,12 @@ impl Board {
             "lastSync": snaps().filter_map(|s| s.last_sync).max(),
             "error": snaps().find_map(|s| s.last_error.clone()),
             "paused": self.paused,
+            "update": self.update.as_ref().map(|u| serde_json::json!({
+                "version": u.release.version,
+                "page": u.release.page,
+                "installable": u.plan.is_some(),
+                "updating": self.updating,
+            })),
             "accounts": self.accounts.iter().map(|(u, s)| s.json(u)).collect::<Vec<_>>(),
         })
         .to_string()
@@ -133,6 +148,10 @@ type Shared = Arc<RwLock<Board>>;
 enum Cmd {
     /// Sync now: every account, or the one named.
     Sync(Option<String>),
+    /// Download and install the newer release.
+    Update,
+    /// Stop, and start again from whatever binary is installed now.
+    Restart,
     Quit,
 }
 
@@ -175,13 +194,19 @@ impl ksni::Tray for Tray {
             (None, [(_, only)]) => only.sentence(),
             (None, many) => many.iter().map(|(u, s)| format!("{u}: {}", s.sentence())).collect::<Vec<_>>().join("\n"),
         };
+        let description = match &b.update {
+            Some(u) => format!("{description}\n{}", update_line(&u.release.version)),
+            None => description,
+        };
         ksni::ToolTip { title: "Proton Drive".into(), description, ..Default::default() }
     }
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
         use ksni::menu::*;
-        let (roots, paused): (Vec<(String, PathBuf)>, bool) = {
+        let (roots, paused, update) = {
             let b = self.board.read().expect("board lock");
-            (b.accounts.iter().map(|(u, s)| (u.clone(), s.root.clone())).collect(), b.paused.is_some())
+            let roots: Vec<(String, PathBuf)> = b.accounts.iter().map(|(u, s)| (u.clone(), s.root.clone())).collect();
+            let update = b.update.as_ref().map(|u| (u.release.version.clone(), u.release.page.clone(), u.plan.is_some(), b.updating));
+            (roots, b.paused.is_some(), update)
         };
         let open = |label: String, root: PathBuf| -> MenuItem<Self> {
             StandardItem {
@@ -205,7 +230,7 @@ impl ksni::Tray for Tray {
             }
             .into(),
         };
-        vec![
+        let mut items = vec![
             folder,
             StandardItem {
                 label: crate::i18n::t("Account and logs…").into(),
@@ -238,7 +263,32 @@ impl ksni::Tray for Tray {
                 ..Default::default()
             }
             .into(),
-            MenuItem::Separator,
+        ];
+        if let Some((version, page, installable, updating)) = update {
+            let fill = |text| crate::i18n::fill(text, &[("version", &version)]);
+            // Without a package for this system, the release page is the way.
+            let item = match (installable, updating) {
+                (_, true) => StandardItem { label: fill(crate::i18n::t("Updating to {version}…")), enabled: false, ..Default::default() },
+                (true, false) => StandardItem {
+                    label: fill(crate::i18n::t("Update to {version}…")),
+                    activate: Box::new(|t: &mut Self| {
+                        let _ = t.cmds.send(Cmd::Update);
+                    }),
+                    ..Default::default()
+                },
+                (false, false) => StandardItem {
+                    label: fill(crate::i18n::t("Download {version}…")),
+                    activate: Box::new(move |_: &mut Self| {
+                        let _ = spawn_detached(std::process::Command::new("xdg-open").arg(&page));
+                    }),
+                    ..Default::default()
+                },
+            };
+            items.push(MenuItem::Separator);
+            items.push(StandardItem { icon_name: "system-software-update".into(), ..item }.into());
+        }
+        items.push(MenuItem::Separator);
+        items.push(
             StandardItem {
                 label: crate::i18n::t("Quit").into(),
                 icon_name: "application-exit".into(),
@@ -248,7 +298,8 @@ impl ksni::Tray for Tray {
                 ..Default::default()
             }
             .into(),
-        ]
+        );
+        items
     }
 }
 
@@ -377,6 +428,14 @@ async fn serve_socket(board: Shared, cmds: mpsc::UnboundedSender<Cmd>) -> Result
                             let _ = cmds.send(Cmd::Sync(None));
                             "OK".into()
                         }
+                        _ if line == "UPDATE" => {
+                            let _ = cmds.send(Cmd::Update);
+                            "OK".into()
+                        }
+                        _ if line == "RESTART" => {
+                            let _ = cmds.send(Cmd::Restart);
+                            "OK".into()
+                        }
                         _ if line == "QUIT" => {
                             let _ = cmds.send(Cmd::Quit);
                             "OK".into()
@@ -469,6 +528,20 @@ pub struct Report {
     pub paused: Option<String>,
     /// Each account the daemon runs, in the order they were added.
     pub accounts: Vec<AccountReport>,
+    /// A newer release the daemon has seen.
+    pub update: Option<UpdateReport>,
+}
+
+/// A newer release, as the daemon tells it.
+#[derive(Default, Debug, Clone)]
+pub struct UpdateReport {
+    pub version: String,
+    /// Its page, for downloading by hand.
+    pub page: String,
+    /// There are packages for this system, so the daemon can install it.
+    pub installable: bool,
+    /// The daemon is installing it now.
+    pub updating: bool,
 }
 
 /// What the daemon is doing for one account.
@@ -590,6 +663,12 @@ pub fn ask() -> Report {
     if let Some(v) = spoke() {
         report.answered = true;
         report.paused = v["paused"].as_str().map(str::to_owned);
+        report.update = v["update"]["version"].as_str().map(|version| UpdateReport {
+            version: version.to_owned(),
+            page: v["update"]["page"].as_str().unwrap_or_default().to_owned(),
+            installable: v["update"]["installable"].as_bool().unwrap_or(false),
+            updating: v["update"]["updating"].as_bool().unwrap_or(false),
+        });
         report.accounts = match v["accounts"].as_array() {
             Some(list) => list.iter().map(AccountReport::parse).collect(),
             // A daemon from before accounts: its one account is the top level.
@@ -609,6 +688,16 @@ pub fn poke() {
 /// As [`poke`], for one account.
 pub fn poke_account(username: &str) {
     send(&format!("SYNC {username}\n"));
+}
+
+/// Asks a running daemon to install the newer release it has seen.
+pub fn install_update() {
+    send("UPDATE\n");
+}
+
+/// Asks a running daemon to start again, so it runs the binary just installed.
+pub fn restart() {
+    send("RESTART\n");
 }
 
 fn send(line: &str) {
@@ -674,6 +763,8 @@ async fn wait_for_work(
                 // Several clicks during one pass mean one forced pass, not several.
                 while let Ok(Cmd::Sync(_)) = rx.try_recv() {}
             }
+            // Only the supervisor is sent these.
+            Some(Cmd::Update | Cmd::Restart) => {}
             Some(Cmd::Quit) | None => return Ok(false),
         },
         Some(()) = fs_rx.recv() => {
@@ -763,7 +854,9 @@ async fn supervise(always_photos: bool) -> Result<()> {
 
     // Opens this run in the log; the window shows everything after it.
     crate::log::mark("daemon started");
+    tokio::task::spawn_local(watch_releases(board.clone(), tray.clone()));
     let mut loops: Vec<Running> = Vec::new();
+    let mut restart = false;
     loop {
         reconcile(&mut loops, &board, &tray, always_photos).await;
         // Cheap: a directory listing.
@@ -784,6 +877,29 @@ async fn supervise(always_photos: bool) -> Result<()> {
                     }
                 }
             }
+            Some(Cmd::Update) => {
+                let available = {
+                    let mut b = board.write().expect("board lock");
+                    match (b.updating, b.update.clone()) {
+                        (false, Some(u)) if u.plan.is_some() => {
+                            b.updating = true;
+                            Some(u)
+                        }
+                        // Already under way, or nothing to install.
+                        _ => None,
+                    }
+                };
+                if let Some(available) = available {
+                    if let Some(t) = &tray {
+                        t.update(|_| {}).await;
+                    }
+                    tokio::task::spawn_local(run_update(available, board.clone(), tray.clone(), tx.clone()));
+                }
+            }
+            Some(Cmd::Restart) => {
+                restart = true;
+                break;
+            }
             Some(Cmd::Quit) | None => break,
         }
     }
@@ -795,7 +911,95 @@ async fn supervise(always_photos: bool) -> Result<()> {
     }
     crate::log::write("INFO", "daemon stopped");
     let _ = std::fs::remove_file(socket_path());
+    if restart {
+        start_again();
+    }
     Ok(())
+}
+
+/// What the tray and the notification say about a newer release.
+fn update_line(version: &str) -> String {
+    crate::i18n::fill(crate::i18n::t("kpdrive {version} is available"), &[("version", version)])
+}
+
+/// Asks GitHub for a newer release once a day, for as long as the daemon
+/// runs. A release is announced once, however many times it is seen.
+async fn watch_releases(board: Shared, tray: Option<ksni::Handle<Tray>>) {
+    loop {
+        let mut wait = UPDATE_EVERY;
+        if crate::config::load().check_updates {
+            match crate::update::check().await {
+                Ok(found) => {
+                    if let Some(u) = &found {
+                        if crate::update::first_notice(&u.release.version) {
+                            crate::log::write("INFO", &format!("kpdrive {} is available", u.release.version));
+                            notify(&update_line(&u.release.version));
+                        }
+                    }
+                    board.write().expect("board lock").update = found;
+                    if let Some(t) = &tray {
+                        t.update(|_| {}).await;
+                    }
+                }
+                // Offline, or GitHub limiting how often it is asked: neither
+                // is the user's problem, and the next try is soon.
+                Err(e) => {
+                    crate::log::write("INFO", &format!("could not check for updates: {e:#}"));
+                    wait = UPDATE_RETRY;
+                }
+            }
+        } else if board.write().expect("board lock").update.take().is_some() {
+            if let Some(t) = &tray {
+                t.update(|_| {}).await;
+            }
+        }
+        tokio::time::sleep(wait).await;
+    }
+}
+
+/// Installs a newer release, then has the supervisor restart into it.
+async fn run_update(
+    available: crate::update::Available,
+    board: Shared,
+    tray: Option<ksni::Handle<Tray>>,
+    cmds: mpsc::UnboundedSender<Cmd>,
+) {
+    let version = available.release.version.clone();
+    crate::log::write("INFO", &format!("installing kpdrive {version}"));
+    match crate::update::install(&available).await {
+        Ok(crate::update::Outcome::Installed) => {
+            crate::log::write("INFO", &format!("installed kpdrive {version}; restarting"));
+            notify(&crate::i18n::fill(crate::i18n::t("Updated to kpdrive {version}"), &[("version", &version)]));
+            let _ = cmds.send(Cmd::Restart);
+            return;
+        }
+        Ok(crate::update::Outcome::Declined) => crate::log::write("INFO", "update cancelled at the password prompt"),
+        Err(e) => {
+            crate::log::error(&format!("update to {version} failed: {e:#}"));
+            notify(&crate::i18n::fill(crate::i18n::t("Could not update kpdrive: {reason}"), &[("reason", &format!("{e:#}"))]));
+        }
+    }
+    board.write().expect("board lock").updating = false;
+    if let Some(t) = &tray {
+        t.update(|_| {}).await;
+    }
+}
+
+/// Starts a daemon like this one from the binary now installed. After a
+/// package upgrade the running file is gone, and the kernel says so in its
+/// name; the new one is at the same path.
+fn start_again() {
+    let exe = match std::env::current_exe() {
+        Ok(exe) => exe,
+        Err(e) => {
+            crate::log::error(&format!("cannot restart: {e}"));
+            return;
+        }
+    };
+    let exe = PathBuf::from(exe.to_string_lossy().trim_end_matches(" (deleted)"));
+    if let Err(e) = spawn_detached(std::process::Command::new(&exe).args(std::env::args_os().skip(1))) {
+        crate::log::error(&format!("cannot restart {}: {e}", exe.display()));
+    }
 }
 
 /// Brings the running loops in line with the accounts in the config.

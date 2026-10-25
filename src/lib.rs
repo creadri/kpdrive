@@ -13,3 +13,4 @@ pub mod photos;
 pub mod plural;
 pub mod setup;
 pub mod sync;
+pub mod update;

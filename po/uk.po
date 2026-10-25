@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kpdrive 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-25 20:29+0200\n"
+"POT-Creation-Date: 2026-10-25 18:02+0100\n"
 "PO-Revision-Date: 2026-09-25 20:32+0200\n"
 "Last-Translator: machine translation, needs review by a speaker\n"
 "Language-Team: uk\n"
@@ -20,143 +20,166 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
-#: src/daemon.rs:67 src/daemon.rs:174
+#: src/daemon.rs:72 src/daemon.rs:193
 msgid "Signed out. Sign in from the account window."
 msgstr "Виконано вихід. Увійдіть у вікні облікового запису."
 
-#: src/daemon.rs:69 src/daemon.rs:535
+#: src/daemon.rs:74 src/daemon.rs:608
 msgid "Syncing…"
 msgstr "Синхронізація…"
 
-#: src/daemon.rs:71 src/daemon.rs:538
+#: src/daemon.rs:76 src/daemon.rs:611
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] "{n} елемент синхронізовано"
 msgstr[1] "{n} елементи синхронізовано"
 msgstr[2] "{n} елементів синхронізовано"
 
-#: src/daemon.rs:199 src/daemon.rs:201 ui/qml/main.qml:469
+#: src/daemon.rs:224 src/daemon.rs:226 ui/qml/main.qml:469
 msgid "Open folder"
 msgstr "Відкрити теку"
 
-#: src/daemon.rs:211
+#: src/daemon.rs:236
 msgid "Account and logs…"
 msgstr "Обліковий запис і журнал…"
 
-#: src/daemon.rs:218 ui/qml/main.qml:456
+#: src/daemon.rs:243 ui/qml/main.qml:456
 msgid "Sync now"
 msgstr "Синхронізувати зараз"
 
-#: src/daemon.rs:230
+#: src/daemon.rs:255
 msgid "Pause sync"
 msgstr "Призупинити синхронізацію"
 
-#: src/daemon.rs:243
+#: src/daemon.rs:271
+msgid "Updating to {version}…"
+msgstr ""
+
+#: src/daemon.rs:273
+msgid "Update to {version}…"
+msgstr ""
+
+#: src/daemon.rs:280
+msgid "Download {version}…"
+msgstr ""
+
+#: src/daemon.rs:293
 msgid "Quit"
 msgstr "Завершити роботу"
 
-#. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no
-#. route"
-#: src/daemon.rs:430
+#. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no route"
+#: src/daemon.rs:489
 msgid "{reason}; retrying"
 msgstr "{reason}; виконується повторна спроба"
 
-#: src/daemon.rs:441
+#: src/daemon.rs:500
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr "Proton Drive знову доступний ({duration})"
 
-#: src/daemon.rs:452
+#: src/daemon.rs:511
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] "{n} секунда"
 msgstr[1] "{n} секунди"
 msgstr[2] "{n} секунд"
 
-#: src/daemon.rs:453
+#: src/daemon.rs:512
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "{n} хвилина"
 msgstr[1] "{n} хвилини"
 msgstr[2] "{n} хвилин"
 
-#: src/daemon.rs:454
+#: src/daemon.rs:513
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] "{n} година"
 msgstr[1] "{n} години"
 msgstr[2] "{n} годин"
 
-#: src/daemon.rs:502
+#: src/daemon.rs:575
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
 msgstr ""
 "Службу синхронізації не запущено. Запустіть її командою: kpdrive sync --watch"
 
-#: src/daemon.rs:505
+#: src/daemon.rs:578
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
 msgstr ""
 "Службу синхронізації запущено, але вона надто стара, щоб повідомити, що "
 "робить. Перезапустіть її."
 
-#: src/daemon.rs:516 src/daemon.rs:525
+#: src/daemon.rs:589 src/daemon.rs:598
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr "Виконано вихід. Синхронізація відновиться після входу."
 
-#: src/daemon.rs:529
+#: src/daemon.rs:602
 msgid "{reason}. Still trying."
 msgstr "{reason}. Спроби тривають."
 
-#: src/daemon.rs:530
+#: src/daemon.rs:603
 msgid "Last sync failed: {reason}"
 msgstr "Не вдалося виконати останню синхронізацію: {reason}"
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:544
+#: src/daemon.rs:617
 msgid "just now"
 msgstr "щойно"
 
-#: src/daemon.rs:546
+#: src/daemon.rs:619
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "{n} хвилину тому"
 msgstr[1] "{n} хвилини тому"
 msgstr[2] "{n} хвилин тому"
 
-#: src/daemon.rs:549
+#: src/daemon.rs:622
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "{n} годину тому"
 msgstr[1] "{n} години тому"
 msgstr[2] "{n} годин тому"
 
-#. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes
-#. ago"
-#: src/daemon.rs:553
+#. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes ago"
+#: src/daemon.rs:626
 msgid "{items}, checked {ago}"
 msgstr "{items}, перевірено {ago}"
 
-#: src/daemon.rs:924
+#: src/daemon.rs:922 ui/qml/main.qml:879
+msgid "kpdrive {version} is available"
+msgstr ""
+
+#: src/daemon.rs:972
+msgid "Updated to kpdrive {version}"
+msgstr ""
+
+#: src/daemon.rs:979
+#, fuzzy
+msgid "Could not update kpdrive: {reason}"
+msgstr "Не вдалося змінити теку: {reason}"
+
+#: src/daemon.rs:1133
 msgid "Signed in again. Syncing resumed."
 msgstr "Вхід виконано знову. Синхронізацію відновлено."
 
-#: src/daemon.rs:938
+#: src/daemon.rs:1148
 msgid "Signed out. Sign in from the account window to resume syncing."
 msgstr ""
 "Виконано вихід. Увійдіть у вікні облікового запису, щоб відновити "
 "синхронізацію."
 
-#: src/daemon.rs:1050
+#: src/daemon.rs:1260
 msgid "Sync resumed"
 msgstr "Синхронізацію відновлено"
 
-#: src/daemon.rs:1067
+#: src/daemon.rs:1277
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] "Завантажено {n} фотографію"
 msgstr[1] "Завантажено {n} фотографії"
 msgstr[2] "Завантажено {n} фотографій"
 
-#: src/daemon.rs:1086
+#: src/daemon.rs:1296
 msgid "{n} photo uploaded to Proton Photos"
 msgid_plural "{n} photos uploaded to Proton Photos"
 msgstr[0] "{n} фотографію вивантажено до Proton Photos"
@@ -194,15 +217,15 @@ msgstr "Призупинено через низький рівень заряд
 msgid "Paused while connected to {network}"
 msgstr "Призупинено під час з'єднання з {network}"
 
-#: src/sync.rs:124
+#: src/sync.rs:195
 msgid "Sync into it and keep what is already there"
 msgstr "Синхронізувати в неї та зберегти те, що в ній уже є"
 
-#: src/sync.rs:125
+#: src/sync.rs:196
 msgid "Move it aside and start from an empty folder"
 msgstr "Відкласти її вбік і почати з порожньої теки"
 
-#: src/sync.rs:163
+#: src/sync.rs:234
 msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
@@ -217,113 +240,113 @@ msgstr[2] ""
 "У теці {folder} уже є {n} елементів. Синхронізація об’єднає її вміст із "
 "Proton Drive."
 
-#: ui/src/bridge.rs:260
+#: ui/src/bridge.rs:283
 msgid "Starting…"
 msgstr "Запуск…"
 
-#: ui/src/bridge.rs:317
+#: ui/src/bridge.rs:345
 msgid "Confirm the code {code} in your browser"
 msgstr "Підтвердьте код {code} у браузері"
 
-#: ui/src/bridge.rs:331
+#: ui/src/bridge.rs:359
 msgid "Sign-in failed: {reason}"
 msgstr "Не вдалося увійти: {reason}"
 
-#: ui/src/bridge.rs:344
+#: ui/src/bridge.rs:372
 msgid "Signed out"
 msgstr "Виконано вихід"
 
-#: ui/src/bridge.rs:347
+#: ui/src/bridge.rs:375
 msgid "Sign-out failed: {reason}"
 msgstr "Не вдалося вийти: {reason}"
 
-#: ui/src/bridge.rs:355
+#: ui/src/bridge.rs:383
 msgid "Removed {account}. Its files were left where they are."
 msgstr "Обліковий запис {account} вилучено. Його файли залишилися на місці."
 
-#: ui/src/bridge.rs:362
+#: ui/src/bridge.rs:390
 msgid "Cannot remove the account: {reason}"
 msgstr "Не вдалося вилучити обліковий запис: {reason}"
 
-#: ui/src/bridge.rs:481
+#: ui/src/bridge.rs:510
 msgid "Cannot change the folder: {reason}"
 msgstr "Не вдалося змінити теку: {reason}"
 
-#: ui/src/bridge.rs:488
+#: ui/src/bridge.rs:517
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr "Теку для синхронізації ще не вибрано. Виконайте: kpdrive setup"
 
-#: ui/src/bridge.rs:492
+#: ui/src/bridge.rs:521
 msgid "Cannot create the ignore file: {reason}"
 msgstr "Не вдалося створити файл виключень: {reason}"
 
-#: ui/src/bridge.rs:537
-msgid "Checking the account…"
-msgstr "Перевірка облікового запису…"
-
-#: ui/src/bridge.rs:543
-msgid "Opening the browser…"
-msgstr "Відкриття браузера…"
-
-#: ui/src/bridge.rs:550
-msgid "Signing out…"
-msgstr "Виконується вихід…"
-
-#: ui/src/bridge.rs:557
-msgid "Removing the account…"
-msgstr "Вилучення облікового запису…"
-
-#: ui/src/bridge.rs:583
-msgid "Cannot read the log: {reason}"
-msgstr "Не вдалося прочитати журнал: {reason}"
-
-#: ui/src/bridge.rs:591 ui/src/bridge.rs:618 ui/src/bridge.rs:632
-#: ui/src/bridge.rs:647 ui/src/bridge.rs:681 ui/src/bridge.rs:723
-#: ui/src/bridge.rs:736 ui/src/bridge.rs:754
+#: ui/src/bridge.rs:570 ui/src/bridge.rs:641 ui/src/bridge.rs:668
+#: ui/src/bridge.rs:682 ui/src/bridge.rs:697 ui/src/bridge.rs:731
+#: ui/src/bridge.rs:773 ui/src/bridge.rs:786 ui/src/bridge.rs:804
 msgid "Cannot save the setting: {reason}"
 msgstr "Не вдалося зберегти параметр: {reason}"
 
-#: ui/src/bridge.rs:599
+#: ui/src/bridge.rs:587
+msgid "Checking the account…"
+msgstr "Перевірка облікового запису…"
+
+#: ui/src/bridge.rs:593
+msgid "Opening the browser…"
+msgstr "Відкриття браузера…"
+
+#: ui/src/bridge.rs:600
+msgid "Signing out…"
+msgstr "Виконується вихід…"
+
+#: ui/src/bridge.rs:607
+msgid "Removing the account…"
+msgstr "Вилучення облікового запису…"
+
+#: ui/src/bridge.rs:633
+msgid "Cannot read the log: {reason}"
+msgstr "Не вдалося прочитати журнал: {reason}"
+
+#: ui/src/bridge.rs:649
 msgid "Proton Photos will be downloaded with the next sync"
 msgstr "Proton Photos буде завантажено під час наступної синхронізації"
 
-#: ui/src/bridge.rs:600
+#: ui/src/bridge.rs:650
 msgid "Proton Photos will be left alone"
 msgstr "Proton Photos залишиться без змін"
 
-#: ui/src/bridge.rs:624
+#: ui/src/bridge.rs:674
 msgid "Photos put in that folder will be uploaded to Proton Photos"
 msgstr "Фотографії, поміщені до цієї теки, буде вивантажено до Proton Photos"
 
-#: ui/src/bridge.rs:625
+#: ui/src/bridge.rs:675
 msgid "No longer uploading photos"
 msgstr "Фотографії більше не вивантажуються"
 
-#: ui/src/bridge.rs:717
+#: ui/src/bridge.rs:767
 msgid "Photos will be downloaded into that folder from the next pass"
 msgstr ""
 "Фотографії буде завантажено до цієї теки, починаючи з наступної синхронізації"
 
-#: ui/src/bridge.rs:741
+#: ui/src/bridge.rs:791
 msgid "Storing everything from now on"
 msgstr "Відтепер зберігається все"
 
-#: ui/src/bridge.rs:742
+#: ui/src/bridge.rs:792
 msgid "Storing warnings and errors from now on"
 msgstr "Відтепер зберігаються попередження та помилки"
 
-#: ui/src/bridge.rs:743
+#: ui/src/bridge.rs:793
 msgid "Storing errors from now on"
 msgstr "Відтепер зберігаються лише помилки"
 
-#: ui/src/bridge.rs:759
+#: ui/src/bridge.rs:809
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] "вилучено {n} файл журналу, старіший за {days} днів"
 msgstr[1] "вилучено {n} файли журналу, старіші за {days} днів"
 msgstr[2] "вилучено {n} файлів журналу, старіших за {days} днів"
 
-#: ui/src/bridge.rs:760
+#: ui/src/bridge.rs:810
 msgid "Cannot prune the log: {reason}"
 msgstr "Не вдалося очистити журнал: {reason}"
 
@@ -487,8 +510,7 @@ msgstr "Змінити…"
 msgid "Ignored paths:"
 msgstr "Виключені шляхи:"
 
-#. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves
-#. alone
+#. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves alone
 #: ui/qml/main.qml:520
 msgid "Ignore file…"
 msgstr "Файл виключень…"
@@ -612,8 +634,7 @@ msgstr "Зберігати журнал:"
 msgid "days"
 msgstr "днів"
 
-#. TRANSLATORS: label before a dropdown choosing which log levels are written
-#. to disk
+#. TRANSLATORS: label before a dropdown choosing which log levels are written to disk
 #: ui/qml/main.qml:719
 msgid "Store:"
 msgstr "Зберігати:"
@@ -679,22 +700,44 @@ msgid "Version:"
 msgstr "Версія:"
 
 #: ui/qml/main.qml:875
+msgid "Update:"
+msgstr ""
+
+#: ui/qml/main.qml:884
+#, fuzzy
+msgid "Updating…"
+msgstr "Запуск…"
+
+#: ui/qml/main.qml:884
+msgid "Update"
+msgstr ""
+
+#: ui/qml/main.qml:891
+#, fuzzy
+msgid "Download page"
+msgstr "Завантаження:"
+
+#: ui/qml/main.qml:898
+msgid "Check for updates once a day"
+msgstr ""
+
+#: ui/qml/main.qml:904
 msgid "Licence:"
 msgstr "Ліцензія:"
 
-#: ui/qml/main.qml:879
+#: ui/qml/main.qml:908
 msgid "Read the licence"
 msgstr "Прочитати ліцензію"
 
-#: ui/qml/main.qml:886
+#: ui/qml/main.qml:915
 msgid "Project:"
 msgstr "Проєкт:"
 
-#: ui/qml/main.qml:889
+#: ui/qml/main.qml:918
 msgid "Source code"
 msgstr "Початковий код"
 
-#: ui/qml/main.qml:894
+#: ui/qml/main.qml:923
 msgid "Report a bug"
 msgstr "Повідомити про ваду"
 

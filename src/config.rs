@@ -123,6 +123,9 @@ pub struct Config {
     /// so a sync does not drain what is left.
     #[serde(default = "default_power_pause")]
     pub pause_on_power: Vec<Power>,
+    /// Look for a newer release once a day, and offer to install it.
+    #[serde(default = "default_true")]
+    pub check_updates: bool,
     /// Every account, in the order they were added. The first is the default.
     #[serde(default)]
     pub accounts: Vec<AccountConfig>,
@@ -153,6 +156,10 @@ fn default_retention() -> u64 {
     30
 }
 
+fn default_true() -> bool {
+    true
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -161,6 +168,7 @@ impl Default for Config {
             sync_paused: false,
             pause_on_networks: Vec::new(),
             pause_on_power: default_power_pause(),
+            check_updates: true,
             accounts: Vec::new(),
             legacy: Legacy::default(),
         }

@@ -45,6 +45,8 @@ Recommends:     kf6-kwallet
 Recommends:     wl-clipboard
 # Prompts during `kpdrive login` when run from a terminal.
 Recommends:     kdialog
+# pkexec asks for the password when the daemon installs an update.
+Recommends:     polkit
 
 %description
 kpdrive keeps a local folder in step with Proton Drive, in both directions and

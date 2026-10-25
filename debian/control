@@ -22,7 +22,7 @@ Rules-Requires-Root: no
 Package: kpdrive
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Recommends: kwalletmanager | gnome-keyring, kdialog, wl-clipboard
+Recommends: kwalletmanager | gnome-keyring, kdialog, wl-clipboard, pkexec
 Description: Proton Drive sync client for KDE Plasma
  kpdrive keeps a local folder in step with Proton Drive, in both directions
  and end to end encrypted. It runs as a daemon with a Plasma tray icon,

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-25 20:29+0200\n"
+"POT-Creation-Date: 2026-10-25 18:02+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,129 +18,153 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
-#: src/daemon.rs:67 src/daemon.rs:174
+#: src/daemon.rs:72 src/daemon.rs:193
 msgid "Signed out. Sign in from the account window."
 msgstr ""
 
-#: src/daemon.rs:69 src/daemon.rs:535
+#: src/daemon.rs:74 src/daemon.rs:608
 msgid "Syncing…"
 msgstr ""
 
-#: src/daemon.rs:71 src/daemon.rs:538
+#: src/daemon.rs:76 src/daemon.rs:611
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:199 src/daemon.rs:201 ui/qml/main.qml:469
+#: src/daemon.rs:224 src/daemon.rs:226 ui/qml/main.qml:469
 msgid "Open folder"
 msgstr ""
 
-#: src/daemon.rs:211
+#: src/daemon.rs:236
 msgid "Account and logs…"
 msgstr ""
 
-#: src/daemon.rs:218 ui/qml/main.qml:456
+#: src/daemon.rs:243 ui/qml/main.qml:456
 msgid "Sync now"
 msgstr ""
 
-#: src/daemon.rs:230
+#: src/daemon.rs:255
 msgid "Pause sync"
 msgstr ""
 
-#: src/daemon.rs:243
+#: src/daemon.rs:271
+msgid "Updating to {version}…"
+msgstr ""
+
+#: src/daemon.rs:273
+msgid "Update to {version}…"
+msgstr ""
+
+#: src/daemon.rs:280
+msgid "Download {version}…"
+msgstr ""
+
+#: src/daemon.rs:293
 msgid "Quit"
 msgstr ""
 
 #. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no route"
-#: src/daemon.rs:430
+#: src/daemon.rs:489
 msgid "{reason}; retrying"
 msgstr ""
 
-#: src/daemon.rs:441
+#: src/daemon.rs:500
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr ""
 
-#: src/daemon.rs:452
+#: src/daemon.rs:511
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:453
+#: src/daemon.rs:512
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:454
+#: src/daemon.rs:513
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:502
+#: src/daemon.rs:575
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
 msgstr ""
 
-#: src/daemon.rs:505
+#: src/daemon.rs:578
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
 msgstr ""
 
-#: src/daemon.rs:516 src/daemon.rs:525
+#: src/daemon.rs:589 src/daemon.rs:598
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr ""
 
-#: src/daemon.rs:529
+#: src/daemon.rs:602
 msgid "{reason}. Still trying."
 msgstr ""
 
-#: src/daemon.rs:530
+#: src/daemon.rs:603
 msgid "Last sync failed: {reason}"
 msgstr ""
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:544
+#: src/daemon.rs:617
 msgid "just now"
 msgstr ""
 
-#: src/daemon.rs:546
+#: src/daemon.rs:619
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:549
+#: src/daemon.rs:622
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] ""
 msgstr[1] ""
 
 #. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes ago"
-#: src/daemon.rs:553
+#: src/daemon.rs:626
 msgid "{items}, checked {ago}"
 msgstr ""
 
-#: src/daemon.rs:924
+#: src/daemon.rs:922 ui/qml/main.qml:879
+msgid "kpdrive {version} is available"
+msgstr ""
+
+#: src/daemon.rs:972
+msgid "Updated to kpdrive {version}"
+msgstr ""
+
+#: src/daemon.rs:979
+msgid "Could not update kpdrive: {reason}"
+msgstr ""
+
+#: src/daemon.rs:1133
 msgid "Signed in again. Syncing resumed."
 msgstr ""
 
-#: src/daemon.rs:938
+#: src/daemon.rs:1148
 msgid "Signed out. Sign in from the account window to resume syncing."
 msgstr ""
 
-#: src/daemon.rs:1050
+#: src/daemon.rs:1260
 msgid "Sync resumed"
 msgstr ""
 
-#: src/daemon.rs:1067
+#: src/daemon.rs:1277
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/daemon.rs:1086
+#: src/daemon.rs:1296
 msgid "{n} photo uploaded to Proton Photos"
 msgid_plural "{n} photos uploaded to Proton Photos"
 msgstr[0] ""
@@ -176,15 +200,15 @@ msgstr ""
 msgid "Paused while connected to {network}"
 msgstr ""
 
-#: src/sync.rs:124
+#: src/sync.rs:195
 msgid "Sync into it and keep what is already there"
 msgstr ""
 
-#: src/sync.rs:125
+#: src/sync.rs:196
 msgid "Move it aside and start from an empty folder"
 msgstr ""
 
-#: src/sync.rs:163
+#: src/sync.rs:234
 msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
@@ -192,111 +216,111 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: ui/src/bridge.rs:260
+#: ui/src/bridge.rs:283
 msgid "Starting…"
 msgstr ""
 
-#: ui/src/bridge.rs:317
+#: ui/src/bridge.rs:345
 msgid "Confirm the code {code} in your browser"
 msgstr ""
 
-#: ui/src/bridge.rs:331
+#: ui/src/bridge.rs:359
 msgid "Sign-in failed: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:344
+#: ui/src/bridge.rs:372
 msgid "Signed out"
 msgstr ""
 
-#: ui/src/bridge.rs:347
+#: ui/src/bridge.rs:375
 msgid "Sign-out failed: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:355
+#: ui/src/bridge.rs:383
 msgid "Removed {account}. Its files were left where they are."
 msgstr ""
 
-#: ui/src/bridge.rs:362
+#: ui/src/bridge.rs:390
 msgid "Cannot remove the account: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:481
+#: ui/src/bridge.rs:510
 msgid "Cannot change the folder: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:488
+#: ui/src/bridge.rs:517
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr ""
 
-#: ui/src/bridge.rs:492
+#: ui/src/bridge.rs:521
 msgid "Cannot create the ignore file: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:537
-msgid "Checking the account…"
-msgstr ""
-
-#: ui/src/bridge.rs:543
-msgid "Opening the browser…"
-msgstr ""
-
-#: ui/src/bridge.rs:550
-msgid "Signing out…"
-msgstr ""
-
-#: ui/src/bridge.rs:557
-msgid "Removing the account…"
-msgstr ""
-
-#: ui/src/bridge.rs:583
-msgid "Cannot read the log: {reason}"
-msgstr ""
-
-#: ui/src/bridge.rs:591 ui/src/bridge.rs:618 ui/src/bridge.rs:632
-#: ui/src/bridge.rs:647 ui/src/bridge.rs:681 ui/src/bridge.rs:723
-#: ui/src/bridge.rs:736 ui/src/bridge.rs:754
+#: ui/src/bridge.rs:570 ui/src/bridge.rs:641 ui/src/bridge.rs:668
+#: ui/src/bridge.rs:682 ui/src/bridge.rs:697 ui/src/bridge.rs:731
+#: ui/src/bridge.rs:773 ui/src/bridge.rs:786 ui/src/bridge.rs:804
 msgid "Cannot save the setting: {reason}"
 msgstr ""
 
-#: ui/src/bridge.rs:599
-msgid "Proton Photos will be downloaded with the next sync"
+#: ui/src/bridge.rs:587
+msgid "Checking the account…"
+msgstr ""
+
+#: ui/src/bridge.rs:593
+msgid "Opening the browser…"
 msgstr ""
 
 #: ui/src/bridge.rs:600
+msgid "Signing out…"
+msgstr ""
+
+#: ui/src/bridge.rs:607
+msgid "Removing the account…"
+msgstr ""
+
+#: ui/src/bridge.rs:633
+msgid "Cannot read the log: {reason}"
+msgstr ""
+
+#: ui/src/bridge.rs:649
+msgid "Proton Photos will be downloaded with the next sync"
+msgstr ""
+
+#: ui/src/bridge.rs:650
 msgid "Proton Photos will be left alone"
 msgstr ""
 
-#: ui/src/bridge.rs:624
+#: ui/src/bridge.rs:674
 msgid "Photos put in that folder will be uploaded to Proton Photos"
 msgstr ""
 
-#: ui/src/bridge.rs:625
+#: ui/src/bridge.rs:675
 msgid "No longer uploading photos"
 msgstr ""
 
-#: ui/src/bridge.rs:717
+#: ui/src/bridge.rs:767
 msgid "Photos will be downloaded into that folder from the next pass"
 msgstr ""
 
-#: ui/src/bridge.rs:741
+#: ui/src/bridge.rs:791
 msgid "Storing everything from now on"
 msgstr ""
 
-#: ui/src/bridge.rs:742
+#: ui/src/bridge.rs:792
 msgid "Storing warnings and errors from now on"
 msgstr ""
 
-#: ui/src/bridge.rs:743
+#: ui/src/bridge.rs:793
 msgid "Storing errors from now on"
 msgstr ""
 
-#: ui/src/bridge.rs:759
+#: ui/src/bridge.rs:809
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] ""
 msgstr[1] ""
 
-#: ui/src/bridge.rs:760
+#: ui/src/bridge.rs:810
 msgid "Cannot prune the log: {reason}"
 msgstr ""
 
@@ -635,21 +659,41 @@ msgid "Version:"
 msgstr ""
 
 #: ui/qml/main.qml:875
+msgid "Update:"
+msgstr ""
+
+#: ui/qml/main.qml:884
+msgid "Updating…"
+msgstr ""
+
+#: ui/qml/main.qml:884
+msgid "Update"
+msgstr ""
+
+#: ui/qml/main.qml:891
+msgid "Download page"
+msgstr ""
+
+#: ui/qml/main.qml:898
+msgid "Check for updates once a day"
+msgstr ""
+
+#: ui/qml/main.qml:904
 msgid "Licence:"
 msgstr ""
 
-#: ui/qml/main.qml:879
+#: ui/qml/main.qml:908
 msgid "Read the licence"
 msgstr ""
 
-#: ui/qml/main.qml:886
+#: ui/qml/main.qml:915
 msgid "Project:"
 msgstr ""
 
-#: ui/qml/main.qml:889
+#: ui/qml/main.qml:918
 msgid "Source code"
 msgstr ""
 
-#: ui/qml/main.qml:894
+#: ui/qml/main.qml:923
 msgid "Report a bug"
 msgstr ""

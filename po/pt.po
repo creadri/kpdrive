@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kpdrive 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-25 20:29+0200\n"
+"POT-Creation-Date: 2026-10-25 18:02+0100\n"
 "PO-Revision-Date: 2026-09-25 20:32+0200\n"
 "Last-Translator: machine translation, needs review by a speaker\n"
 "Language-Team: pt\n"
@@ -19,137 +19,160 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: src/daemon.rs:67 src/daemon.rs:174
+#: src/daemon.rs:72 src/daemon.rs:193
 msgid "Signed out. Sign in from the account window."
 msgstr "Sessão terminada. Inicie sessão a partir da janela da conta."
 
-#: src/daemon.rs:69 src/daemon.rs:535
+#: src/daemon.rs:74 src/daemon.rs:608
 msgid "Syncing…"
 msgstr "A sincronizar…"
 
-#: src/daemon.rs:71 src/daemon.rs:538
+#: src/daemon.rs:76 src/daemon.rs:611
 msgid "{n} item in sync"
 msgid_plural "{n} items in sync"
 msgstr[0] "{n} item sincronizado"
 msgstr[1] "{n} itens sincronizados"
 
-#: src/daemon.rs:199 src/daemon.rs:201 ui/qml/main.qml:469
+#: src/daemon.rs:224 src/daemon.rs:226 ui/qml/main.qml:469
 msgid "Open folder"
 msgstr "Abrir pasta"
 
-#: src/daemon.rs:211
+#: src/daemon.rs:236
 msgid "Account and logs…"
 msgstr "Conta e registos…"
 
-#: src/daemon.rs:218 ui/qml/main.qml:456
+#: src/daemon.rs:243 ui/qml/main.qml:456
 msgid "Sync now"
 msgstr "Sincronizar agora"
 
-#: src/daemon.rs:230
+#: src/daemon.rs:255
 msgid "Pause sync"
 msgstr "Pausar sincronização"
 
-#: src/daemon.rs:243
+#: src/daemon.rs:271
+msgid "Updating to {version}…"
+msgstr ""
+
+#: src/daemon.rs:273
+msgid "Update to {version}…"
+msgstr ""
+
+#: src/daemon.rs:280
+msgid "Download {version}…"
+msgstr ""
+
+#: src/daemon.rs:293
 msgid "Quit"
 msgstr "Sair"
 
-#. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no
-#. route"
-#: src/daemon.rs:430
+#. TRANSLATORS: {reason} is a sentence, e.g. "cannot reach Proton Drive: no route"
+#: src/daemon.rs:489
 msgid "{reason}; retrying"
 msgstr "{reason}; a tentar novamente"
 
-#: src/daemon.rs:441
+#: src/daemon.rs:500
 msgid "Proton Drive is reachable again, after {duration}"
 msgstr "O Proton Drive está novamente acessível, após {duration}"
 
-#: src/daemon.rs:452
+#: src/daemon.rs:511
 msgid "{n} second"
 msgid_plural "{n} seconds"
 msgstr[0] "{n} segundo"
 msgstr[1] "{n} segundos"
 
-#: src/daemon.rs:453
+#: src/daemon.rs:512
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "{n} minuto"
 msgstr[1] "{n} minutos"
 
-#: src/daemon.rs:454
+#: src/daemon.rs:513
 msgid "{n} hour"
 msgid_plural "{n} hours"
 msgstr[0] "{n} hora"
 msgstr[1] "{n} horas"
 
-#: src/daemon.rs:502
+#: src/daemon.rs:575
 msgid "The sync daemon is not running. Start it with: kpdrive sync --watch"
 msgstr ""
 "O serviço de sincronização não está em execução. Inicie-o com: kpdrive sync "
 "--watch"
 
-#: src/daemon.rs:505
+#: src/daemon.rs:578
 msgid ""
 "A sync daemon is running but is too old to say what it is doing. Restart it."
 msgstr ""
 "Está em execução um serviço de sincronização demasiado antigo para indicar o "
 "que está a fazer. Reinicie-o."
 
-#: src/daemon.rs:516 src/daemon.rs:525
+#: src/daemon.rs:589 src/daemon.rs:598
 msgid "Signed out. Syncing resumes once you sign in."
 msgstr "Sessão terminada. A sincronização é retomada assim que iniciar sessão."
 
-#: src/daemon.rs:529
+#: src/daemon.rs:602
 msgid "{reason}. Still trying."
 msgstr "{reason}. A continuar a tentar."
 
-#: src/daemon.rs:530
+#: src/daemon.rs:603
 msgid "Last sync failed: {reason}"
 msgstr "A última sincronização falhou: {reason}"
 
 #. TRANSLATORS: how long ago the last sync ran; fills {ago} below
-#: src/daemon.rs:544
+#: src/daemon.rs:617
 msgid "just now"
 msgstr "agora mesmo"
 
-#: src/daemon.rs:546
+#: src/daemon.rs:619
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "há {n} minuto"
 msgstr[1] "há {n} minutos"
 
-#: src/daemon.rs:549
+#: src/daemon.rs:622
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "há {n} hora"
 msgstr[1] "há {n} horas"
 
-#. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes
-#. ago"
-#: src/daemon.rs:553
+#. TRANSLATORS: {items} is "5 items in sync", {ago} is "just now" or "3 minutes ago"
+#: src/daemon.rs:626
 msgid "{items}, checked {ago}"
 msgstr "{items}, última verificação {ago}"
 
-#: src/daemon.rs:924
+#: src/daemon.rs:922 ui/qml/main.qml:879
+msgid "kpdrive {version} is available"
+msgstr ""
+
+#: src/daemon.rs:972
+msgid "Updated to kpdrive {version}"
+msgstr ""
+
+#: src/daemon.rs:979
+#, fuzzy
+msgid "Could not update kpdrive: {reason}"
+msgstr "Não é possível alterar a pasta: {reason}"
+
+#: src/daemon.rs:1133
 msgid "Signed in again. Syncing resumed."
 msgstr "Sessão iniciada novamente. Sincronização retomada."
 
-#: src/daemon.rs:938
+#: src/daemon.rs:1148
 msgid "Signed out. Sign in from the account window to resume syncing."
 msgstr ""
 "Sessão terminada. Inicie sessão a partir da janela da conta para retomar a "
 "sincronização."
 
-#: src/daemon.rs:1050
+#: src/daemon.rs:1260
 msgid "Sync resumed"
 msgstr "Sincronização retomada"
 
-#: src/daemon.rs:1067
+#: src/daemon.rs:1277
 msgid "{n} photo downloaded"
 msgid_plural "{n} photos downloaded"
 msgstr[0] "{n} fotografia transferida"
 msgstr[1] "{n} fotografias transferidas"
 
-#: src/daemon.rs:1086
+#: src/daemon.rs:1296
 msgid "{n} photo uploaded to Proton Photos"
 msgid_plural "{n} photos uploaded to Proton Photos"
 msgstr[0] "{n} fotografia enviada para o Proton Photos"
@@ -185,15 +208,15 @@ msgstr "Em pausa enquanto a bateria está fraca"
 msgid "Paused while connected to {network}"
 msgstr "Em pausa enquanto ligado a {network}"
 
-#: src/sync.rs:124
+#: src/sync.rs:195
 msgid "Sync into it and keep what is already there"
 msgstr "Sincronizar para esta pasta e manter o que já lá está"
 
-#: src/sync.rs:125
+#: src/sync.rs:196
 msgid "Move it aside and start from an empty folder"
 msgstr "Mover a pasta para o lado e começar com uma pasta vazia"
 
-#: src/sync.rs:163
+#: src/sync.rs:234
 msgid ""
 "{folder} already holds {n} item, which syncing will merge with Proton Drive."
 msgid_plural ""
@@ -203,114 +226,114 @@ msgstr[0] ""
 msgstr[1] ""
 "{folder} já contém {n} itens, que a sincronização irá juntar ao Proton Drive."
 
-#: ui/src/bridge.rs:260
+#: ui/src/bridge.rs:283
 msgid "Starting…"
 msgstr "A iniciar…"
 
-#: ui/src/bridge.rs:317
+#: ui/src/bridge.rs:345
 msgid "Confirm the code {code} in your browser"
 msgstr "Confirme o código {code} no navegador"
 
-#: ui/src/bridge.rs:331
+#: ui/src/bridge.rs:359
 msgid "Sign-in failed: {reason}"
 msgstr "Falha ao iniciar sessão: {reason}"
 
-#: ui/src/bridge.rs:344
+#: ui/src/bridge.rs:372
 msgid "Signed out"
 msgstr "Sessão terminada"
 
-#: ui/src/bridge.rs:347
+#: ui/src/bridge.rs:375
 msgid "Sign-out failed: {reason}"
 msgstr "Falha ao terminar sessão: {reason}"
 
-#: ui/src/bridge.rs:355
+#: ui/src/bridge.rs:383
 msgid "Removed {account}. Its files were left where they are."
 msgstr "A conta {account} foi removida. Os seus ficheiros ficaram onde estão."
 
-#: ui/src/bridge.rs:362
+#: ui/src/bridge.rs:390
 msgid "Cannot remove the account: {reason}"
 msgstr "Não é possível remover a conta: {reason}"
 
-#: ui/src/bridge.rs:481
+#: ui/src/bridge.rs:510
 msgid "Cannot change the folder: {reason}"
 msgstr "Não é possível alterar a pasta: {reason}"
 
-#: ui/src/bridge.rs:488
+#: ui/src/bridge.rs:517
 msgid "No sync folder yet. Run: kpdrive setup"
 msgstr "Ainda não existe uma pasta de sincronização. Execute: kpdrive setup"
 
-#: ui/src/bridge.rs:492
+#: ui/src/bridge.rs:521
 msgid "Cannot create the ignore file: {reason}"
 msgstr "Não é possível criar o ficheiro de exclusões: {reason}"
 
-#: ui/src/bridge.rs:537
-msgid "Checking the account…"
-msgstr "A verificar a conta…"
-
-#: ui/src/bridge.rs:543
-msgid "Opening the browser…"
-msgstr "A abrir o navegador…"
-
-#: ui/src/bridge.rs:550
-msgid "Signing out…"
-msgstr "A terminar sessão…"
-
-#: ui/src/bridge.rs:557
-msgid "Removing the account…"
-msgstr "A remover a conta…"
-
-#: ui/src/bridge.rs:583
-msgid "Cannot read the log: {reason}"
-msgstr "Não é possível ler o registo: {reason}"
-
-#: ui/src/bridge.rs:591 ui/src/bridge.rs:618 ui/src/bridge.rs:632
-#: ui/src/bridge.rs:647 ui/src/bridge.rs:681 ui/src/bridge.rs:723
-#: ui/src/bridge.rs:736 ui/src/bridge.rs:754
+#: ui/src/bridge.rs:570 ui/src/bridge.rs:641 ui/src/bridge.rs:668
+#: ui/src/bridge.rs:682 ui/src/bridge.rs:697 ui/src/bridge.rs:731
+#: ui/src/bridge.rs:773 ui/src/bridge.rs:786 ui/src/bridge.rs:804
 msgid "Cannot save the setting: {reason}"
 msgstr "Não é possível guardar a definição: {reason}"
 
-#: ui/src/bridge.rs:599
+#: ui/src/bridge.rs:587
+msgid "Checking the account…"
+msgstr "A verificar a conta…"
+
+#: ui/src/bridge.rs:593
+msgid "Opening the browser…"
+msgstr "A abrir o navegador…"
+
+#: ui/src/bridge.rs:600
+msgid "Signing out…"
+msgstr "A terminar sessão…"
+
+#: ui/src/bridge.rs:607
+msgid "Removing the account…"
+msgstr "A remover a conta…"
+
+#: ui/src/bridge.rs:633
+msgid "Cannot read the log: {reason}"
+msgstr "Não é possível ler o registo: {reason}"
+
+#: ui/src/bridge.rs:649
 msgid "Proton Photos will be downloaded with the next sync"
 msgstr "O Proton Photos será transferido na próxima sincronização"
 
-#: ui/src/bridge.rs:600
+#: ui/src/bridge.rs:650
 msgid "Proton Photos will be left alone"
 msgstr "O Proton Photos não será transferido"
 
-#: ui/src/bridge.rs:624
+#: ui/src/bridge.rs:674
 msgid "Photos put in that folder will be uploaded to Proton Photos"
 msgstr ""
 "As fotografias colocadas nessa pasta serão enviadas para o Proton Photos"
 
-#: ui/src/bridge.rs:625
+#: ui/src/bridge.rs:675
 msgid "No longer uploading photos"
 msgstr "As fotografias já não são enviadas"
 
-#: ui/src/bridge.rs:717
+#: ui/src/bridge.rs:767
 msgid "Photos will be downloaded into that folder from the next pass"
 msgstr ""
 "A partir da próxima passagem, as fotografias serão transferidas para essa "
 "pasta"
 
-#: ui/src/bridge.rs:741
+#: ui/src/bridge.rs:791
 msgid "Storing everything from now on"
 msgstr "A partir de agora será registado tudo"
 
-#: ui/src/bridge.rs:742
+#: ui/src/bridge.rs:792
 msgid "Storing warnings and errors from now on"
 msgstr "A partir de agora serão registados avisos e erros"
 
-#: ui/src/bridge.rs:743
+#: ui/src/bridge.rs:793
 msgid "Storing errors from now on"
 msgstr "A partir de agora serão registados apenas erros"
 
-#: ui/src/bridge.rs:759
+#: ui/src/bridge.rs:809
 msgid "removed {n} log file older than {days} days"
 msgid_plural "removed {n} log files older than {days} days"
 msgstr[0] "removido {n} ficheiro de registo com mais de {days} dias"
 msgstr[1] "removidos {n} ficheiros de registo com mais de {days} dias"
 
-#: ui/src/bridge.rs:760
+#: ui/src/bridge.rs:810
 msgid "Cannot prune the log: {reason}"
 msgstr "Não é possível limpar o registo: {reason}"
 
@@ -474,8 +497,7 @@ msgstr "Alterar…"
 msgid "Ignored paths:"
 msgstr "Caminhos excluídos:"
 
-#. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves
-#. alone
+#. TRANSLATORS: button that opens .protonignore, the list of paths sync leaves alone
 #: ui/qml/main.qml:520
 msgid "Ignore file…"
 msgstr "Ficheiro de exclusões…"
@@ -599,8 +621,7 @@ msgstr "Manter registos durante:"
 msgid "days"
 msgstr "dias"
 
-#. TRANSLATORS: label before a dropdown choosing which log levels are written
-#. to disk
+#. TRANSLATORS: label before a dropdown choosing which log levels are written to disk
 #: ui/qml/main.qml:719
 msgid "Store:"
 msgstr "Registar:"
@@ -666,22 +687,44 @@ msgid "Version:"
 msgstr "Versão:"
 
 #: ui/qml/main.qml:875
+msgid "Update:"
+msgstr ""
+
+#: ui/qml/main.qml:884
+#, fuzzy
+msgid "Updating…"
+msgstr "A iniciar…"
+
+#: ui/qml/main.qml:884
+msgid "Update"
+msgstr ""
+
+#: ui/qml/main.qml:891
+#, fuzzy
+msgid "Download page"
+msgstr "Transferência:"
+
+#: ui/qml/main.qml:898
+msgid "Check for updates once a day"
+msgstr ""
+
+#: ui/qml/main.qml:904
 msgid "Licence:"
 msgstr "Licença:"
 
-#: ui/qml/main.qml:879
+#: ui/qml/main.qml:908
 msgid "Read the licence"
 msgstr "Ler a licença"
 
-#: ui/qml/main.qml:886
+#: ui/qml/main.qml:915
 msgid "Project:"
 msgstr "Projeto:"
 
-#: ui/qml/main.qml:889
+#: ui/qml/main.qml:918
 msgid "Source code"
 msgstr "Código-fonte"
 
-#: ui/qml/main.qml:894
+#: ui/qml/main.qml:923
 msgid "Report a bug"
 msgstr "Comunicar um erro"
 

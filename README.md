@@ -17,6 +17,7 @@ Simple KDE Proton Drive sync Client designed to have a simple solution.
   `.gitignore` files inside the sync folder are honoured too.
 - **Localization** support
 - **Conditional Sync Pause** currently based either on power management or network
+- **Updates**: the daemon looks for a new release once a day and installs it from the Fedora or Debian packages on click
 - **Multiple accounts**, each with its own folder, photos and ingestion settings, run by one daemon under one tray icon
 
 ## Design decisions
@@ -93,6 +94,7 @@ kpdrive setup [--root DIR]    # local folder, ignore file, Places entry, autosta
 kpdrive sync [--root DIR] [--watch] [--force]   # two-way Drive <-> local; --watch = daemon with tray
 kpdrive logs [--search TERM] [--lines N] [--retention DAYS]
 kpdrive logout [--remove]     # sign out; --remove also forgets the account (its files stay)
+kpdrive update [--check]      # install the latest release's packages, then restart the daemon
 ```
 
 With more than one account, pick one with `--account NAME` (`-a`, the start of
@@ -114,6 +116,7 @@ Missing keys take the default, so the file only needs what you change.
 - *log_retention_days* : Days of logs, `30` by default
 - *sync_paused* : boolean, true while paused by hand (`kpdrive pause`, the tray or the window): no file sync, photo download or ingestion. `false` by default
 - *pause_on_networks* : NetworkManager connection names, as the network applet shows them, that pause syncing while connected, such as a phone's hotspot. Checked at least every thirty seconds; a sync already under way finishes first. Empty by default
+- *check_updates* : boolean, true if the daemon asks GitHub once a day for a newer release. `true` by default
 - *pause_on_power* : power sources that pause syncing while in use, any of `"ac"`, `"battery"` and `"low_battery"`, as Plasma's power management tells them apart (low means the level set in System Settings; without PowerDevil, the kernel's battery level against 20%). `"battery"` covers a low battery too. `["low_battery"]` by default
 
 - *accounts* : one entry per account, in the order they were added; the window and `kpdrive login` add them. Each has:
@@ -232,6 +235,22 @@ apt it is a file and not a package name.
 > Don't forget to reload Dolphin to see icon overlay.
 > Check Autostart to add kpdrive.
 
+### Updates
+
+Once a day the daemon asks GitHub for the latest release. A newer one gets one
+notification, an entry in the tray menu and a line on the window's About page.
+On Fedora and Debian, when kpdrive came from the release packages, **Update to
+x.y.z…** downloads the packages you have installed (`kpdrive`, and
+`kpdrive-ui` and `kpdrive-dolphin` if present), checks each against the
+release's `SHA256SUMS`, and installs them with `pkexec dnf` or `pkexec
+apt-get` behind a password prompt. The daemon then restarts into the new
+version. An open window keeps the old one until reopened, and Dolphin loads the
+new overlay plugin the next time it starts.
+
+Anywhere else (a source build, another distribution or Fedora release) the
+entry opens the release page instead. `kpdrive update` does the same from a
+terminal, and `check_updates: false` turns the check off.
+
 ### Uninstall
 
 ### RPM
@@ -266,6 +285,9 @@ A tag containing a hyphen (`v0.x.0-rc1`) is published as a pre-release, and
 | --- | --- | --- |
 | Fedora, current and previous release | `fedora:44`, `fedora:43` | `kpdrive`, `kpdrive-ui`, `kpdrive-dolphin` (plus the source RPM) |
 | Debian stable | `debian:trixie` | the same three as `.deb` |
+
+The release also carries `SHA256SUMS`, which the updater refuses to install
+without.
 
 Bump the Fedora numbers in both workflows when Fedora moves on; every filename
 carries its dist tag, so which is which is never in doubt. The Debian build

@@ -872,6 +872,35 @@ Kirigami.ApplicationWindow {
                                 }
 
                                 RowLayout {
+                                    Kirigami.FormData.label: backend.i18n("Update:")
+                                    visible: backend.updateVersion.length > 0
+
+                                    Controls.Label {
+                                        text: backend.i18n("kpdrive {version} is available").replace("{version}", backend.updateVersion)
+                                    }
+                                    Controls.Button {
+                                        visible: backend.updateInstallable
+                                        enabled: !backend.updating
+                                        text: backend.updating ? backend.i18n("Updating…") : backend.i18n("Update")
+                                        icon.name: "system-software-update"
+                                        onClicked: backend.installUpdate()
+                                    }
+                                    // No package for this system: install it by hand.
+                                    Controls.Button {
+                                        visible: !backend.updateInstallable
+                                        text: backend.i18n("Download page")
+                                        icon.name: "internet-services"
+                                        onClicked: root.open(backend.updatePage, "the release page")
+                                    }
+                                }
+
+                                Controls.CheckBox {
+                                    text: backend.i18n("Check for updates once a day")
+                                    checked: backend.checkUpdates
+                                    onToggled: backend.changeCheckUpdates(checked)
+                                }
+
+                                RowLayout {
                                     Kirigami.FormData.label: backend.i18n("Licence:")
 
                                     Controls.Label { text: backend.license }

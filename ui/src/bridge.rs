@@ -56,6 +56,14 @@ pub mod qobject {
         #[qproperty(QString, ignore_file, cxx_name = "ignoreFile")]
         #[qproperty(QString, version)]
         #[qproperty(QString, license)]
+        /// A newer release the daemon has seen, empty when there is none.
+        #[qproperty(QString, update_version, cxx_name = "updateVersion")]
+        #[qproperty(QString, update_page, cxx_name = "updatePage")]
+        /// There are packages of it for this system.
+        #[qproperty(bool, update_installable, cxx_name = "updateInstallable")]
+        /// The daemon is installing it now.
+        #[qproperty(bool, updating)]
+        #[qproperty(bool, check_updates, cxx_name = "checkUpdates")]
         type Backend = super::BackendRust;
 
         /// Asks the window to open a URL. Routed through QML so Qt can obtain
@@ -101,6 +109,16 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "changeIngestPermRm"]
         fn change_ingest_perm_rm(self: Pin<&mut Self>, on: bool);
+
+        /// Have the daemon install the newer release.
+        #[qinvokable]
+        #[cxx_name = "installUpdate"]
+        fn install_update(self: Pin<&mut Self>);
+
+        /// Look for newer releases, or stop looking.
+        #[qinvokable]
+        #[cxx_name = "changeCheckUpdates"]
+        fn change_check_updates(self: Pin<&mut Self>, on: bool);
 
         /// Pause or resume syncing by hand.
         #[qinvokable]
@@ -244,6 +262,11 @@ pub struct BackendRust {
     ignore_file: QString,
     version: QString,
     license: QString,
+    update_version: QString,
+    update_page: QString,
+    update_installable: bool,
+    updating: bool,
+    check_updates: bool,
     tasks: Option<Sender<Task>>,
 }
 
@@ -281,6 +304,11 @@ impl Default for BackendRust {
             ignore_file: QString::default(),
             version: QString::from(env!("CARGO_PKG_VERSION")),
             license: QString::from("GNU GPL v3 or later"),
+            update_version: QString::default(),
+            update_page: QString::default(),
+            update_installable: false,
+            updating: false,
+            check_updates: true,
             tasks: None,
         }
     }
@@ -370,6 +398,7 @@ impl cxx_qt::Initialize for qobject::Backend {
         self.as_mut().set_retention_days(config.log_retention_days as i32);
         self.as_mut().set_log_level(QString::from(config.log_level.name()));
         self.as_mut().set_paused_by_hand(config.sync_paused);
+        self.as_mut().set_check_updates(config.check_updates);
         self.as_mut().reload_networks();
         self.as_mut().reload_power();
         self.as_mut().reload_logs("");
@@ -521,6 +550,27 @@ impl qobject::Backend {
         let sentence = report.sentence(Some(&name).filter(|n| !n.is_empty()).map(String::as_str));
         self.as_mut().set_sync_status(QString::from(&sentence));
         self.as_mut().set_sync_paused(report.paused.is_some());
+        let update = report.update.unwrap_or_default();
+        self.as_mut().set_update_version(QString::from(&update.version));
+        self.as_mut().set_update_page(QString::from(&update.page));
+        self.as_mut().set_update_installable(update.installable);
+        self.as_mut().set_updating(update.updating);
+    }
+
+    pub fn install_update(mut self: Pin<&mut Self>) {
+        kpdrive::daemon::install_update();
+        // Shown at once; the daemon's own word follows on the next refresh.
+        self.as_mut().set_updating(true);
+    }
+
+    pub fn change_check_updates(mut self: Pin<&mut Self>, on: bool) {
+        let mut config = kpdrive::config::load();
+        config.check_updates = on;
+        if let Err(e) = kpdrive::config::save(&config) {
+            self.as_mut().set_status(QString::from(&kpdrive::i18n::fill(kpdrive::i18n::t("Cannot save the setting: {reason}"), &[("reason", &format!("{e:#}"))])));
+            return;
+        }
+        self.as_mut().set_check_updates(on);
     }
 
     pub fn sync_now(self: Pin<&mut Self>) {
