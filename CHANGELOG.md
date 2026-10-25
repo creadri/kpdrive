@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 - 2026-10-25
+
+- Adding .gitignore files to be treated like .protonignore
+- Adding Update notification and install aid
+
 ## 0.6.0 - 2026-09-25
 
 - Multi-account support
