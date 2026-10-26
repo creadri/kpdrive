@@ -1,3 +1,17 @@
+kpdrive (0.6.2) unstable; urgency=medium
+
+  * added nested .protonignore and .gitignore
+  * updating forgotten version edition
+
+ -- Adrien Nelis <github.com.daybed777@passmail.net>  Mon, 26 Oct 2026 13:00:00 +0100
+
+kpdrive (0.6.1) unstable; urgency=medium
+
+  * Adding .gitignore files to be treated like .protonignore
+  * Adding Update notification and install aid
+
+ -- Adrien Nelis <github.com.daybed777@passmail.net>  Sun, 25 Oct 2026 13:00:00 +0100
+
 kpdrive (0.6.0) unstable; urgency=medium
 
   * Multi-account support

@@ -126,6 +126,14 @@ cargo test --release --workspace --offline --locked
 %{_datadir}/kio/servicemenus/kpdrive-share.desktop
 
 %changelog
+* Mon Oct 26 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.6.2-1
+- added nested .protonignore and .gitignore
+- updating forgotten version edition
+
+* Sun Oct 25 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.6.1-1
+- Adding .gitignore files to be treated like .protonignore
+- Adding Update notification and install aid
+
 * Fri Sep 25 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.6.0-1
 - Multi-account support
 

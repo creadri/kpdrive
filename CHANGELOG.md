@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2 - 2026-10-26
+
+- added nested .protonignore and .gitignore
+- updating forgotten version edition
+
 ## 0.6.1 - 2026-10-25
 
 - Adding .gitignore files to be treated like .protonignore
