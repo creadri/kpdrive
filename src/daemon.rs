@@ -32,6 +32,9 @@ const SWEEP_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
 const UPDATE_EVERY: std::time::Duration = std::time::Duration::from_secs(24 * 3600);
 const UPDATE_RETRY: std::time::Duration = std::time::Duration::from_secs(3600);
 
+/// How long Quit waits for a sync pass under way to finish.
+const QUIT_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// What the tray, the socket and the window see of one account; refreshed
 /// after every pass.
 #[derive(Default)]
@@ -906,8 +909,14 @@ async fn supervise(always_photos: bool) -> Result<()> {
     for r in &loops {
         let _ = r.cmds.send(Cmd::Quit);
     }
-    for r in loops {
-        let _ = r.task.await;
+    // A loop hears Quit only between passes, and a pass over a folder adopted
+    // afresh can take hours. One that ends soon still saves its state; past
+    // that it is dropped with the rest, which loses nothing but its progress:
+    // state is only written once a pass is complete, so the next start
+    // simply does it again.
+    let tasks = futures_util::future::join_all(loops.into_iter().map(|r| r.task));
+    if tokio::time::timeout(QUIT_GRACE, tasks).await.is_err() {
+        crate::log::write("INFO", "a sync pass was still running; it starts over next time");
     }
     crate::log::write("INFO", "daemon stopped");
     let _ = std::fs::remove_file(socket_path());

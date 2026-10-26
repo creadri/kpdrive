@@ -335,6 +335,47 @@ fn adopt_files(config: &config::Config, username: &str, old: &Path, dir: &Path) 
     Ok(settings)
 }
 
+/// An older, single-account kpdrive run after the move still writes its state
+/// in `old`, and the account's copy then falls behind what is on disk. Starting
+/// from that copy makes the next pass compare the whole folder again, so the
+/// newer one is taken, and the account's kept beside it as `.older`.
+///
+/// The state goes to the account whose volume it records, or to the only
+/// account when the account's state names none.
+fn adopt_left_behind(old: &Path, accounts: &[PathBuf]) -> Result<()> {
+    let from = old.join("state.json");
+    let Ok(from_meta) = std::fs::metadata(&from) else { return Ok(()) };
+    let volume = |path: &Path| -> Option<String> {
+        let v: serde_json::Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
+        v["volume_id"].as_str().map(str::to_owned)
+    };
+    let theirs = volume(&from);
+    let target = accounts
+        .iter()
+        .find(|dir| theirs.is_some() && volume(&dir.join("state.json")) == theirs)
+        .or(match accounts {
+            [only] if volume(&only.join("state.json")).is_none() || theirs.is_none() => Some(only),
+            _ => None,
+        });
+    let Some(dir) = target else { return Ok(()) };
+    let to = dir.join("state.json");
+    let newer = match std::fs::metadata(&to) {
+        Ok(to_meta) => from_meta.modified()? > to_meta.modified()?,
+        Err(_) => true,
+    };
+    if !newer {
+        return Ok(());
+    }
+    std::fs::create_dir_all(dir)?;
+    if to.exists() {
+        let aside = dir.join("state.json.older");
+        std::fs::rename(&to, &aside).with_context(|| format!("move {} aside", to.display()))?;
+    }
+    std::fs::rename(&from, &to).with_context(|| format!("move {} to {}", from.display(), to.display()))?;
+    crate::log::write("INFO", &format!("took up the newer sync state an older kpdrive left in {}", from.display()));
+    Ok(())
+}
+
 /// Brings a single-account setup over to the per-account layout, once. Runs
 /// at the start of every kpdrive program; a no-op once there are accounts, or
 /// when there is no old session to move. Each step can be repeated, so an
@@ -342,6 +383,10 @@ fn adopt_files(config: &config::Config, username: &str, old: &Path, dir: &Path) 
 pub async fn migrate() -> Result<()> {
     let mut config = config::load();
     if !config.accounts.is_empty() {
+        let accounts: Vec<PathBuf> = config.accounts.iter().map(|a| Account { username: a.username.clone() }.dir()).collect();
+        if let Err(e) = adopt_left_behind(&config::data_dir(), &accounts) {
+            crate::log::warn(&format!("could not take up the state an older kpdrive left: {e:#}"));
+        }
         return Ok(());
     }
     let keyring = keyring().await?;
@@ -420,6 +465,40 @@ mod tests {
         let again = adopt_files(&config, "alice", &old, &dir).unwrap();
         assert_eq!(again.sync_folder.as_deref(), Some(Path::new("/home/me/Configured")), "the setting beats the old state");
         assert!(std::fs::read_to_string(dir.join("state.json")).unwrap().contains("/home/me/Drive"), "the moved state is kept");
+        std::fs::remove_dir_all(&old).unwrap();
+    }
+
+    #[test]
+    fn newer_state_left_by_an_older_version_is_taken_up() {
+        let old = std::env::temp_dir().join(format!("kpdrive-behind-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&old);
+        let (alice, bob) = (old.join("accounts/alice"), old.join("accounts/bob"));
+        std::fs::create_dir_all(&alice).unwrap();
+        std::fs::create_dir_all(&bob).unwrap();
+        let state = |volume: &str, nodes: &str| format!(r#"{{"root":"/r","volume_id":"{volume}","nodes":{{{nodes}}}}}"#);
+        std::fs::write(alice.join("state.json"), state("va", "")).unwrap();
+        std::fs::write(bob.join("state.json"), state("vb", "")).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::fs::write(old.join("state.json"), state("vb", r#""n":1"#)).unwrap();
+
+        adopt_left_behind(&old, &[alice.clone(), bob.clone()]).unwrap();
+        assert!(!old.join("state.json").exists());
+        assert!(std::fs::read_to_string(bob.join("state.json")).unwrap().contains(r#""n":1"#), "to the account of its volume");
+        assert!(bob.join("state.json.older").exists(), "the stale one is kept");
+        assert!(!alice.join("state.json.older").exists());
+
+        // Older than the account's: left where it is.
+        std::fs::write(old.join("state.json"), state("vb", "")).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::fs::write(bob.join("state.json"), state("vb", r#""n":2"#)).unwrap();
+        adopt_left_behind(&old, &[alice.clone(), bob.clone()]).unwrap();
+        assert!(old.join("state.json").exists());
+        assert!(std::fs::read_to_string(bob.join("state.json")).unwrap().contains(r#""n":2"#));
+
+        // No volume matches among several: nothing to go on.
+        std::fs::write(old.join("state.json"), state("vc", "")).unwrap();
+        adopt_left_behind(&old, &[alice.clone(), bob.clone()]).unwrap();
+        assert!(old.join("state.json").exists());
         std::fs::remove_dir_all(&old).unwrap();
     }
 

@@ -32,6 +32,9 @@ const LIST_IN_FLIGHT: usize = 8;
 /// Files of one folder uploaded together. Each upload already keeps up to six
 /// block PUTs in flight, so this is for many small files, not one big one.
 const UPLOAD_IN_FLIGHT: usize = 4;
+/// Files of one walk level brought up to date together. Most need nothing,
+/// and each download keeps six blocks in flight already, so this stays low.
+const DOWNLOAD_IN_FLIGHT: usize = 4;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct State {
@@ -408,6 +411,11 @@ pub async fn run_with<P: PGPProviderSync>(
     // has no record of.
     let mut seen: BTreeMap<String, Entry> = state.nodes.clone();
     let mut walk = force || events.refresh;
+    if events.refresh && !force {
+        // A cursor this old means everything since is unknown, so the walk
+        // may compare a lot of files; better said up front than discovered.
+        crate::log::write("INFO", "the change history is too old to follow; walking the whole tree");
+    }
     if !walk {
         walk = !apply_changes(drive, state, &ignores, &root_id, events.changes, &mut seen, &mut nodes, &mut to_trash, &mut notes).await?;
         if walk {
@@ -693,7 +701,7 @@ async fn walk_tree<P: PGPProviderSync>(
                 .collect()
                 .await
         };
-        let mut next_level = Vec::new();
+        let (mut files, mut folders) = (Vec::new(), Vec::new());
         for ((_, rel), children) in level.into_iter().zip(listed) {
             for node in children? {
                 let Some(name) = safe_name(&node.name) else {
@@ -704,15 +712,41 @@ async fn walk_tree<P: PGPProviderSync>(
                 if ignores.is_ignored(&node_rel, node.is_folder) {
                     continue;
                 }
-                let old = state.nodes.get(&node.id).cloned();
-                if let Some(entry) = apply_node(drive, state, &node, node_rel.clone(), old.as_ref(), to_trash, notes).await? {
-                    if node.is_folder {
-                        next_level.push((node.id.clone(), node_rel));
-                    }
-                    seen.insert(node.id.clone(), entry);
+                match node.is_folder {
+                    true => folders.push((node, node_rel)),
+                    false => files.push((node, node_rel)),
                 }
-                nodes.insert(node.id.clone(), node);
             }
+        }
+        // Files before the folders beside them: a file moved out of a folder
+        // that is itself being renamed must find its old path still there.
+        // Their parents were handled a level up, so nothing else is in the
+        // way, and they go side by side.
+        let done: Vec<_> = stream::iter(files)
+            .map(|(node, node_rel)| async move {
+                let (mut trash, mut file_notes) = (Vec::new(), Vec::new());
+                let r = apply_node(drive, state, &node, node_rel, state.nodes.get(&node.id), &mut trash, &mut file_notes).await;
+                (node, r, trash, file_notes)
+            })
+            .buffer_unordered(DOWNLOAD_IN_FLIGHT)
+            .collect()
+            .await;
+        for (node, r, trash, file_notes) in done {
+            to_trash.extend(trash);
+            notes.extend(file_notes);
+            if let Some(entry) = r? {
+                seen.insert(node.id.clone(), entry);
+            }
+            nodes.insert(node.id.clone(), node);
+        }
+        let mut next_level = Vec::new();
+        for (node, node_rel) in folders {
+            let old = state.nodes.get(&node.id);
+            if let Some(entry) = apply_node(drive, state, &node, node_rel.clone(), old, to_trash, notes).await? {
+                next_level.push((node.id.clone(), node_rel));
+                seen.insert(node.id.clone(), entry);
+            }
+            nodes.insert(node.id.clone(), node);
         }
         level = next_level;
     }
@@ -965,6 +999,28 @@ async fn sync_file<P: PGPProviderSync>(
         }
     }
 
+    // Reasons the local copy might be worth keeping: it was edited while the
+    // remote changed too, or we have no record of it and cannot assume.
+    let why = local_meta.as_ref().and_then(|meta| match old {
+        Some(old) if !local_matches(meta, old) => Some("edited locally and remotely"),
+        None => Some("exists locally and remotely"),
+        Some(_) => None, // ours, untouched: the remote update just lands
+    });
+    if let (Some(why), Some(meta)) = (why, &local_meta) {
+        // The uploader's SHA-1 settles it without fetching anything, which is
+        // what makes adopting a folder afresh take minutes rather than hours.
+        // A file of another size cannot match, so is not even read.
+        if let Some((size, sha1)) = drive.content_digest(node) {
+            if size.is_none_or(|s| s == meta.len()) && sha1_of(local).is_ok_and(|mine| mine == sha1) {
+                crate::log::info(&format!("matched {} by checksum", local.display()));
+                return Ok(Some((mtime_of(meta), meta.len())));
+            }
+        }
+        // Comparing costs a whole download, and a folder adopted afresh can
+        // hold thousands of these, so each is said before it starts.
+        crate::log::info(&format!("comparing {} with Proton: {why}", local.display()));
+    }
+
     let tmp = local.with_file_name(format!(".{}{PART_SUFFIX}", local.file_name().and_then(|n| n.to_str()).unwrap_or("file")));
     let mut out = std::io::BufWriter::new(fs::File::create(&tmp)?);
     let size = drive.download(node, &mut out).await?;
@@ -975,21 +1031,12 @@ async fn sync_file<P: PGPProviderSync>(
     drop(file);
 
     let mut quiet = false;
-    if let Some(meta) = &local_meta {
-        // Reasons the local copy might be worth keeping: it was edited while the
-        // remote changed too, or we have no record of it and cannot assume.
-        let why = match old {
-            Some(old) if !local_matches(meta, old) => Some("edited locally and remotely"),
-            None => Some("exists locally and remotely"),
-            Some(_) => None, // ours, untouched: the remote update just lands
-        };
-        if let Some(why) = why {
-            if same_contents(local, &tmp).unwrap_or(false) {
-                // The bytes already agree; nothing to keep, nothing to report.
-                quiet = true;
-            } else {
-                keep_local_copy(local, why, notes)?;
-            }
+    if let Some(why) = why {
+        if same_contents(local, &tmp).unwrap_or(false) {
+            // The bytes already agree; nothing to keep, nothing more to report.
+            quiet = true;
+        } else {
+            keep_local_copy(local, why, notes)?;
         }
     }
 
@@ -998,6 +1045,14 @@ async fn sync_file<P: PGPProviderSync>(
         crate::log::info(&format!("fetched {} ({size} bytes)", local.display()));
     }
     Ok(Some((mtime, size)))
+}
+
+/// A file's SHA-1, lowercase hex, as Proton's clients record it.
+fn sha1_of(path: &Path) -> Result<String> {
+    use sha1::{Digest, Sha1};
+    let mut hasher = Sha1::new();
+    std::io::copy(&mut fs::File::open(path)?, &mut hasher)?;
+    Ok(hex::encode(hasher.finalize()))
 }
 
 /// Byte-for-byte comparison, cheapest checks first.

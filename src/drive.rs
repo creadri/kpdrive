@@ -118,6 +118,10 @@ struct File {
 struct ActiveRevision {
     #[serde(rename = "RevisionID")]
     id: String,
+    /// Armored, encrypted to the node key: what the uploader recorded about
+    /// the content, its SHA-1 included when the client wrote one.
+    #[serde(rename = "XAttr", default)]
+    xattr: Option<String>,
 }
 
 /// What a photo carries beyond a plain file.
@@ -269,7 +273,7 @@ impl<P: PGPProviderSync> Drive<P> {
             key: self.reimport(&node.key)?,
             file: node.file.as_ref().map(|f| File {
                 content_key_packet: f.content_key_packet.clone(),
-                active_revision: f.active_revision.as_ref().map(|r| ActiveRevision { id: r.id.clone() }),
+                active_revision: f.active_revision.as_ref().map(|r| ActiveRevision { id: r.id.clone(), xattr: r.xattr.clone() }),
             }),
             hash_key: node.hash_key.clone(),
             passphrase: node.passphrase.clone(),
@@ -290,6 +294,18 @@ impl<P: PGPProviderSync> Drive<P> {
     pub fn cached_folder(&self, id: &str) -> Option<Node<P::PrivateKey>> {
         let cache = self.folders.read().expect("folder cache");
         cache.get(id).and_then(|n| self.dup(n).ok())
+    }
+
+    /// The size and SHA-1 (lowercase hex) the uploader recorded for a file's
+    /// active revision, when it recorded a SHA-1. Read from the listing
+    /// already in hand, so it costs a decryption and no request.
+    ///
+    /// The signature is not checked: a forged value can at worst make sync
+    /// keep a local copy it would otherwise have replaced, never lose one.
+    pub fn content_digest(&self, node: &Node<P::PrivateKey>) -> Option<(Option<u64>, String)> {
+        let armored = node.file.as_ref()?.active_revision.as_ref()?.xattr.as_deref()?;
+        let plain = self.pgp.new_decryptor().with_decryption_key(&node.key).decrypt(armored, DataEncoding::Armor).ok()?;
+        parse_digest(plain.as_ref())
     }
 
     fn decrypt_link(pgp: &P, volume_id: &str, parent: &P::PrivateKey, d: LinkDetails) -> Result<Node<P::PrivateKey>> {
@@ -1473,6 +1489,14 @@ fn generated_password() -> String {
     out
 }
 
+/// Size and SHA-1 from a decrypted XAttr: `{"Common": {"Size": …,
+/// "Digests": {"SHA1": "…"}}}`. Clients that record no digest give `None`.
+fn parse_digest(xattr: &[u8]) -> Option<(Option<u64>, String)> {
+    let v: serde_json::Value = serde_json::from_slice(xattr).ok()?;
+    let sha1 = v["Common"]["Digests"]["SHA1"].as_str().filter(|h| h.len() == 40)?;
+    Some((v["Common"]["Size"].as_u64(), sha1.to_ascii_lowercase()))
+}
+
 fn name_hash(hash_key: &[u8], name: &str) -> String {
     let mut mac = Hmac::<Sha256>::new_from_slice(hash_key).expect("hmac accepts any key length");
     mac.update(name.as_bytes());
@@ -1526,6 +1550,18 @@ mod tests {
         assert_eq!(iso8601(0), "1970-01-01T00:00:00Z");
         assert_eq!(iso8601(1_700_000_000), "2023-11-14T22:13:20Z");
         assert_eq!(iso8601(951_782_400), "2000-02-29T00:00:00Z");
+    }
+
+    #[test]
+    fn the_uploaders_digest_is_read_from_the_xattr() {
+        let sha1 = "a9993e364706816aba3e25717850c26c9cd0d89d";
+        let full = format!(r#"{{"Common":{{"Size":3,"ModificationTime":"2026-01-01T00:00:00Z","Digests":{{"SHA1":"{}"}}}}}}"#, sha1.to_uppercase());
+        assert_eq!(parse_digest(full.as_bytes()), Some((Some(3), sha1.to_owned())), "case does not matter");
+        let no_size = format!(r#"{{"Common":{{"Digests":{{"SHA1":"{sha1}"}}}}}}"#);
+        assert_eq!(parse_digest(no_size.as_bytes()), Some((None, sha1.to_owned())));
+        assert_eq!(parse_digest(br#"{"Common":{"Size":3}}"#), None, "no digest recorded");
+        assert_eq!(parse_digest(br#"{"Common":{"Digests":{"SHA1":"short"}}}"#), None);
+        assert_eq!(parse_digest(b"not json"), None);
     }
 
     /// The step a visitor depends on: the share's session key must come back out
