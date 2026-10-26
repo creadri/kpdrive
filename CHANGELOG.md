@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0 - 2026-10-26
+
+- improving sync: - checksums instead of download - concurrent downloads in the walks
+
 ## 0.6.2 - 2026-10-26
 
 - added nested .protonignore and .gitignore

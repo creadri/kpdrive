@@ -126,6 +126,9 @@ cargo test --release --workspace --offline --locked
 %{_datadir}/kio/servicemenus/kpdrive-share.desktop
 
 %changelog
+* Mon Oct 26 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.7.0-1
+- improving sync: - checksums instead of download - concurrent downloads in the walks
+
 * Mon Oct 26 2026 Adrien Nelis <github.com.daybed777@passmail.net> - 0.6.2-1
 - added nested .protonignore and .gitignore
 - updating forgotten version edition
