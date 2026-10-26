@@ -94,8 +94,9 @@ pub fn ignore_template(root: &Path) -> Result<bool> {
          # Ignored paths are neither uploaded nor downloaded, and are never\n\
          # deleted by sync. This file itself does sync, like .gitignore does.\n\
          #\n\
-         # .gitignore files in this folder apply too, each to its own folder.\n\
-         # A line here overrides them, so !.env keeps a git-ignored file syncing.\n",
+         # A .protonignore or .gitignore in a subfolder applies to that folder,\n\
+         # and the nearest one wins. Any .protonignore overrides .gitignore\n\
+         # files, so !.env keeps a git-ignored file syncing.\n",
     )?;
     Ok(true)
 }

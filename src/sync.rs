@@ -61,33 +61,37 @@ pub struct Entry {
 
 pub const PART_SUFFIX: &str = ".kpdrive-part";
 
-/// Patterns for paths sync should leave alone, in the root of the sync folder.
-/// Same syntax as `.gitignore`, matched by the same library, so anchoring,
-/// `**`, trailing-slash directory rules and `!` negation all behave as expected.
+/// Patterns for paths sync should leave alone, in any folder of the sync
+/// folder, each applying to its own folder and below. Same syntax as
+/// `.gitignore`, matched by the same library, so anchoring, `**`,
+/// trailing-slash directory rules and `!` negation all behave as expected.
 pub const IGNORE_FILE: &str = ".protonignore";
 
 /// Also honoured, at any depth, each applying to its own folder as git does.
-/// Only copies already on disk count: one that exists only remotely starts
-/// applying once it has been downloaded.
+/// Only copies already on disk count, of either file: one that exists only
+/// remotely starts applying once it has been downloaded.
 pub const GIT_IGNORE_FILE: &str = ".gitignore";
 
 /// What the ignore files say. Absent or unreadable means nothing is ignored.
 pub struct Ignores {
-    matcher: Gitignore,
-    /// Each `.gitignore` found, keyed by the folder holding it, relative to `root`.
+    /// Each `.protonignore` found, keyed by the folder holding it, relative to `root`.
+    proton: HashMap<PathBuf, Gitignore>,
+    /// Each `.gitignore` found, keyed the same way.
     git: HashMap<PathBuf, Gitignore>,
     root: PathBuf,
 }
 
 impl Ignores {
     pub fn load(root: &Path) -> Self {
-        let matcher = read_ignore_file(root, IGNORE_FILE);
-        let mut ignores = Self { matcher, git: HashMap::new(), root: root.to_owned() };
+        let mut ignores = Self { proton: HashMap::new(), git: HashMap::new(), root: root.to_owned() };
         // Parents first, so a folder some outer file ignores is never entered,
-        // and the `.gitignore` files inside it never read, exactly as git does.
+        // and the ignore files inside it never read, exactly as git does.
         let mut queue = VecDeque::from([PathBuf::new()]);
         while let Some(rel) = queue.pop_front() {
             let dir = root.join(&rel);
+            if dir.join(IGNORE_FILE).is_file() {
+                ignores.proton.insert(rel.clone(), read_ignore_file(&dir, IGNORE_FILE));
+            }
             if dir.join(GIT_IGNORE_FILE).is_file() {
                 ignores.git.insert(rel.clone(), read_ignore_file(&dir, GIT_IGNORE_FILE));
             }
@@ -109,16 +113,17 @@ impl Ignores {
     /// Whether `rel` (relative to the sync folder) is excluded, either directly
     /// or because one of its parent folders is.
     ///
-    /// `.protonignore` has the last word: when it matches, ignoring or with a
-    /// `!` exception, the `.gitignore` files are not asked. That way it can
-    /// keep syncing something a project's `.gitignore` leaves out of git.
+    /// The `.protonignore` files have the last word: when one matches,
+    /// ignoring or with a `!` exception, the `.gitignore` files are not asked.
+    /// That way they can keep syncing something a project's `.gitignore`
+    /// leaves out of git. Among each kind, the nearest file that matches
+    /// decides, so a folder's own file can overrule one further up.
     pub fn is_ignored(&self, rel: &Path, is_dir: bool) -> bool {
         if rel.as_os_str().is_empty() {
             return false;
         }
-        let own = self.matcher.matched_path_or_any_parents(self.root.join(rel), is_dir);
-        if !own.is_none() {
-            return own.is_ignore();
+        if let Some(ignored) = self.proton_verdict(rel, is_dir) {
+            return ignored;
         }
         if self.git.is_empty() {
             return false;
@@ -135,6 +140,18 @@ impl Ignores {
             }
         }
         false
+    }
+
+    /// What the `.protonignore` files say about `rel`, or `None` when none of
+    /// them has a matching pattern. Each file is asked about `rel` and its
+    /// parents together, so as before an exception can reach inside a folder
+    /// the same file ignores.
+    fn proton_verdict(&self, rel: &Path, is_dir: bool) -> Option<bool> {
+        let path = self.root.join(rel);
+        rel.ancestors().skip(1).filter_map(|dir| self.proton.get(dir)).find_map(|proton| {
+            let m = proton.matched_path_or_any_parents(&path, is_dir);
+            (!m.is_none()).then(|| m.is_ignore())
+        })
     }
 
     /// What the `.gitignore` files say about `rel` itself: the nearest one
@@ -1155,6 +1172,36 @@ mod tests {
         assert!(!ig.is_ignored(Path::new("app/.env"), false), ".protonignore has the last word");
         assert!(!ig.is_ignored(Path::new("app/.gitignore"), false), "the files themselves sync");
         assert!(!ig.git.contains_key(Path::new("app/target")));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn protonignore_files_apply_to_their_own_folder() {
+        let dir = std::env::temp_dir().join(format!("kpdrive-nested-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("app/cache")).unwrap();
+        fs::create_dir_all(dir.join("other")).unwrap();
+        fs::create_dir_all(dir.join("skip/inner")).unwrap();
+        fs::write(dir.join(IGNORE_FILE), "*.tmp\nskip/\n").unwrap();
+        fs::write(dir.join("app").join(IGNORE_FILE), "/cache/\n!keep.tmp\n.env\n!secret.key\n").unwrap();
+        fs::write(dir.join("app/.gitignore"), "*.key\n").unwrap();
+        // Inside a folder the top file ignores, so never read.
+        fs::write(dir.join("skip").join(IGNORE_FILE), "!*\n").unwrap();
+
+        let ig = Ignores::load(&dir);
+        assert!(ig.is_ignored(Path::new("app/cache"), true), "a nested file applies");
+        assert!(ig.is_ignored(Path::new("app/cache/x.bin"), false), "and below its folder");
+        assert!(!ig.is_ignored(Path::new("other/cache"), true), "anchored to its own folder");
+        assert!(ig.is_ignored(Path::new("app/a.tmp"), false), "the top file still applies inside");
+        assert!(!ig.is_ignored(Path::new("app/keep.tmp"), false), "a nearer file overrules it");
+        assert!(ig.is_ignored(Path::new("other/keep.tmp"), false), "but only in its own folder");
+        assert!(ig.is_ignored(Path::new("app/.env"), false));
+        assert!(!ig.is_ignored(Path::new("other/.env"), false));
+        assert!(ig.is_ignored(Path::new("app/other.key"), false), "the .gitignore beside it still applies");
+        assert!(!ig.is_ignored(Path::new("app/secret.key"), false), "a .protonignore beats a .gitignore");
+        assert!(ig.is_ignored(Path::new("skip/inner/a.txt"), false), "nothing comes back from an ignored folder");
+        assert!(!ig.proton.contains_key(Path::new("skip")));
+        assert!(!ig.is_ignored(&Path::new("app").join(IGNORE_FILE), false), "the files themselves sync");
         fs::remove_dir_all(&dir).unwrap();
     }
 
